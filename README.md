@@ -7,7 +7,7 @@ https://saltskrew.xyz
 https://discord.gg/KJyRgfej7H
 
 
-DONATE
+# DONATE
 
 BTC:
 bc1qeun5ap3lgel3q6wel3vxpmvjgu2d5lp6gauxk3
