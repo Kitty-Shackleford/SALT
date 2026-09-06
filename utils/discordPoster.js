@@ -27,6 +27,32 @@ function sleep(ms) {
 }
 
 /**
+ * Discord snowflake IDs are numeric strings. Validating this before
+ * interpolating a channel ID into a Discord API URL prevents request
+ * forgery via path traversal or host confusion.
+ */
+function isValidChannelId(channelId) {
+  return typeof channelId === 'string' || typeof channelId === 'number'
+    ? /^\d{1,20}$/.test(String(channelId))
+    : false;
+}
+
+/**
+ * Only allow well-formed Discord webhook URLs to be used as request
+ * targets, to prevent request forgery against arbitrary hosts/paths.
+ */
+function isValidWebhookUrl(webhookUrl) {
+  let parsed;
+  try {
+    parsed = new URL(webhookUrl);
+  } catch {
+    return false;
+  }
+  return parsed.protocol === 'https:' && parsed.hostname === 'discord.com' &&
+    /^\/api(?:\/v\d+)?\/webhooks\/\d+\/[^/]+$/.test(parsed.pathname);
+}
+
+/**
  * Wait if needed to avoid rate limits for a channel
  */
 async function waitForRateLimit(channelId) {
@@ -50,9 +76,10 @@ async function validateDiscordDestination(discordGuildId, channelId, webhookUrl)
   if (!expectedGuildId || (!channelId && !webhookUrl)) return false;
 
   if (channelId) {
+    if (!isValidChannelId(channelId)) return false;
     const botToken = process.env.DISCORD_BOT_TOKEN;
     if (!botToken) return false;
-    const response = await fetchDiscord(`https://discord.com/api/v10/channels/${channelId}`, {
+    const response = await fetchDiscord(`https://discord.com/api/v10/channels/${encodeURIComponent(channelId)}`, {
       headers: { Authorization: `Bot ${botToken}` }
     });
     if (!response.ok) return false;
@@ -61,17 +88,8 @@ async function validateDiscordDestination(discordGuildId, channelId, webhookUrl)
   }
 
   if (webhookUrl) {
-    let parsed;
-    try {
-      parsed = new URL(webhookUrl);
-    } catch {
-      return false;
-    }
-    if (parsed.protocol !== 'https:' || parsed.hostname !== 'discord.com' ||
-        !/^\/api(?:\/v\d+)?\/webhooks\/\d+\/[^/]+$/.test(parsed.pathname)) {
-      return false;
-    }
-    const response = await fetchDiscord(parsed.toString());
+    if (!isValidWebhookUrl(webhookUrl)) return false;
+    const response = await fetchDiscord(new URL(webhookUrl).toString());
     if (!response.ok) return false;
     const webhook = await response.json();
     if (String(webhook.guild_id || '') !== expectedGuildId) return false;
@@ -85,6 +103,11 @@ async function validateDiscordDestination(discordGuildId, channelId, webhookUrl)
  */
 async function postViaWebhook(webhookUrl, content, isEmbed = false, timeoutMs = DEFAULT_DISCORD_TIMEOUT_MS) {
   try {
+    if (!isValidWebhookUrl(webhookUrl)) {
+      console.error('❌ Refusing to post: invalid Discord webhook URL');
+      return false;
+    }
+
     const payload = isEmbed ? content : { content };
 
     const response = await fetchDiscord(webhookUrl, {
@@ -140,6 +163,11 @@ async function postViaWebhook(webhookUrl, content, isEmbed = false, timeoutMs = 
  */
 async function postViaBot(channelId, content, isEmbed = false) {
   try {
+    if (!isValidChannelId(channelId)) {
+      console.error('❌ Refusing to post: invalid Discord channel ID');
+      return false;
+    }
+
     const botToken = process.env.DISCORD_BOT_TOKEN;
 
     if (!botToken) {
