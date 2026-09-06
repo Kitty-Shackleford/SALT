@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Console - DayZ Dashboard</title>
+  <link rel="stylesheet" href="/css/tailwind.css">
+  <script src="/js/instance-config.js" defer></script>
+</head>
+<body class="bg-gray-900 text-white">
+  <div class="container mx-auto p-6 max-w-7xl">
+    <div class="flex justify-between items-center mb-6">
+      <h1 class="text-4xl font-bold">🖥️ Console</h1>
+      <a href="/dashboard" class="bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded">← Back</a>
+    </div>
+
+    <!-- Dashboard Navigation -->
+    <nav class="bg-gray-800 rounded-lg p-3 mb-6 border border-gray-700">
+      <div class="flex gap-2 flex-wrap">
+        <a href="/dashboard" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">🎮 Servers</a>
+        <a href="/dashboard/economy" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">💰 Economy</a>
+        <a href="/map" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">🗺️ Map</a>
+        <a href="/dashboard/feeds" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">📢 Feeds</a>
+        <a href="/dashboard/automation" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">⚙️ Automation</a>
+        <a href="/dashboard/tasks" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">🕒 Tasks</a>
+        <a href="/dashboard/server-control" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">🎮 Control</a>
+        <a href="/dashboard/backups" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">💾 Backups</a>
+        <a href="/dashboard/rotation" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">🔄 Rotation</a>
+        <a href="/dashboard/ai-assistant" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">🤖 AI</a>
+        <a href="/dashboard/server-stats" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">📊 Stats</a>
+        <a href="/dashboard/activity-log" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">📋 Activity</a>
+        <a href="/dashboard/console" class="bg-blue-600 px-4 py-2 rounded font-semibold">🖥️ Console</a>
+        <a href="/dashboard/boost" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">🚀 Boost</a>
+        <a href="/dashboard/support" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">🎫 Support</a>
+        <a href="/dashboard/settings" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">🔧 Settings</a>
+        <a href="/player-portal" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">👤 Player Portal</a>
+        <a href="/dashboard/shop-admin" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">🛒 Shop</a>
+      </div>
+    </nav>
+
+    <!-- Note about Xbox limitation -->
+    <div class="bg-yellow-900 border border-yellow-600 text-yellow-200 p-4 rounded-lg mb-6 text-sm">
+      ⚠️ <strong>Note:</strong> Console command support depends on your server platform and Nitrado plan.
+      Xbox servers may not support this feature via the Nitrado API.
+    </div>
+
+    <!-- Server selector -->
+    <div class="bg-gray-800 p-4 rounded-lg mb-6 border border-gray-700">
+      <label class="block mb-2 font-semibold">Select Server</label>
+      <select id="serverSelect" class="bg-gray-700 p-2 rounded w-full max-w-sm">
+        <option value="">Loading servers…</option>
+      </select>
+    </div>
+
+    <!-- Command input -->
+    <div id="consoleWrap" class="hidden">
+      <div class="bg-gray-800 p-6 rounded-lg border border-gray-700 mb-6">
+        <h2 class="text-xl font-bold mb-4">Send Command</h2>
+        <div class="flex gap-3 mb-4">
+          <input id="commandInput" type="text" placeholder="e.g. say Hello players" maxlength="256"
+            class="flex-1 bg-gray-700 border border-gray-600 p-3 rounded font-mono text-sm"
+            autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" />
+          <button id="sendBtn"
+            class="bg-green-600 hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed px-6 py-3 rounded font-semibold">
+            ▶ Send
+          </button>
+        </div>
+        <!-- Quick command shortcuts -->
+        <div class="flex gap-2 flex-wrap">
+          <span class="text-gray-400 text-sm mr-1">Quick:</span>
+          <button class="quick-cmd bg-gray-700 hover:bg-gray-600 px-3 py-1 rounded text-sm" data-cmd="#login YourPassword">Login</button>
+          <button class="quick-cmd bg-gray-700 hover:bg-gray-600 px-3 py-1 rounded text-sm" data-cmd="players">Players</button>
+          <button class="quick-cmd bg-gray-700 hover:bg-gray-600 px-3 py-1 rounded text-sm" data-cmd="missions">Missions</button>
+          <button class="quick-cmd bg-gray-700 hover:bg-gray-600 px-3 py-1 rounded text-sm" data-cmd="serverlock">Lock</button>
+          <button class="quick-cmd bg-gray-700 hover:bg-gray-600 px-3 py-1 rounded text-sm" data-cmd="serverunlock">Unlock</button>
+          <button class="quick-cmd bg-red-900 hover:bg-red-800 px-3 py-1 rounded text-sm" data-cmd="#restart">Restart</button>
+        </div>
+      </div>
+
+      <!-- Response / history log -->
+      <div class="bg-gray-800 p-6 rounded-lg border border-gray-700">
+        <div class="flex justify-between items-center mb-4">
+          <h2 class="text-xl font-bold">Output</h2>
+          <button id="clearBtn" class="bg-gray-700 hover:bg-gray-600 px-3 py-1 rounded text-sm">🗑️ Clear</button>
+        </div>
+        <div id="outputLog"
+          class="bg-gray-900 rounded-lg p-4 font-mono text-sm min-h-40 max-h-96 overflow-y-auto space-y-2 text-gray-300">
+          <p class="text-gray-500">— no output yet —</p>
+        </div>
+      </div>
+    </div>
+
+  </div>
+  <script src="/js/consoleCommands.js"></script>
+</body>
+</html>

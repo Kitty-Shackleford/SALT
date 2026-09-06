@@ -1,0 +1,68 @@
+{
+  "provenance": {
+    "officialCentralEconomyCommit": "9a21bb9f5fb9c62a7ce2761402196091588133e6",
+    "method": "Exact class-and-position matches between official mapgrouppos.xml and dayz.xam.nu 1.29-7 marker data; expected pixels use the independently registered 15392x15392 local raster mosaic.",
+    "pixelOrigin": "top-left",
+    "worldOrigin": "south-west"
+  },
+  "maps": [
+    {
+      "id": "chernarusplus",
+      "worldWidth": 15360,
+      "worldHeight": 15360,
+      "imageWidth": 15392,
+      "imageHeight": 15392,
+      "points": [
+        {"label":"Land_Shed_W2 center","world":{"x":7281.47,"y":295.62,"z":7757.26},"pixel":{"x":7296.64,"y":7618.58}},
+        {"label":"Land_Misc_DeerStand2 north-east","world":{"x":15134.53,"y":133.12,"z":14788.88},"pixel":{"x":15166.06,"y":572.31}},
+        {"label":"Land_Misc_FeedShack north-west","world":{"x":139.82,"y":474.68,"z":14356.99},"pixel":{"x":140.11,"y":1005.10}},
+        {"label":"Land_Boat_Small1 south-west","world":{"x":363.32,"y":3.05,"z":1547.40},"pixel":{"x":364.07,"y":13841.37}},
+        {"label":"Land_Wreck_Caravan_WBrown south-east","world":{"x":14037.33,"y":23.47,"z":2911.72},"pixel":{"x":14066.58,"y":12474.22}},
+        {"label":"Land_Wreck_Caravan_MRust far north","world":{"x":7568.18,"y":427.12,"z":15070.96},"pixel":{"x":7583.95,"y":289.65}},
+        {"label":"Land_Misc_FeedShack west","world":{"x":178.25,"y":316.45,"z":7858.57},"pixel":{"x":178.62,"y":7517.06}},
+        {"label":"Land_Boat_Small1 south","world":{"x":6209.02,"y":2.24,"z":1972.36},"pixel":{"x":6221.96,"y":13415.53}},
+        {"label":"Land_Shed_W1 east","world":{"x":12950.25,"y":6.60,"z":9367.78},"pixel":{"x":12977.23,"y":6004.71}},
+        {"label":"Land_Mil_Guardhouse1 north-west interior","world":{"x":4159.60,"y":373.70,"z":11619.11},"pixel":{"x":4168.26,"y":3748.69}}
+      ]
+    },
+    {
+      "id": "enoch",
+      "worldWidth": 12800,
+      "worldHeight": 12800,
+      "imageWidth": 15392,
+      "imageHeight": 15392,
+      "points": [
+        {"label":"Land_Container_1Mo center","world":{"x":6506.33,"y":290.14,"z":6265.44},"pixel":{"x":7823.86,"y":7857.81}},
+        {"label":"Land_Misc_FeedShack north-east","world":{"x":12724.10,"y":225.42,"z":12436.65},"pixel":{"x":15300.73,"y":436.92}},
+        {"label":"Land_Misc_DeerStand1 north-west","world":{"x":527.45,"y":436.17,"z":12033.08},"pixel":{"x":634.26,"y":922.22}},
+        {"label":"Land_Misc_DeerStand1 south-west","world":{"x":662.09,"y":506.68,"z":404.93},"pixel":{"x":796.17,"y":14905.07}},
+        {"label":"Land_House_1W05_Yellow south-east","world":{"x":11929.37,"y":238.63,"z":467.82},"pixel":{"x":14345.07,"y":14829.44}},
+        {"label":"Land_Misc_DeerStand2 north","world":{"x":6697.43,"y":233.11,"z":12205.65},"pixel":{"x":8053.65,"y":714.71}},
+        {"label":"Land_Misc_FeedShack east","world":{"x":12725.77,"y":294.67,"z":6317.31},"pixel":{"x":15302.74,"y":7795.44}},
+        {"label":"Land_Shed_W1 west","world":{"x":451.68,"y":253.96,"z":6369.92},"pixel":{"x":543.15,"y":7732.17}},
+        {"label":"Land_Misc_DeerStand1 south","world":{"x":6532.65,"y":480.92,"z":720.26},"pixel":{"x":7855.51,"y":14525.88}},
+        {"label":"Land_Boat_Small3 north-west interior","world":{"x":3650.26,"y":171.26,"z":9070.19},"pixel":{"x":4389.43,"y":4485.09}}
+      ]
+    },
+    {
+      "id": "sakhal",
+      "worldWidth": 15360,
+      "worldHeight": 15360,
+      "imageWidth": 15392,
+      "imageHeight": 15392,
+      "previousWorldSize": 12800,
+      "points": [
+        {"label":"Land_House_2W01 center","world":{"x":7671.94,"y":7.09,"z":7691.18},"pixel":{"x":7687.92,"y":7684.80}},
+        {"label":"Land_Lighthouse south-west","world":{"x":1136.91,"y":11.19,"z":589.58},"pixel":{"x":1139.28,"y":14801.19}},
+        {"label":"Land_Bunker3_2 north-west","world":{"x":683.88,"y":6.81,"z":11429.09},"pixel":{"x":685.31,"y":3939.10}},
+        {"label":"Land_Lighthouse north-east","world":{"x":13921.05,"y":10.50,"z":12543.96},"pixel":{"x":13950.05,"y":2821.90}},
+        {"label":"Land_Boathouse south-east","world":{"x":13066.93,"y":-1.64,"z":2078.61},"pixel":{"x":13094.16,"y":13309.06}},
+        {"label":"Land_Shed_M4 far north","world":{"x":8013.65,"y":6.23,"z":13602.31},"pixel":{"x":8030.35,"y":1761.36}},
+        {"label":"Land_Workshop5 west","world":{"x":2371.28,"y":32.33,"z":6075.43},"pixel":{"x":2376.22,"y":9303.92}},
+        {"label":"Land_Pier_Crane_B east","world":{"x":12963.39,"y":20.88,"z":7354.29},"pixel":{"x":12990.39,"y":8022.39}},
+        {"label":"Land_Boat_Small1 south","world":{"x":5942.66,"y":2.10,"z":2024.76},"pixel":{"x":5955.04,"y":13363.02}},
+        {"label":"Land_Workshop4 north-west interior","world":{"x":4781.45,"y":5.86,"z":11175.72},"pixel":{"x":4791.41,"y":4193.00}}
+      ]
+    }
+  ]
+}

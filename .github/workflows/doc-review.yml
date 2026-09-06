@@ -1,0 +1,32 @@
+name: Doc — PR Code-Reviewer
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: read
+
+jobs:
+  review:
+    name: Doc review
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Run Doc reviewer
+        env:
+          DOC_REVIEW_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          DOC_REVIEW_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          node scripts/doc-review.js

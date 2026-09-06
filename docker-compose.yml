@@ -1,0 +1,89 @@
+services:
+  postgres:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_DB: dayz-dashboard
+      POSTGRES_USER: dayz-dashboard
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U dayz-dashboard"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  db-init:
+    image: ${BACKEND_IMAGE:-dayz-dashboard:local}
+    env_file:
+      - .env
+    build: .
+    command: ["node", "scripts/init-db.js"]
+    environment:
+      - POSTGRES_HOST=postgres
+    restart: "no"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  backend:
+    image: ${BACKEND_IMAGE:-dayz-dashboard:local}
+    env_file:
+      - .env
+    build: .
+    ports:
+      # nginx is the only trusted proxy hop; do not expose the backend directly.
+      - "127.0.0.1:3000:3000"
+    environment:
+      - POSTGRES_HOST=postgres
+    volumes:
+      - ./downloads:/app/downloads
+      - ./data:/app/data
+      - ./bin:/app/bin
+    restart: unless-stopped
+    depends_on:
+      db-init:
+        condition: service_completed_successfully
+
+  bot:
+    image: ${BOT_IMAGE:-dayz-dashboard-bot:local}
+    build:
+      context: .
+      dockerfile: Dockerfile.bot
+    env_file:
+      - .env
+    environment:
+      - POSTGRES_HOST=postgres
+    volumes:
+      - ./downloads:/app/downloads
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      db-init:
+        condition: service_completed_successfully
+
+  tui:
+    profiles:
+      - tools
+    build: .
+    env_file:
+      - .env
+    entrypoint: ["node", "/app/scripts/tui-admin.js"]
+    environment:
+      - POSTGRES_HOST=postgres
+    volumes:
+      - ./downloads:/app/downloads
+      - ./data:/app/data
+      - ./bin:/app/bin
+      - ./:/app
+    tty: true
+    stdin_open: true
+    restart: "no"
+    depends_on:
+      db-init:
+        condition: service_completed_successfully
+
+volumes:
+  postgres-data:

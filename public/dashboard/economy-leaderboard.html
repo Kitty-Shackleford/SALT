@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Leaderboard - DayZ Dashboard</title>
+  <link rel="stylesheet" href="/css/tailwind.css">
+  <style>
+    @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    .spinner { animation: spin 1s linear infinite; }
+    #leaderboardBody tr { transition: background-color 0.15s; }
+  </style>
+  <script src="/js/instance-config.js" defer></script>
+</head>
+<body class="bg-gray-900 text-white">
+  <div class="container mx-auto p-6 max-w-5xl">
+
+    <!-- Header -->
+    <div class="flex justify-between items-center mb-8">
+      <div>
+        <h1 class="text-4xl font-bold">🏆 Guild Leaderboard</h1>
+        <p class="text-gray-400 mt-1">Top players by wealth</p>
+      </div>
+      <div class="flex gap-2">
+        <a href="/dashboard/economy" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">💰 Dashboard</a>
+        <a href="/dashboard/economy-transactions" class="bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded">📜 Transactions</a>
+        <a href="/dashboard" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">← Dashboard</a>
+        <a href="/logout" class="bg-red-600 hover:bg-red-700 px-4 py-2 rounded">Logout</a>
+      </div>
+    </div>
+
+    <!-- No guild state -->
+    <div id="no-guild" class="hidden bg-gray-800 p-8 rounded-lg text-center">
+      <p class="text-4xl mb-4">🏰</p>
+      <h2 class="text-2xl font-bold mb-2">Select a Community First</h2>
+      <p class="text-gray-400 mb-6">Link your game account in the Player Portal to view the leaderboard.</p>
+      <a href="/player" class="bg-green-600 hover:bg-green-700 px-6 py-3 rounded font-semibold">Go to Player Portal</a>
+    </div>
+
+    <!-- Main content -->
+    <div id="main-content" class="hidden">
+
+      <!-- Controls -->
+      <div class="bg-gray-800 p-4 rounded-lg border border-gray-700 mb-4">
+        <div class="flex flex-col md:flex-row gap-3">
+          <input type="text" id="lb-search" placeholder="🔍 Search by gamertag..."
+                 class="bg-gray-700 px-4 py-2 rounded focus:ring-2 focus:ring-green-500 outline-none flex-1" />
+          <div class="flex items-center gap-2">
+            <label class="text-sm text-gray-400">Sort by:</label>
+            <select id="sortBy" class="bg-gray-700 px-3 py-2 rounded focus:ring-2 focus:ring-green-500 outline-none">
+              <option value="total">Total Wealth</option>
+              <option value="cash">Cash</option>
+              <option value="bank">Bank</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <!-- Leaderboard Table -->
+      <div class="bg-gray-800 rounded-lg border border-gray-700 overflow-hidden mb-4">
+        <div class="overflow-x-auto">
+          <table class="leaderboard-table w-full">
+            <thead class="bg-gray-700">
+              <tr>
+                <th class="px-4 py-3 text-left text-sm font-semibold text-gray-300">Rank</th>
+                <th class="px-4 py-3 text-left text-sm font-semibold text-gray-300">Player</th>
+                <th class="px-4 py-3 text-left text-sm font-semibold text-gray-300">Cash</th>
+                <th class="px-4 py-3 text-left text-sm font-semibold text-gray-300">Bank</th>
+                <th class="px-4 py-3 text-left text-sm font-semibold text-gray-300">Total Wealth</th>
+              </tr>
+            </thead>
+            <tbody id="leaderboardBody">
+              <tr>
+                <td colspan="5" class="text-center py-8">
+                  <div class="spinner border-4 border-green-600 border-t-transparent rounded-full w-10 h-10 mx-auto"></div>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Pagination -->
+      <div id="lb-pagination" class="flex items-center justify-center gap-3"></div>
+
+    </div>
+
+    <!-- Initial loading -->
+    <div id="loading-state" class="text-center py-20">
+      <div class="spinner border-4 border-green-600 border-t-transparent rounded-full w-16 h-16 mx-auto mb-4"></div>
+      <p class="text-gray-400">Loading leaderboard...</p>
+    </div>
+
+  </div>
+
+  <script src="/js/components/leaderboardTable.js"></script>
+  <script src="/js/economy-leaderboard-init.js"></script>
+</body>
+</html>

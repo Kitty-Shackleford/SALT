@@ -1,0 +1,15 @@
+title = "S.A.L.T. public repository gitleaks configuration"
+
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = "Reserved synthetic Discord snowflakes used only in test fixtures"
+regexTarget = "match"
+regexes = [
+  '''9000000000000000[0-9]{2}''',
+]
+paths = [
+  '''scripts/.*-test\.js''',
+  '''scripts/unit-test\.js''',
+]

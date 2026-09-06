@@ -1,0 +1,566 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Server Map - DayZ Dashboard</title>
+  <link rel="stylesheet" href="/css/tailwind.css">
+  <link rel="stylesheet" href="/vendor/leaflet/leaflet.css" />
+  <script src="/vendor/leaflet/leaflet.js"></script>
+  <script src="/vendor/leaflet/leaflet-heat.js"></script>
+  <style>
+    #map {
+      height: calc(100vh - 120px);
+      width: 100%;
+      background: #2d3748;
+    }
+    .leaflet-container {
+      background: #2d3748;
+      cursor: grab;
+    }
+    .leaflet-container:active {
+      cursor: grabbing;
+    }
+    .leaflet-container.radius-mode {
+      cursor: crosshair;
+    }
+    .grid-label {
+      pointer-events: none;
+    }
+    .custom-marker {
+      text-align: center;
+      line-height: 30px;
+      font-size: 20px;
+    }
+    .badge {
+      display: inline-block;
+      padding: 4px 8px;
+      border-radius: 4px;
+      font-size: 12px;
+      font-weight: 600;
+    }
+    .badge-green { background: #10b981; color: white; }
+    .badge-blue { background: #3b82f6; color: white; }
+    .badge-gray { background: #6b7280; color: white; }
+    .badge-red { background: #ef4444; color: white; }
+    .badge-orange { background: #f97316; color: white; }
+    .badge-yellow { background: #eab308; color: white; }
+
+    /* Filter Panel */
+    .filter-panel {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      background: rgba(31, 41, 55, 0.98);
+      border-radius: 8px;
+      z-index: 1000;
+      max-width: 320px;
+      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+      transition: all 0.3s ease;
+    }
+
+    .filter-panel.minimized {
+      max-height: 50px;
+      overflow: hidden;
+    }
+
+    .filter-panel.maximized {
+      max-height: calc(100vh - 200px);
+      overflow-y: auto;
+    }
+
+    .filter-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 12px 15px;
+      border-bottom: 1px solid #4b5563;
+      cursor: pointer;
+      user-select: none;
+      background: rgba(55, 65, 81, 0.5);
+      border-radius: 8px 8px 0 0;
+    }
+
+    .filter-header:hover {
+      background: rgba(55, 65, 81, 0.7);
+    }
+
+    .filter-content {
+      padding: 15px;
+    }
+
+    .filter-section {
+      margin-bottom: 15px;
+      padding-bottom: 15px;
+      border-bottom: 1px solid #374151;
+    }
+
+    .filter-section:last-child {
+      border-bottom: none;
+      margin-bottom: 0;
+      padding-bottom: 0;
+    }
+
+    .filter-section h3 {
+      font-size: 13px;
+      font-weight: 600;
+      margin-bottom: 10px;
+      color: #9ca3af;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .filter-checkbox {
+      display: flex;
+      align-items: center;
+      margin-bottom: 6px;
+      font-size: 13px;
+    }
+
+    .filter-checkbox input {
+      margin-right: 8px;
+      cursor: pointer;
+    }
+
+    .filter-checkbox label {
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      flex: 1;
+    }
+
+    .color-dot {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      display: inline-block;
+      border: 1px solid white;
+    }
+
+    .search-box {
+      width: 100%;
+      padding: 8px;
+      border-radius: 4px;
+      border: 1px solid #4b5563;
+      background: #374151;
+      color: white;
+      font-size: 13px;
+    }
+
+    .search-box:focus {
+      outline: none;
+      border-color: #3b82f6;
+    }
+
+    .radius-controls {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+    }
+
+    .radius-input {
+      width: 70px;
+      padding: 6px;
+      border-radius: 4px;
+      border: 1px solid #4b5563;
+      background: #374151;
+      color: white;
+      font-size: 13px;
+    }
+
+    .btn-small {
+      padding: 6px 12px;
+      border-radius: 4px;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      border: none;
+      transition: all 0.2s;
+    }
+
+    .btn-primary {
+      background: #3b82f6;
+      color: white;
+    }
+
+    .btn-primary:hover {
+      background: #2563eb;
+    }
+
+    .btn-danger {
+      background: #ef4444;
+      color: white;
+    }
+
+    .btn-danger:hover {
+      background: #dc2626;
+    }
+
+    .btn-success {
+      background: #10b981;
+      color: white;
+    }
+
+    .btn-success:hover {
+      background: #059669;
+    }
+
+    .search-results {
+      max-height: 200px;
+      overflow-y: auto;
+      margin-top: 8px;
+      font-size: 12px;
+    }
+
+    .search-result-item {
+      padding: 6px;
+      margin-bottom: 4px;
+      background: #374151;
+      border-radius: 4px;
+      cursor: pointer;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .search-result-item:hover {
+      background: #4b5563;
+    }
+
+    input[type="color"] {
+      -webkit-appearance: none;
+      border: 1px solid #4b5563;
+      cursor: pointer;
+    }
+
+    input[type="color"]::-webkit-color-swatch-wrapper {
+      padding: 0;
+    }
+
+    input[type="color"]::-webkit-color-swatch {
+      border: none;
+      border-radius: 4px;
+    }
+
+    input[type="color"]::-moz-color-swatch {
+      border: none;
+      border-radius: 4px;
+    }
+
+    .stat-card {
+      position: relative;
+      overflow: hidden;
+    }
+
+    .stat-trend {
+      font-size: 11px;
+      margin-top: 4px;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .stat-trend.up {
+      color: #10b981;
+    }
+
+    .stat-trend.down {
+      color: #ef4444;
+    }
+
+    .stat-trend.neutral {
+      color: #9ca3af;
+    }
+
+    .auto-refresh-indicator {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 11px;
+      color: #9ca3af;
+      padding: 4px 8px;
+      background: rgba(59, 130, 246, 0.1);
+      border-radius: 4px;
+      border: 1px solid rgba(59, 130, 246, 0.3);
+    }
+
+    .pulse-dot {
+      width: 8px;
+      height: 8px;
+      background: #10b981;
+      border-radius: 50%;
+      animation: pulse 2s infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% {
+        opacity: 1;
+      }
+      50% {
+        opacity: 0.3;
+      }
+    }
+
+    .minimize-icon {
+      transition: transform 0.3s ease;
+    }
+
+    .minimized .minimize-icon {
+      transform: rotate(180deg);
+    }
+
+    .heatmap-filter-btn {
+      padding: 3px 8px;
+      border-radius: 4px;
+      font-size: 11px;
+      font-weight: 600;
+      cursor: pointer;
+      border: 1px solid #4b5563;
+      background: #374151;
+      color: #9ca3af;
+      transition: all 0.15s;
+    }
+
+    .heatmap-filter-btn.active {
+      background: #ef4444;
+      border-color: #ef4444;
+      color: white;
+    }
+  </style>
+  <script src="/js/instance-config.js" defer></script>
+</head>
+<body class="bg-gray-900 text-white">
+  <!-- Header -->
+  <div class="bg-gray-800 p-4 shadow-lg">
+    <div class="container mx-auto flex justify-between items-center flex-wrap gap-4">
+      <div class="flex-1">
+        <h1 class="text-2xl font-bold">📍 Server Map Viewer</h1>
+        <div class="flex items-center gap-2 mt-1 flex-wrap">
+          <p class="text-sm text-gray-400" id="server-info">Select a server to view its active map</p>
+          <span id="active-badge" class="badge badge-gray" style="display: none;">Active</span>
+          <span id="players-badge" class="badge badge-blue" style="display: none;">0/0 Players</span>
+          <span id="auto-refresh-badge" class="auto-refresh-indicator" style="display: none;">
+            <span class="pulse-dot"></span>
+            <span id="refresh-timer">Auto-refresh in 30s</span>
+          </span>
+        </div>
+      </div>
+      <div class="flex gap-4 items-center flex-wrap">
+        <select id="server-select" class="bg-gray-700 px-4 py-2 rounded">
+          <option value="">Select Server...</option>
+        </select>
+        <select id="map-select" class="bg-gray-700 px-4 py-2 rounded">
+          <option value="">Select Map...</option>
+          <option value="enoch" selected>Livonia</option>
+          <option value="chernarusplus">Chernarus+</option>
+          <option value="sakhal">Sakhal</option>
+          <option value="namalsk">Namalsk</option>
+          <option value="takistanplus">Takistan+</option>
+        </select>
+
+        <button id="refresh-btn" class="bg-green-600 hover:bg-green-700 px-4 py-2 rounded">
+          🔄 Refresh
+        </button>
+        <a href="/dashboard" class="bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded">← Dashboard</a>
+      </div>
+    </div>
+  </div>
+
+  <!-- Map Container -->
+  <div class="container mx-auto p-4">
+    <section id="event-health-panel" class="bg-gray-800 rounded-lg p-4 mb-4 shadow-lg">
+      <div class="flex justify-between items-center gap-3 flex-wrap">
+        <div>
+          <h2 class="font-bold">🚦 Quick Event Health</h2>
+          <p id="event-health-summary" class="text-sm text-gray-400">Select a server to check spawn positions and newest retained RPT evidence.</p>
+        </div>
+        <div class="flex gap-2 items-center">
+          <input id="event-health-search" class="search-box" style="width:220px;" placeholder="Search event (e.g. trainlocked)">
+          <button id="event-health-refresh" class="btn-small btn-success" type="button">Refresh health</button>
+        </div>
+      </div>
+      <div id="event-health-results" class="mt-3 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-2"></div>
+      <p id="event-health-limit" class="text-xs text-gray-500 mt-3"></p>
+    </section>
+    <div id="map-container" class="relative">
+      <div id="map" class="rounded-lg shadow-lg"></div>
+
+      <!-- Filter Panel -->
+      <div id="filter-panel" class="filter-panel maximized">
+        <div id="filter-header" class="filter-header">
+          <h2 class="text-base font-bold">🔍 Filters & Tools</h2>
+          <span class="minimize-icon text-xl">▼</span>
+        </div>
+
+        <div class="filter-content">
+          <!-- Search -->
+          <div class="filter-section">
+            <h3>🔎 Search Events</h3>
+            <input
+              type="text"
+              id="search-input"
+              class="search-box"
+              placeholder="Type event name..."
+            />
+            <div id="search-results" class="search-results"></div>
+          </div>
+
+          <!-- Radius Search -->
+          <div class="filter-section">
+            <h3>📍 Radius Search</h3>
+            <div class="radius-controls">
+              <input
+                type="number"
+                id="radius-input"
+                class="radius-input"
+                value="500"
+                min="100"
+                step="100"
+                placeholder="Radius"
+              />
+              <span style="font-size: 12px;">meters</span>
+            </div>
+            <div style="margin-top: 8px; display: flex; gap: 8px;">
+              <button class="btn-small btn-primary" id="radius-btn">
+                📍 Click Map
+              </button>
+              <button class="btn-small btn-danger" style="display: none;" id="cancel-radius-btn">
+                ✕ Cancel
+              </button>
+            </div>
+            <div id="radius-results" style="margin-top: 8px; font-size: 12px; color: #9ca3af;"></div>
+          </div>
+
+          <!-- Auto Refresh Settings -->
+          <div class="filter-section">
+            <h3>🔄 Auto Refresh</h3>
+            <div class="filter-checkbox">
+              <input type="checkbox" id="auto-refresh-toggle" checked>
+              <label for="auto-refresh-toggle">Enable auto-refresh (30s)</label>
+            </div>
+            <div style="font-size: 11px; color: #9ca3af; margin-top: 4px;">
+              Last updated: <span id="last-update-time">Never</span>
+            </div>
+          </div>
+
+          <!-- Event Type Filters -->
+          <div class="filter-section">
+            <h3>📦 Event Types</h3>
+            <div id="event-type-filters"></div>
+          </div>
+
+          <!-- Stats -->
+          <div class="filter-section">
+            <h3>📊 Statistics</h3>
+            <div style="font-size: 12px; color: #9ca3af;">
+              <div>Total Events: <span id="filter-stat-total" class="text-white font-bold">0</span></div>
+              <div>Visible: <span id="filter-stat-visible" class="text-white font-bold">0</span></div>
+              <div>Hidden: <span id="filter-stat-hidden" class="text-white font-bold">0</span></div>
+            </div>
+          </div>
+
+          <!-- Loot Despawn Heatmap -->
+          <div class="filter-section">
+            <h3>🔥 Loot Heatmap</h3>
+            <div class="filter-checkbox">
+              <input type="checkbox" id="heatmap-toggle">
+              <label for="heatmap-toggle">Show despawn heatmap</label>
+            </div>
+            <div id="heatmap-controls" style="display:none; margin-top:8px;">
+              <!-- Category chips -->
+              <div style="margin-bottom:8px;">
+                <div style="font-size:11px; color:#9ca3af; margin-bottom:4px;">Category</div>
+                <div style="display:flex; gap:4px; flex-wrap:wrap;">
+                  <button class="heatmap-filter-btn active" data-filter="all">All</button>
+                  <button class="heatmap-filter-btn" data-filter="items">Loot only</button>
+                  <button class="heatmap-filter-btn" data-filter="infected">Infected only</button>
+                </div>
+              </div>
+              <!-- Days + grid selectors -->
+              <div style="display:flex; gap:6px; margin-bottom:8px;">
+                <div style="flex:1;">
+                  <div style="font-size:11px; color:#9ca3af; margin-bottom:2px;">Days</div>
+                  <select id="heatmap-days" class="search-box">
+                    <option value="7" selected>7 days</option>
+                    <option value="14">14 days</option>
+                    <option value="30">30 days</option>
+                  </select>
+                </div>
+                <div style="flex:1;">
+                  <div style="font-size:11px; color:#9ca3af; margin-bottom:2px;">Grid</div>
+                  <select id="heatmap-grid" class="search-box">
+                    <option value="100">100m</option>
+                    <option value="200" selected>200m</option>
+                    <option value="400">400m</option>
+                  </select>
+                </div>
+              </div>
+              <div id="heatmap-status" style="font-size:11px; color:#9ca3af;"></div>
+              <div id="heatmap-top-items" style="margin-top:8px;"></div>
+            </div>
+
+            <!-- Kill locations heatmap toggle -->
+            <div class="filter-checkbox" style="margin-top:8px;">
+              <input type="checkbox" id="kill-heatmap-toggle">
+              <label for="kill-heatmap-toggle">🔪 Kill locations</label>
+            </div>
+            <div id="kill-heatmap-status" style="font-size:11px; color:#9ca3af; margin-left:22px;"></div>
+
+            <!-- Death locations heatmap toggle -->
+            <div class="filter-checkbox">
+              <input type="checkbox" id="death-heatmap-toggle">
+              <label for="death-heatmap-toggle">💀 Death locations</label>
+            </div>
+            <div id="death-heatmap-status" style="font-size:11px; color:#9ca3af; margin-left:22px;"></div>
+
+            <!-- Player movement heatmap toggle -->
+            <div class="filter-checkbox">
+              <input type="checkbox" id="movement-heatmap-toggle">
+              <label for="movement-heatmap-toggle">👣 Player movement</label>
+            </div>
+            <div id="movement-heatmap-status" style="font-size:11px; color:#9ca3af; margin-left:22px;"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Loading Overlay -->
+      <div id="loading" class="absolute inset-0 bg-gray-900 bg-opacity-90 flex items-center justify-center z-50 rounded-lg" style="display: none;">
+        <div class="text-center">
+          <div class="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-blue-500 mx-auto mb-4"></div>
+          <p class="text-xl">Loading map...</p>
+          <p id="loading-status" class="text-sm text-gray-400 mt-2">Initializing...</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Stats Panel -->
+    <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mt-4">
+      <div class="bg-gray-800 p-4 rounded-lg stat-card">
+        <h3 class="text-sm text-gray-400">Total Spawn Points</h3>
+        <p id="stat-spawns" class="text-2xl font-bold">-</p>
+        <div id="stat-spawns-trend" class="stat-trend"></div>
+      </div>
+      <div class="bg-gray-800 p-4 rounded-lg stat-card">
+        <h3 class="text-sm text-gray-400">Unique Events</h3>
+        <p id="stat-events" class="text-2xl font-bold">-</p>
+        <div id="stat-events-trend" class="stat-trend"></div>
+      </div>
+      <div class="bg-gray-800 p-4 rounded-lg stat-card">
+        <h3 class="text-sm text-gray-400">Active Players</h3>
+        <p id="stat-players" class="text-2xl font-bold">-</p>
+        <div id="stat-players-trend" class="stat-trend"></div>
+      </div>
+      <div class="bg-gray-800 p-4 rounded-lg stat-card">
+        <h3 class="text-sm text-gray-400">Map Size</h3>
+        <p id="stat-size" class="text-2xl font-bold">-</p>
+      </div>
+    </div>
+  </div>
+
+  <script src="/js/api.js"></script>
+  <script src="/js/csrf-helper.js"></script>
+  <script src="/js/dayz-map-coordinates.js"></script>
+  <script src="/js/dayz-map-tiles.js"></script>
+  <script src="/js/map.js"></script>
+</body>
+</html>

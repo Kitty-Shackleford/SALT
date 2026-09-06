@@ -1,0 +1,368 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Discord Feeds - DayZ Dashboard</title>
+  <link rel="stylesheet" href="/css/tailwind.css">
+  <style>
+    .feed-card {
+      transition: all 0.3s ease;
+    }
+    .feed-card:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+    }
+    .toggle-switch {
+      position: relative;
+      display: inline-block;
+      width: 60px;
+      height: 34px;
+    }
+    .toggle-switch input {
+      opacity: 0;
+      width: 0;
+      height: 0;
+    }
+    .slider {
+      position: absolute;
+      cursor: pointer;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background-color: #ccc;
+      transition: .4s;
+      border-radius: 34px;
+    }
+    .slider:before {
+      position: absolute;
+      content: "";
+      height: 26px;
+      width: 26px;
+      left: 4px;
+      bottom: 4px;
+      background-color: white;
+      transition: .4s;
+      border-radius: 50%;
+    }
+    input:checked + .slider {
+      background-color: #10b981;
+    }
+    input:checked + .slider:before {
+      transform: translateX(26px);
+    }
+    .variable-tag {
+      display: inline-block;
+      background: #374151;
+      padding: 0.25rem 0.5rem;
+      border-radius: 4px;
+      font-size: 0.875rem;
+      font-family: monospace;
+      cursor: pointer;
+      margin: 0.25rem;
+    }
+    .variable-tag:hover {
+      background: #4b5563;
+    }
+  </style>
+  <script src="/js/instance-config.js" defer></script>
+</head>
+<body class="bg-gray-900 text-white">
+
+  <nav class="bg-gray-800 p-4 shadow-lg">
+    <div class="container mx-auto flex items-center justify-between">
+      <h1 class="text-2xl font-bold">🔔 Discord Feeds</h1>
+      <div class="flex gap-4">
+        <a href="/dashboard" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">← Dashboard</a>
+        <button id="logoutBtn" class="bg-red-600 hover:bg-red-700 px-4 py-2 rounded">Logout</button>
+      </div>
+    </div>
+  </nav>
+
+  <div class="container mx-auto p-6 max-w-6xl">
+
+    <!-- Dashboard Navigation -->
+    <nav class="bg-gray-800 rounded-lg p-3 mb-6 border border-gray-700">
+      <div class="flex gap-2 flex-wrap">
+        <a href="/dashboard" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">🎮 Servers</a>
+        <a href="/dashboard/economy" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">💰 Economy</a>
+        <a href="/map" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">🗺️ Map</a>
+        <a href="/dashboard/feeds" class="bg-blue-600 px-4 py-2 rounded font-semibold">📢 Feeds</a>
+        <a href="/dashboard/automation" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">⚙️ Automation</a>
+        <a href="/dashboard/tasks" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">🕒 Tasks</a>
+        <a href="/dashboard/server-control" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">🎮 Control</a>
+        <a href="/dashboard/backups" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">💾 Backups</a>
+        <a href="/dashboard/rotation" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">🔄 Rotation</a>
+        <a href="/dashboard/ai-assistant" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">🤖 AI</a>
+        <a href="/dashboard/server-stats" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">📊 Stats</a>
+        <a href="/dashboard/activity-log" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">📋 Activity</a>
+        <a href="/dashboard/console" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">🖥️ Console</a>
+        <a href="/dashboard/boost" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">🚀 Boost</a>
+        <a href="/dashboard/support" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">🎫 Support</a>
+        <a href="/dashboard/settings" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">🔧 Settings</a>
+        <a href="/player-portal" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">👤 Player Portal</a>
+        <a href="/dashboard/shop-admin" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">🛒 Shop</a>
+      </div>
+    </nav>
+
+    <!-- Guild Selector -->
+    <div class="bg-gray-800 p-6 rounded-lg shadow-lg mb-6">
+      <h2 class="text-xl font-bold mb-4">📋 Select Guild</h2>
+      <select id="guildSelect" class="w-full bg-gray-700 p-3 rounded focus:ring-2 focus:ring-blue-500 outline-none">
+        <option value="">-- Select a Guild --</option>
+      </select>
+      <select id="serverSelect" class="w-full bg-gray-700 p-3 mt-3 rounded focus:ring-2 focus:ring-blue-500 outline-none" disabled>
+        <option value="">-- Select a DayZ Server --</option>
+      </select>
+    </div>
+
+    <!-- Loading State -->
+    <div id="loadingState" class="text-center py-12" style="display: none;">
+      <div class="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-white mb-4"></div>
+      <p class="text-gray-400">Loading feeds...</p>
+    </div>
+
+    <!-- No Guild Selected -->
+    <div id="noGuildState" class="bg-gray-800 p-12 rounded-lg text-center">
+      <p class="text-gray-400 text-lg">👆 Select a guild to manage feeds</p>
+    </div>
+
+    <!-- Feeds Container -->
+    <div id="feedsContainer" style="display: none;">
+
+      <!-- Kill Feed -->
+      <div class="bg-gray-800 p-6 rounded-lg shadow-lg mb-6 feed-card">
+        <div class="flex items-center justify-between mb-4">
+          <div>
+            <h3 class="text-2xl font-bold">☠️ Kill Feed</h3>
+            <p class="text-gray-400 text-sm">Announce player kills, zombie kills, and animal kills</p>
+          </div>
+          <label class="toggle-switch">
+            <input type="checkbox" id="killFeedEnabled" data-feed-type="kill_feed">
+            <span class="slider"></span>
+          </label>
+        </div>
+
+        <div id="killFeedSettings" style="display: none;">
+          <!-- Channel Selection -->
+          <div class="mb-4">
+            <label class="block text-sm text-gray-400 mb-2">Discord Channel</label>
+            <select id="killFeedChannel" class="w-full bg-gray-700 p-3 rounded focus:ring-2 focus:ring-blue-500 outline-none">
+              <option value="">-- Select Channel --</option>
+            </select>
+            <p class="text-xs text-gray-500 mt-1">💡 Make sure the bot has permission to post in this channel</p>
+          </div>
+
+          <!-- Webhook URL (Optional) -->
+          <div class="mb-4">
+            <label class="block text-sm text-gray-400 mb-2">Webhook URL (Optional)</label>
+            <input type="text" id="killFeedWebhook"
+                   placeholder="https://discord.com/api/webhooks/..."
+                   class="w-full bg-gray-700 p-3 rounded focus:ring-2 focus:ring-blue-500 outline-none">
+            <p class="text-xs text-gray-500 mt-1">⚠️ Leave empty to use bot posting, or provide webhook for faster delivery</p>
+          </div>
+
+          <!-- Feed Settings -->
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+            <div>
+              <label class="flex items-center gap-2 cursor-pointer">
+                <input type="checkbox" id="killFeedShowPlayers" checked class="w-4 h-4">
+                <span>Show Player Kills</span>
+              </label>
+            </div>
+            <div>
+              <label class="flex items-center gap-2 cursor-pointer">
+                <input type="checkbox" id="killFeedShowZombies" class="w-4 h-4">
+                <span>Show Zombie Kills</span>
+              </label>
+            </div>
+            <div>
+              <label class="flex items-center gap-2 cursor-pointer">
+                <input type="checkbox" id="killFeedShowAnimals" class="w-4 h-4">
+                <span>Show Animal Kills</span>
+              </label>
+            </div>
+            <div>
+              <label class="flex items-center gap-2 cursor-pointer">
+                <input type="checkbox" id="killFeedShowSuicides" class="w-4 h-4">
+                <span>Show Suicides</span>
+              </label>
+            </div>
+          </div>
+
+          <!-- Minimum Distance Filter -->
+          <div class="mb-4">
+            <label class="block text-sm text-gray-400 mb-2">Minimum Kill Distance (meters)</label>
+            <input type="number" id="killFeedMinDistance" value="0" min="0" max="1000"
+                   class="w-full bg-gray-700 p-3 rounded focus:ring-2 focus:ring-blue-500 outline-none">
+            <p class="text-xs text-gray-500 mt-1">Only show kills beyond this distance (0 = all kills)</p>
+          </div>
+
+          <!-- Template Editor -->
+          <div class="mb-4">
+            <label class="block text-sm text-gray-400 mb-2">Message Template - Player Kills</label>
+            <textarea id="killFeedTemplatePlayer" rows="3"
+                      class="w-full bg-gray-700 p-3 rounded focus:ring-2 focus:ring-blue-500 outline-none font-mono text-sm"
+                      placeholder="☠️ **{killer}** killed **{victim}** with {weapon} ({distance}m)">☠️ **{killer}** killed **{victim}** with {weapon} ({distance}m)</textarea>
+            <div class="mt-2">
+              <p class="text-xs text-gray-500 mb-1">Available variables:</p>
+              <span class="variable-tag" tabindex="0" data-textarea="killFeedTemplatePlayer" data-variable="{killer}">{killer}</span>
+              <span class="variable-tag" tabindex="0" data-textarea="killFeedTemplatePlayer" data-variable="{victim}">{victim}</span>
+              <span class="variable-tag" tabindex="0" data-textarea="killFeedTemplatePlayer" data-variable="{weapon}">{weapon}</span>
+              <span class="variable-tag" tabindex="0" data-textarea="killFeedTemplatePlayer" data-variable="{distance}">{distance}</span>
+              <span class="variable-tag" tabindex="0" data-textarea="killFeedTemplatePlayer" data-variable="{timestamp}">{timestamp}</span>
+              <span class="variable-tag" tabindex="0" data-textarea="killFeedTemplatePlayer" data-variable="{server}">{server}</span>
+            </div>
+          </div>
+
+          <div class="mb-4">
+            <label class="block text-sm text-gray-400 mb-2">Message Template - Zombie Kills</label>
+            <textarea id="killFeedTemplateZombie" rows="2"
+                      class="w-full bg-gray-700 p-3 rounded focus:ring-2 focus:ring-blue-500 outline-none font-mono text-sm"
+                      placeholder="🧟 **{player}** killed a zombie with {weapon}">🧟 **{player}** killed a zombie with {weapon}</textarea>
+          </div>
+
+          <div class="mb-4">
+            <label class="block text-sm text-gray-400 mb-2">Message Template - Animal Kills</label>
+            <textarea id="killFeedTemplateAnimal" rows="2"
+                      class="w-full bg-gray-700 p-3 rounded focus:ring-2 focus:ring-blue-500 outline-none font-mono text-sm"
+                      placeholder="🦌 **{player}** killed a {animal} with {weapon}">🦌 **{player}** killed a {animal} with {weapon}</textarea>
+          </div>
+
+          <!-- Embed Settings -->
+          <div class="mb-4">
+            <label class="flex items-center gap-2 cursor-pointer mb-2">
+              <input type="checkbox" id="killFeedUseEmbed" class="w-4 h-4">
+              <span>Use Discord Embed (Rich Formatting)</span>
+            </label>
+            <div id="killFeedEmbedSettings" style="display: none;">
+              <label class="block text-sm text-gray-400 mb-2">Embed Color</label>
+              <input type="color" id="killFeedEmbedColor" value="#ff0000"
+                     class="w-24 h-10 bg-gray-700 rounded cursor-pointer">
+            </div>
+          </div>
+
+          <!-- Action Buttons -->
+          <div class="flex gap-3">
+            <button id="saveKillFeed" class="bg-green-600 hover:bg-green-700 px-6 py-2 rounded font-semibold">
+              💾 Save Configuration
+            </button>
+            <button id="testKillFeed" class="bg-blue-600 hover:bg-blue-700 px-6 py-2 rounded font-semibold">
+              🧪 Send Test Message
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Death Feed (Coming Soon) -->
+      <div class="bg-gray-800 p-6 rounded-lg shadow-lg mb-6 feed-card opacity-50">
+        <div class="flex items-center justify-between">
+          <div>
+            <h3 class="text-2xl font-bold">💀 Death Feed</h3>
+            <p class="text-gray-400 text-sm">Coming in next update...</p>
+          </div>
+          <span class="bg-gray-700 px-4 py-2 rounded text-sm">Coming Soon</span>
+        </div>
+      </div>
+
+      <!-- Join/Leave Feed (Coming Soon) -->
+      <div class="bg-gray-800 p-6 rounded-lg shadow-lg mb-6 feed-card opacity-50">
+        <div class="flex items-center justify-between">
+          <div>
+            <h3 class="text-2xl font-bold">🚪 Join/Leave Feed</h3>
+            <p class="text-gray-400 text-sm">Coming in next update...</p>
+          </div>
+          <span class="bg-gray-700 px-4 py-2 rounded text-sm">Coming Soon</span>
+        </div>
+      </div>
+
+      <!-- Faction War Feed -->
+      <div class="bg-gray-800 p-6 rounded-lg shadow-lg mb-6 feed-card" style="border-left: 3px solid #f59e0b;">
+        <div class="flex items-center justify-between mb-4">
+          <div>
+            <h3 class="text-2xl font-bold">⚔️ Faction War Feed</h3>
+            <p class="text-gray-400 text-sm">Announce kills between players in different factions</p>
+          </div>
+          <label class="toggle-switch">
+            <input type="checkbox" id="factionFeedEnabled" data-feed-type="faction_feed">
+            <span class="slider"></span>
+          </label>
+        </div>
+
+        <div id="factionFeedSettings" style="display: none;">
+          <!-- Channel Selection -->
+          <div class="mb-4">
+            <label class="block text-sm text-gray-400 mb-2">Discord Channel</label>
+            <select id="factionFeedChannel" class="w-full bg-gray-700 p-3 rounded focus:ring-2 focus:ring-yellow-500 outline-none">
+              <option value="">-- Select Channel --</option>
+            </select>
+            <p class="text-xs text-gray-500 mt-1">💡 Make sure the bot has permission to post in this channel</p>
+          </div>
+
+          <!-- Webhook URL (Optional) -->
+          <div class="mb-4">
+            <label class="block text-sm text-gray-400 mb-2">Webhook URL (Optional)</label>
+            <input type="text" id="factionFeedWebhook"
+                   placeholder="https://discord.com/api/webhooks/..."
+                   class="w-full bg-gray-700 p-3 rounded focus:ring-2 focus:ring-yellow-500 outline-none">
+            <p class="text-xs text-gray-500 mt-1">⚠️ Leave empty to use bot posting, or provide webhook for faster delivery</p>
+          </div>
+
+          <!-- Template Editor -->
+          <div class="mb-4">
+            <label class="block text-sm text-gray-400 mb-2">Message Template</label>
+            <textarea id="factionFeedTemplate" rows="3"
+                      class="w-full bg-gray-700 p-3 rounded focus:ring-2 focus:ring-yellow-500 outline-none font-mono text-sm"
+                      placeholder="⚔️ **[{killerFaction}]** {killer} eliminated **[{victimFaction}]** {victim} with {weapon}">⚔️ **[{killerFaction}]** {killer} eliminated **[{victimFaction}]** {victim} with {weapon}</textarea>
+            <div class="mt-2">
+              <p class="text-xs text-gray-500 mb-1">Available variables:</p>
+              <span class="variable-tag" tabindex="0" data-textarea="factionFeedTemplate" data-variable="{killer}">{killer}</span>
+              <span class="variable-tag" tabindex="0" data-textarea="factionFeedTemplate" data-variable="{killerFaction}">{killerFaction}</span>
+              <span class="variable-tag" tabindex="0" data-textarea="factionFeedTemplate" data-variable="{victim}">{victim}</span>
+              <span class="variable-tag" tabindex="0" data-textarea="factionFeedTemplate" data-variable="{victimFaction}">{victimFaction}</span>
+              <span class="variable-tag" tabindex="0" data-textarea="factionFeedTemplate" data-variable="{weapon}">{weapon}</span>
+              <span class="variable-tag" tabindex="0" data-textarea="factionFeedTemplate" data-variable="{distance}">{distance}</span>
+              <span class="variable-tag" tabindex="0" data-textarea="factionFeedTemplate" data-variable="{timestamp}">{timestamp}</span>
+              <span class="variable-tag" tabindex="0" data-textarea="factionFeedTemplate" data-variable="{server}">{server}</span>
+            </div>
+          </div>
+
+          <!-- Embed Settings -->
+          <div class="mb-4">
+            <label class="flex items-center gap-2 cursor-pointer mb-2">
+              <input type="checkbox" id="factionFeedUseEmbed" class="w-4 h-4">
+              <span>Use Discord Embed (Rich Formatting)</span>
+            </label>
+            <div id="factionFeedEmbedSettings" style="display: none;">
+              <label class="block text-sm text-gray-400 mb-2">Embed Color</label>
+              <input type="color" id="factionFeedEmbedColor" value="#ffa500"
+                     class="w-24 h-10 bg-gray-700 rounded cursor-pointer">
+            </div>
+          </div>
+
+          <!-- Action Buttons -->
+          <div class="flex gap-3">
+            <button id="saveFactionFeed" class="bg-yellow-600 hover:bg-yellow-700 px-6 py-2 rounded font-semibold">
+              💾 Save Configuration
+            </button>
+            <button id="testFactionFeed" class="bg-blue-600 hover:bg-blue-700 px-6 py-2 rounded font-semibold">
+              🧪 Send Test Message
+            </button>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+  </div>
+
+  <!-- Success/Error Messages -->
+  <div id="alertSuccess" class="fixed top-4 right-4 bg-green-600 text-white px-6 py-3 rounded shadow-lg" style="display: none;"></div>
+  <div id="alertError" class="fixed top-4 right-4 bg-red-600 text-white px-6 py-3 rounded shadow-lg" style="display: none;"></div>
+
+  <script src="/js/api.js"></script>
+  <script src="/js/csrf-helper.js"></script>
+  <script src="/js/dashboard-feeds.js"></script>
+</body>
+</html>

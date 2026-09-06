@@ -1,0 +1,26 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>DayZ Dashboard — Setup</title>
+  <link href="/css/tailwind.css" rel="stylesheet">
+  <style>
+    body{background:#071023;color:#e6eef8;font-family:Inter,system-ui,Arial,sans-serif}
+    .wrap{max-width:760px;margin:3rem auto;padding:2rem;background:#061022;border:1px solid #233042;border-radius:12px}
+    .muted{color:#a8b3c7}.guild{margin-top:1.25rem;padding:1rem;border:1px solid #233042;border-radius:8px}
+    .steps{list-style:none;padding:0;margin:.75rem 0}.steps li{padding:.45rem 0}.done{color:#7ee787}.todo{color:#a8b3c7}
+    a{color:#7cc7ff}.actions{display:flex;gap:1rem;flex-wrap:wrap;margin-top:1rem}
+  </style>
+  <script src="/js/instance-config.js" defer></script>
+</head>
+<body>
+  <div class="wrap">
+    <h1 style="font-size:1.5rem;margin-bottom:0.5rem">Set up <span data-app-name>DayZ Dashboard</span></h1>
+    <p class="muted">Sign in with Discord to view setup progress. Guild and server identifiers are never accepted from this page as proof of access.</p>
+    <div class="actions"><a href="/auth/discord">Sign in with Discord</a><a id="inviteLink" href="#">Invite Bot</a><a href="/dashboard">Open Dashboard</a></div>
+    <div id="setupSteps" aria-live="polite"><p class="muted">Loading your setup status…</p></div>
+  </div>
+  <script src="/js/onboarding.js" integrity="sha384-iGbFBTDYNUD4m++6sH3RYWHWW6SQBNmkleVhBSisrtd1kJOotn35QkTZwNtOEWJW" crossorigin="anonymous"></script>
+</body>
+</html>

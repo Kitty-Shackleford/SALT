@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Loot Finder - DayZ Dashboard</title>
+  <link rel="stylesheet" href="/css/tailwind.css">
+  <link rel="stylesheet" href="/vendor/leaflet/leaflet.css" />
+  <script src="/vendor/leaflet/leaflet.js"></script>
+  <style>
+    #loot-map {
+      height: 100%;
+      min-height: 400px;
+      background: #1a202c;
+    }
+    .leaflet-container { background: #1a202c; }
+
+    /* Tier badge colors */
+    .tier-badge-Tier1 { background: #10b981; color: #fff; }
+    .tier-badge-Tier2 { background: #3b82f6; color: #fff; }
+    .tier-badge-Tier3 { background: #f97316; color: #fff; }
+    .tier-badge-Tier4 { background: #ef4444; color: #fff; }
+
+    /* Scrollable panels */
+    .scroll-panel { overflow-y: auto; max-height: calc(100vh - 220px); }
+
+    /* Item card hover */
+    .item-card { transition: background 0.15s; cursor: pointer; }
+    .item-card:hover { background: #374151; }
+    .item-card.selected { background: #1e3a5f; border-color: #3b82f6; }
+
+    /* Tab underline */
+    .tab-btn.active { border-bottom: 2px solid #3b82f6; color: #60a5fa; }
+
+    /* Health bar */
+    .health-bar-fill { transition: width 0.5s ease; }
+
+    /* Spawn marker popup */
+    .leaflet-popup-content-wrapper { background: #1f2937; color: #f3f4f6; border: 1px solid #374151; }
+    .leaflet-popup-tip { background: #1f2937; }
+  </style>
+  <script src="/js/instance-config.js" defer></script>
+</head>
+<body class="bg-gray-900 text-white min-h-screen">
+
+  <!-- Top bar -->
+  <div class="bg-gray-800 border-b border-gray-700 px-6 py-3 flex items-center justify-between">
+    <div class="flex items-center gap-4">
+      <a href="/dashboard" class="text-gray-400 hover:text-white text-sm">← Dashboard</a>
+      <h1 class="text-xl font-bold text-white">🔍 Loot Finder</h1>
+    </div>
+    <div class="flex items-center gap-3">
+      <!-- Server selector -->
+      <label class="text-sm text-gray-400">Server:</label>
+      <select id="serverSelector" class="bg-gray-700 border border-gray-600 rounded px-3 py-1 text-sm text-white focus:outline-none focus:border-blue-500">
+        <option value="">Loading servers…</option>
+      </select>
+      <!-- Map selector (populated from server's available maps) -->
+      <label class="text-sm text-gray-400">Map:</label>
+      <select id="mapSelector" class="bg-gray-700 border border-gray-600 rounded px-3 py-1 text-sm text-white focus:outline-none focus:border-blue-500" disabled>
+        <option value="">Select server first</option>
+      </select>
+      <span id="username" class="text-gray-400 text-sm"></span>
+      <a href="/logout" class="bg-red-700 hover:bg-red-600 px-3 py-1 rounded text-sm">Logout</a>
+    </div>
+  </div>
+
+  <!-- Tab bar -->
+  <div class="bg-gray-800 border-b border-gray-700 px-6 flex gap-1">
+    <button id="tab-finder" class="tab-btn active px-5 py-3 text-sm font-semibold text-gray-300 hover:text-white border-b-2 border-transparent transition-colors">
+      🗺️ Item Finder
+    </button>
+    <button id="tab-live" class="tab-btn px-5 py-3 text-sm font-semibold text-gray-400 hover:text-white border-b-2 border-transparent transition-colors hidden" data-admin-only>
+      📡 Live Loot Feed
+    </button>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════ ITEM FINDER TAB -->
+  <div id="panel-finder" class="flex" style="height: calc(100vh - 120px);">
+
+    <!-- Left: Search & Filters -->
+    <div class="w-72 bg-gray-800 border-r border-gray-700 flex flex-col flex-shrink-0">
+      <div class="p-4 border-b border-gray-700">
+        <input id="searchInput"
+               type="text"
+               placeholder="Search item name…"
+               autocomplete="off"
+               class="w-full bg-gray-700 border border-gray-600 rounded px-3 py-2 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-blue-500">
+      </div>
+
+      <!-- Filters -->
+      <div class="p-4 border-b border-gray-700 space-y-3">
+        <div>
+          <label class="text-xs text-gray-500 uppercase tracking-wide block mb-1">Category</label>
+          <select id="filterCategory" class="w-full bg-gray-700 border border-gray-600 rounded px-2 py-1.5 text-sm text-white focus:outline-none focus:border-blue-500">
+            <option value="">All categories</option>
+          </select>
+        </div>
+        <div>
+          <label class="text-xs text-gray-500 uppercase tracking-wide block mb-1">Usage Zone</label>
+          <select id="filterUsage" class="w-full bg-gray-700 border border-gray-600 rounded px-2 py-1.5 text-sm text-white focus:outline-none focus:border-blue-500">
+            <option value="">All zones</option>
+          </select>
+        </div>
+        <div>
+          <label class="text-xs text-gray-500 uppercase tracking-wide block mb-1">Tier</label>
+          <select id="filterValue" class="w-full bg-gray-700 border border-gray-600 rounded px-2 py-1.5 text-sm text-white focus:outline-none focus:border-blue-500">
+            <option value="">All tiers</option>
+          </select>
+        </div>
+        <button id="clearFilters" class="w-full bg-gray-700 hover:bg-gray-600 rounded py-1 text-xs text-gray-400 mt-1">
+          Clear filters
+        </button>
+      </div>
+
+      <!-- Results count -->
+      <div class="px-4 py-2 text-xs text-gray-500" id="resultCount">Search or select a filter to find items</div>
+
+      <!-- Results list -->
+      <div id="itemList" class="scroll-panel flex-1 divide-y divide-gray-700"></div>
+    </div>
+
+    <!-- Center: Item detail panel -->
+    <div class="w-80 bg-gray-850 border-r border-gray-700 flex flex-col flex-shrink-0" style="background:#111827">
+      <div id="itemDetail" class="p-4 flex-1 overflow-y-auto">
+        <div class="text-center text-gray-600 mt-20">
+          <div class="text-4xl mb-3">🎒</div>
+          <p class="text-sm">Select an item to view details and spawn locations on the map</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Right: Map -->
+    <div class="flex-1 relative">
+      <div id="loot-map" class="absolute inset-0"></div>
+      <!-- Map overlay controls -->
+      <div class="absolute top-3 right-3 z-10 flex flex-col gap-2">
+        <button id="btnFitMarkers" title="Fit all spawn markers" class="bg-gray-800 hover:bg-gray-700 border border-gray-600 rounded p-2 text-sm shadow">⊕</button>
+        <div class="bg-gray-800 border border-gray-600 rounded p-2 text-xs text-gray-400 space-y-1" id="mapLegend" style="display:none">
+          <div class="font-semibold text-gray-300 mb-1">Tiers</div>
+          <div class="flex items-center gap-1"><span class="w-3 h-3 rounded-full inline-block" style="background:#10b981"></span> Tier 1</div>
+          <div class="flex items-center gap-1"><span class="w-3 h-3 rounded-full inline-block" style="background:#3b82f6"></span> Tier 2</div>
+          <div class="flex items-center gap-1"><span class="w-3 h-3 rounded-full inline-block" style="background:#f97316"></span> Tier 3</div>
+          <div class="flex items-center gap-1"><span class="w-3 h-3 rounded-full inline-block" style="background:#ef4444"></span> Tier 4</div>
+          <div class="flex items-center gap-1"><span class="w-3 h-3 rounded-full inline-block" style="background:#a855f7"></span> No tier</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════ LIVE LOOT FEED TAB -->
+  <div id="panel-live" class="hidden p-6" style="height: calc(100vh - 120px); overflow-y: auto;">
+
+    <!-- Economy health bar -->
+    <div class="bg-gray-800 rounded-lg border border-gray-700 p-5 mb-6">
+      <div class="flex justify-between items-center mb-3">
+        <h2 class="font-bold text-lg">Economy Health</h2>
+        <div class="flex items-center gap-3">
+          <span id="liveRptFile" class="text-xs text-gray-500"></span>
+          <span id="liveLastUpdated" class="text-xs text-gray-500"></span>
+          <button id="btnRefreshLive" class="bg-blue-700 hover:bg-blue-600 rounded px-3 py-1 text-xs">↻ Refresh</button>
+        </div>
+      </div>
+      <div id="liveHealthDisplay">
+        <div class="flex justify-between text-sm text-gray-400 mb-1">
+          <span>Items in world</span>
+          <span id="liveHealthPct" class="font-bold text-white">—</span>
+        </div>
+        <div class="w-full bg-gray-700 rounded-full h-4 overflow-hidden">
+          <div id="liveHealthBar" class="health-bar-fill h-4 rounded-full bg-green-500" style="width: 0%"></div>
+        </div>
+        <div class="flex justify-between text-xs text-gray-500 mt-1">
+          <span id="liveTotalInMap">—</span>
+          <span id="liveTotalNominal">—</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+
+      <!-- RESPAWN CANDIDATE table -->
+      <div class="bg-gray-800 rounded-lg border border-gray-700">
+        <div class="px-5 py-3 border-b border-gray-700 flex justify-between items-center">
+          <h3 class="font-semibold text-white">Items Below Nominal</h3>
+          <span id="candidateCount" class="text-xs text-gray-400"></span>
+        </div>
+        <div class="overflow-y-auto" style="max-height: calc(100vh - 380px);">
+          <table class="w-full text-sm">
+            <thead class="bg-gray-750 sticky top-0" style="background:#1f2937">
+              <tr class="text-xs text-gray-400 uppercase">
+                <th class="px-4 py-2 text-left">Item</th>
+                <th class="px-4 py-2 text-right">Current</th>
+                <th class="px-4 py-2 text-right">Nominal</th>
+                <th class="px-4 py-2 text-right">Missing</th>
+                <th class="px-4 py-2 text-right">Health</th>
+              </tr>
+            </thead>
+            <tbody id="candidateTable" class="divide-y divide-gray-700"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Live Spawn Feed -->
+      <div class="bg-gray-800 rounded-lg border border-gray-700">
+        <div class="px-5 py-3 border-b border-gray-700 flex justify-between items-center">
+          <h3 class="font-semibold text-white">Recent Spawn Events</h3>
+          <span id="spawnEventCount" class="text-xs text-gray-400"></span>
+        </div>
+        <div class="overflow-y-auto text-xs font-mono" style="max-height: calc(100vh - 380px);" id="spawnFeed">
+          <div class="p-4 text-gray-500 text-center">Loading…</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="/js/dayz-map-coordinates.js"></script>
+  <script src="/js/loot-finder.js"></script>
+</body>
+</html>

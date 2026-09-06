@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Transaction History - DayZ Dashboard</title>
+  <link rel="stylesheet" href="/css/tailwind.css">
+  <style>
+    @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    .spinner { animation: spin 1s linear infinite; }
+    .bg-gray-750 { background-color: rgb(43, 53, 68); }
+  </style>
+  <script src="/js/instance-config.js" defer></script>
+</head>
+<body class="bg-gray-900 text-white">
+  <div class="container mx-auto p-6 max-w-4xl">
+
+    <!-- Header -->
+    <div class="flex justify-between items-center mb-8">
+      <div>
+        <h1 class="text-4xl font-bold">📜 Transaction History</h1>
+        <p class="text-gray-400 mt-1">All your economy transactions</p>
+      </div>
+      <div class="flex gap-2">
+        <a href="/dashboard/economy" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">💰 Dashboard</a>
+        <a href="/dashboard/economy-leaderboard" class="bg-yellow-600 hover:bg-yellow-700 px-4 py-2 rounded">🏆 Leaderboard</a>
+        <a href="/dashboard" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">← Dashboard</a>
+        <a href="/logout" class="bg-red-600 hover:bg-red-700 px-4 py-2 rounded">Logout</a>
+      </div>
+    </div>
+
+    <!-- No account state -->
+    <div id="no-account" class="hidden bg-gray-800 p-8 rounded-lg text-center">
+      <p class="text-4xl mb-4">🏰</p>
+      <h2 class="text-2xl font-bold mb-2">Select a Community First</h2>
+      <p class="text-gray-400 mb-6">Link your game account in the Player Portal to view transaction history.</p>
+      <a href="/player" class="bg-green-600 hover:bg-green-700 px-6 py-3 rounded font-semibold">Go to Player Portal</a>
+    </div>
+
+    <!-- Main content -->
+    <div id="main-content" class="hidden">
+
+      <div class="bg-gray-800 p-4 rounded-lg border border-gray-700 mb-4">
+        <label for="economyMembershipSelect" class="block text-xs text-gray-400 mb-1">Community, server, and player</label>
+        <select id="economyMembershipSelect" class="w-full bg-gray-700 px-3 py-2 rounded focus:ring-2 focus:ring-blue-500 outline-none text-sm"></select>
+      </div>
+
+      <!-- Filters -->
+      <div class="bg-gray-800 p-4 rounded-lg border border-gray-700 mb-4">
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 mb-3">
+          <div>
+            <label class="block text-xs text-gray-400 mb-1">Type</label>
+            <select id="typeFilter" class="w-full bg-gray-700 px-3 py-2 rounded focus:ring-2 focus:ring-blue-500 outline-none text-sm">
+              <option value="all">All Types</option>
+              <option value="earn">Earnings</option>
+              <option value="deposit">Deposits</option>
+              <option value="withdraw">Withdrawals</option>
+              <option value="transfer_send">Transfers Sent</option>
+              <option value="transfer_receive">Transfers Received</option>
+              <option value="penalty">Penalties</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-xs text-gray-400 mb-1">Start Date</label>
+            <input type="date" id="startDate" class="w-full bg-gray-700 px-3 py-2 rounded focus:ring-2 focus:ring-blue-500 outline-none text-sm" />
+          </div>
+          <div>
+            <label class="block text-xs text-gray-400 mb-1">End Date</label>
+            <input type="date" id="endDate" class="w-full bg-gray-700 px-3 py-2 rounded focus:ring-2 focus:ring-blue-500 outline-none text-sm" />
+          </div>
+          <div>
+            <label class="block text-xs text-gray-400 mb-1">Min Amount</label>
+            <input type="number" id="minAmount" min="0" step="0.01" placeholder="0.00" class="w-full bg-gray-700 px-3 py-2 rounded focus:ring-2 focus:ring-blue-500 outline-none text-sm" />
+          </div>
+          <div>
+            <label class="block text-xs text-gray-400 mb-1">Max Amount</label>
+            <input type="number" id="maxAmount" min="0" step="0.01" placeholder="Any" class="w-full bg-gray-700 px-3 py-2 rounded focus:ring-2 focus:ring-blue-500 outline-none text-sm" />
+          </div>
+          <div>
+            <label class="block text-xs text-gray-400 mb-1">Search Description</label>
+            <input type="text" id="tl-search" placeholder="Search..." class="w-full bg-gray-700 px-3 py-2 rounded focus:ring-2 focus:ring-blue-500 outline-none text-sm" />
+          </div>
+        </div>
+        <div class="flex justify-end">
+          <button id="exportCSV" class="bg-green-700 hover:bg-green-600 px-4 py-2 rounded text-sm font-semibold">
+            📥 Export CSV
+          </button>
+        </div>
+      </div>
+
+      <!-- Transaction List -->
+      <div id="transactionList">
+        <div class="text-center py-12">
+          <div class="spinner border-4 border-green-600 border-t-transparent rounded-full w-10 h-10 mx-auto"></div>
+        </div>
+      </div>
+
+      <!-- Pagination -->
+      <div id="tl-pagination" class="flex items-center justify-center gap-3 mt-4"></div>
+
+    </div>
+
+    <!-- Initial loading -->
+    <div id="loading-state" class="text-center py-20">
+      <div class="spinner border-4 border-green-600 border-t-transparent rounded-full w-16 h-16 mx-auto mb-4"></div>
+      <p class="text-gray-400">Loading transactions...</p>
+    </div>
+
+  </div>
+
+  <!-- Transaction Detail Modal -->
+  <div id="txDetailModal" class="hidden fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50">
+    <div class="bg-gray-800 p-8 rounded-lg shadow-xl max-w-md w-full mx-4">
+      <h2 class="text-2xl font-bold mb-4">💱 Transaction Details</h2>
+      <div id="txDetailBody"></div>
+      <button id="closeTxDetail" class="bg-gray-600 hover:bg-gray-700 px-6 py-3 rounded font-semibold w-full mt-4">Close</button>
+    </div>
+  </div>
+
+  <script src="/js/components/transactionList.js"></script>
+  <script src="/js/economy-transactions-init.js"></script>
+</body>
+</html>

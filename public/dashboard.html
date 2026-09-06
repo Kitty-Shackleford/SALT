@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Dashboard - DayZ Dashboard</title>
+  <link rel="stylesheet" href="/css/tailwind.css">
+  <style>
+    .server-card { transition: all 0.3s; }
+    .server-card:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,0.3); }
+    @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    .spinner { animation: spin 1s linear infinite; }
+    @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+    .pulse { animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite; }
+  </style>
+  <script src="/js/instance-config.js" defer></script>
+</head>
+<body class="bg-gray-900 text-white">
+  <div class="container mx-auto p-6 max-w-7xl">
+    <!-- Header -->
+    <div class="flex justify-between items-center mb-6">
+    <h1 class="text-4xl font-bold">Welcome, <span id="username">...</span></h1>
+    <div class="flex gap-2">
+        <a href="/admin/guilds" id="adminLink" class="bg-indigo-600 hover:bg-indigo-700 px-4 py-2 rounded hidden">🛡️ Admin</a>
+        <a href="/logout" class="bg-red-600 hover:bg-red-700 px-4 py-2 rounded">Logout</a>
+    </div>
+    </div>
+
+    <!-- Dashboard Navigation -->
+    <nav class="bg-gray-800 rounded-lg p-3 mb-6 border border-gray-700">
+      <div class="flex gap-2 flex-wrap">
+        <a href="/dashboard" class="bg-blue-600 px-4 py-2 rounded font-semibold">🎮 Servers</a>
+        <a href="/dashboard/economy" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">💰 Economy</a>
+        <a href="/map" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">🗺️ Map</a>
+        <a href="/loot-finder" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">🔍 Loot Finder</a>
+        <a href="/dashboard/feeds" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">📢 Feeds</a>
+        <a href="/dashboard/automation" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">⚙️ Automation</a>
+        <a href="/dashboard/tasks" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">🕒 Tasks</a>
+        <a href="/dashboard/server-control" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">🎮 Control</a>
+        <a href="/dashboard/backups" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">💾 Backups</a>
+        <a href="/dashboard/rotation" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">🔄 Rotation</a>
+        <a href="/dashboard/ai-assistant" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">🤖 AI</a>
+        <a href="/dashboard/server-stats" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">📊 Stats</a>
+        <a href="/dashboard/activity-log" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">📋 Activity</a>
+        <a href="/dashboard/console" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">🖥️ Console</a>
+        <a href="/dashboard/settings" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">🔧 Settings</a>
+        <a href="/player-portal" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">👤 Player Portal</a>
+        <a href="/dashboard/shop-admin" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">🛒 Shop</a>
+        <a href="/dashboard/spawn-exclusions" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">🛡️ Exclusions</a>
+        <a href="/server-players" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">👥 Players</a>
+        <a href="/server-lists" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">📋 Lists</a>
+      </div>
+    </nav>
+
+    <!-- Dashboard Stats Overview -->
+    <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+      <!-- Total Servers -->
+      <div class="bg-gray-800 p-6 rounded-lg border border-gray-700">
+        <div class="flex items-center gap-3 mb-2">
+          <span class="text-3xl">🖥️</span>
+          <h3 class="text-gray-400 font-semibold">Total Servers</h3>
+        </div>
+        <p class="text-3xl font-bold text-blue-400" id="stat-total-servers">-</p>
+        <p class="text-xs text-gray-500 mt-1">Registered servers</p>
+      </div>
+
+      <!-- Total Players -->
+      <div class="bg-gray-800 p-6 rounded-lg border border-gray-700">
+        <div class="flex items-center gap-3 mb-2">
+          <span class="text-3xl">👥</span>
+          <h3 class="text-gray-400 font-semibold">Total Players</h3>
+        </div>
+        <p class="text-3xl font-bold text-green-400" id="stat-total-players">-</p>
+        <p class="text-xs text-gray-500 mt-1">Linked accounts</p>
+      </div>
+
+      <!-- Active Guilds -->
+      <div class="bg-gray-800 p-6 rounded-lg border border-gray-700">
+        <div class="flex items-center gap-3 mb-2">
+          <span class="text-3xl">🏰</span>
+          <h3 class="text-gray-400 font-semibold">Active Guilds</h3>
+        </div>
+        <p class="text-3xl font-bold text-purple-400" id="stat-active-guilds">-</p>
+        <p class="text-xs text-gray-500 mt-1">Discord communities</p>
+      </div>
+
+      <!-- Server Health -->
+      <div class="bg-gray-800 p-6 rounded-lg border border-gray-700">
+        <div class="flex items-center gap-3 mb-2">
+          <span class="text-3xl">💚</span>
+          <h3 class="text-gray-400 font-semibold">Health Status</h3>
+        </div>
+        <p class="text-3xl font-bold text-green-400" id="stat-health-status">✅</p>
+        <p class="text-xs text-gray-500 mt-1" id="stat-health-text">All systems operational</p>
+      </div>
+    </div>
+
+    <!-- Recent Activity -->
+    <div class="bg-gray-800 p-6 rounded-lg mb-6 border border-gray-700 mt-8">
+      <div class="flex justify-between items-center mb-4">
+        <h2 class="text-2xl font-bold">🕐 Recent Activity</h2>
+        <button id="refresh-activity" class="bg-gray-700 hover:bg-gray-600 px-3 py-1 rounded text-sm">🔄 Refresh</button>
+      </div>
+      <div id="activity-feed" class="space-y-2">
+        <div class="text-center py-8 text-gray-400">
+          <div class="spinner border-4 border-blue-600 border-t-transparent rounded-full w-8 h-8 mx-auto mb-2"></div>
+          <p class="text-sm">Loading activity...</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Nitrado account server selection -->
+    <section id="nitrado-account-servers" class="bg-gray-800 p-6 rounded-lg shadow-lg mt-8 border border-gray-700">
+      <div class="flex flex-col md:flex-row md:items-end md:justify-between gap-4 mb-4">
+        <div>
+          <h2 class="text-2xl font-semibold">🎚️ Nitrado Account Servers</h2>
+          <p class="text-sm text-gray-400 mt-1">Enable only the servers this guild should manage. You can also set a custom dashboard name.</p>
+        </div>
+        <div class="flex flex-col sm:flex-row gap-2">
+          <label class="text-sm text-gray-300">
+            Discord guild
+            <select id="nitrado-guild-select" class="block bg-gray-700 border border-gray-600 rounded px-3 py-2 mt-1 min-w-64">
+              <option value="">Loading guilds…</option>
+            </select>
+          </label>
+          <button id="refresh-nitrado-account-servers" class="bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded self-end">Refresh</button>
+        </div>
+      </div>
+      <div id="nitrado-account-servers-status" class="text-sm text-gray-400 mb-3"></div>
+      <div id="nitrado-account-servers-list" class="grid grid-cols-1 lg:grid-cols-2 gap-4"></div>
+    </section>
+
+    <!-- Servers Section -->
+    <div class="bg-gray-800 p-6 rounded-lg shadow-lg mt-8">
+      <div class="flex justify-between items-center mb-4">
+        <h2 class="text-2xl font-semibold">🖥️ Your Registered Servers</h2>
+        <button id="loadRegisteredServersBtn" class="bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded">
+          🔄 Refresh
+        </button>
+      </div>
+      <div id="servers-container" class="space-y-4"></div>
+    </div>
+
+    <!-- 📊 Session Analytics -->
+    <div class="bg-gray-800 p-6 rounded-lg shadow-lg mt-8 border border-gray-700" id="session-analytics-section">
+      <div class="flex justify-between items-center mb-4">
+        <h2 class="text-2xl font-bold">📊 Session Analytics</h2>
+        <div class="flex items-center gap-2">
+          <label class="text-sm text-gray-400">Server:</label>
+          <select id="analytics-server-select"
+                  class="bg-gray-700 px-3 py-2 rounded text-sm focus:ring-2 focus:ring-blue-500 outline-none">
+            <option value="">— Select server —</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Summary cards -->
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+        <div class="bg-gray-700 p-4 rounded-lg">
+          <p class="text-sm text-gray-400">Avg Session Length (30d)</p>
+          <p class="text-2xl font-bold text-blue-400" id="analytics-avg-session">—</p>
+        </div>
+        <div class="bg-gray-700 p-4 rounded-lg">
+          <p class="text-sm text-gray-400">Total Sessions (30d)</p>
+          <p class="text-2xl font-bold text-green-400" id="analytics-total-sessions">—</p>
+        </div>
+      </div>
+
+      <!-- Daily active players bar chart -->
+      <div class="mb-6">
+        <h3 class="text-sm font-semibold text-gray-400 uppercase tracking-wide mb-3">Daily Active Players (last 30 days)</h3>
+        <div id="analytics-daily-chart"
+             class="flex items-end gap-1 h-24 overflow-x-auto"
+             style="min-height:96px;">
+          <span class="text-gray-500 text-sm">Select a server to load data</span>
+        </div>
+      </div>
+
+      <!-- Peak hours bar chart -->
+      <div>
+        <h3 class="text-sm font-semibold text-gray-400 uppercase tracking-wide mb-3">Busiest Hours (UTC)</h3>
+        <div id="analytics-peak-chart"
+             class="flex items-end gap-px h-16"
+             style="min-height:64px;">
+        </div>
+        <div class="flex justify-between text-xs text-gray-500 mt-1">
+          <span>00:00</span><span>06:00</span><span>12:00</span><span>18:00</span><span>23:00</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Sync Jobs -->
+    <div class="bg-gray-800 p-6 rounded-lg shadow-lg mt-8">
+      <div class="flex justify-between items-center mb-4">
+        <h2 class="text-2xl font-semibold">📊 Sync Jobs</h2>
+        <button id="loadSyncJobsBtn" class="bg-purple-600 hover:bg-purple-700 px-4 py-2 rounded text-sm">
+          Refresh
+        </button>
+      </div>
+      <div id="sync-jobs-container"></div>
+    </div>
+  </div>
+
+  <script src="/js/api.js"></script>
+  <script src="/js/csrf-helper.js"></script>
+  <script src="/js/dashboard.js"></script>
+</body>
+</html>

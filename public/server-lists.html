@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Server List Management - DayZ Dashboard</title>
+  <link rel="stylesheet" href="/css/tailwind.css">
+  <script src="/js/instance-config.js" defer></script>
+</head>
+<body class="bg-gray-900 text-white">
+  <div class="container mx-auto p-6 max-w-4xl">
+    <!-- Header -->
+    <div class="flex justify-between items-center mb-6">
+      <h1 class="text-4xl font-bold">📋 Server List Management</h1>
+      <a href="/dashboard" class="bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded">← Back</a>
+    </div>
+
+    <!-- Server Selector -->
+    <div class="bg-gray-800 p-6 rounded-lg shadow-lg mb-6 border border-gray-700">
+      <label class="block mb-2 font-semibold">Select Server:</label>
+      <select id="serverSelect" class="bg-gray-700 p-3 rounded w-full md:w-96 focus:ring-2 focus:ring-blue-500 outline-none">
+        <option value="">Loading servers...</option>
+      </select>
+    </div>
+
+    <div id="toastArea" class="mb-4"></div>
+
+    <!-- List Management Tabs -->
+    <div id="listSection" class="hidden">
+      <!-- Tab buttons -->
+      <div class="flex gap-2 mb-4">
+        <button id="tab-whitelist" class="px-4 py-2 rounded font-semibold bg-green-600 hover:bg-green-700">✅ Whitelist</button>
+        <button id="tab-blacklist" class="px-4 py-2 rounded font-semibold bg-gray-700 hover:bg-gray-600">🚫 Blacklist</button>
+        <button id="tab-prioritylist" class="px-4 py-2 rounded font-semibold bg-gray-700 hover:bg-gray-600">⭐ Priority List</button>
+      </div>
+
+      <!-- Whitelist Panel -->
+      <div id="panel-whitelist" class="bg-gray-800 p-6 rounded-lg shadow-lg border border-gray-700">
+        <h2 class="text-xl font-semibold mb-4 text-green-400">✅ Whitelist</h2>
+        <div class="flex gap-2 mb-4">
+          <input id="add-whitelist" type="text" placeholder="Enter gamertag..." class="bg-gray-700 px-4 py-2 rounded border border-gray-600 focus:ring-2 focus:ring-green-500 outline-none flex-1">
+          <button class="bg-green-600 hover:bg-green-700 px-4 py-2 rounded font-semibold">Add</button>
+        </div>
+        <div id="list-whitelist" class="space-y-2">
+          <p class="text-gray-400">Loading...</p>
+        </div>
+      </div>
+
+      <!-- Blacklist Panel -->
+      <div id="panel-blacklist" class="hidden bg-gray-800 p-6 rounded-lg shadow-lg border border-gray-700">
+        <h2 class="text-xl font-semibold mb-4 text-red-400">🚫 Blacklist</h2>
+        <div class="flex gap-2 mb-4">
+          <input id="add-blacklist" type="text" placeholder="Enter gamertag..." class="bg-gray-700 px-4 py-2 rounded border border-gray-600 focus:ring-2 focus:ring-red-500 outline-none flex-1">
+          <button class="bg-red-600 hover:bg-red-700 px-4 py-2 rounded font-semibold">Add</button>
+        </div>
+        <div id="list-blacklist" class="space-y-2">
+          <p class="text-gray-400">Loading...</p>
+        </div>
+      </div>
+
+      <!-- Priority List Panel -->
+      <div id="panel-prioritylist" class="hidden bg-gray-800 p-6 rounded-lg shadow-lg border border-gray-700">
+        <h2 class="text-xl font-semibold mb-4 text-yellow-400">⭐ Priority List</h2>
+        <div class="flex gap-2 mb-4">
+          <input id="add-prioritylist" type="text" placeholder="Enter gamertag..." class="bg-gray-700 px-4 py-2 rounded border border-gray-600 focus:ring-2 focus:ring-yellow-500 outline-none flex-1">
+          <button class="bg-yellow-600 hover:bg-yellow-700 px-4 py-2 rounded font-semibold">Add</button>
+        </div>
+        <div id="list-prioritylist" class="space-y-2">
+          <p class="text-gray-400">Loading...</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="/js/api.js"></script>
+  <script src="/js/csrf-helper.js"></script>
+  <script src="/js/server-lists.js"></script>
+</body>
+</html>

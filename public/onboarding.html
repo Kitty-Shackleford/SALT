@@ -1,0 +1,28 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>DayZ Dashboard — Onboarding</title>
+  <link href="/css/tailwind.css" rel="stylesheet">
+  <style>body{background:#0b1220;color:#e6eef8;font-family:Inter,system-ui,Arial,sans-serif} .wrap{max-width:720px;margin:6rem auto;padding:2rem;background:#071023;border-radius:8px}</style>
+  <script src="/js/instance-config.js" defer></script>
+</head>
+<body>
+  <div class="wrap">
+    <h1 style="font-size:1.5rem;margin-bottom:0.5rem">Welcome</h1>
+    <p style="color:#a8b3c7;margin-bottom:1rem">To get started, invite the bot to your Discord server and then run <strong>/register-token</strong> in that server. The bot will prompt you for your Nitrado API token.</p>
+
+    <p style="margin:0.75rem 0"><a id="inviteLink" href="#" style="color:#7cc7ff;">Invite Bot</a></p>
+
+    <form id="tokenForm" style="margin-top:1.25rem">
+      <label for="token" style="display:block;margin-bottom:0.5rem;color:#cbd6e6">Nitrado API token (paste here to keep it handy before running /register-token)</label>
+      <input id="token" name="token" type="text" autocomplete="off" style="width:100%;padding:0.5rem;border-radius:6px;border:1px solid #233042;background:#061022;color:#e6eef8" />
+      <p style="color:#8596ac;font-size:0.9rem;margin-top:0.75rem">Note: For security, do not paste tokens on public/shared devices. The bot is the recommended place to register tokens via /register-token.</p>
+    </form>
+
+  </div>
+
+  <script src="/js/onboarding.js" integrity="sha384-YpJt/jSudnTcHSFxyBJn63kORjbKEkG13rzg+IUhIEFytY11BfaAUML3KHXMDQIe" crossorigin="anonymous"></script>
+</body>
+</html>

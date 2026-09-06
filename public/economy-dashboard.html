@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Economy Dashboard - DayZ Dashboard</title>
+  <link rel="stylesheet" href="/css/tailwind.css">
+  <style>
+    @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    .spinner { animation: spin 1s linear infinite; }
+  </style>
+  <script src="/js/instance-config.js" defer></script>
+</head>
+<body class="bg-gray-900 text-white">
+  <div class="container mx-auto p-6 max-w-7xl">
+
+    <!-- Header -->
+    <div class="flex justify-between items-center mb-8">
+      <div>
+        <h1 class="text-4xl font-bold">💰 Economy Dashboard</h1>
+        <p class="text-gray-400 mt-1">Your personal economy overview</p>
+      </div>
+      <div class="flex gap-2">
+        <a href="/player" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">← Player Portal</a>
+        <a href="/economy-leaderboard" class="bg-yellow-600 hover:bg-yellow-700 px-4 py-2 rounded">🏆 Leaderboard</a>
+        <a href="/economy-transactions" class="bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded">📜 Transactions</a>
+        <a href="/logout" class="bg-red-600 hover:bg-red-700 px-4 py-2 rounded">Logout</a>
+      </div>
+    </div>
+
+    <!-- No guild state -->
+    <div id="no-guild" class="hidden bg-gray-800 p-8 rounded-lg text-center">
+      <p class="text-4xl mb-4">🏰</p>
+      <h2 class="text-2xl font-bold mb-2">Select a Community First</h2>
+      <p class="text-gray-400 mb-6">Link your game account in the Player Portal to view economy data.</p>
+      <a href="/player" class="bg-green-600 hover:bg-green-700 px-6 py-3 rounded font-semibold">Go to Player Portal</a>
+    </div>
+
+    <!-- Main content -->
+    <div id="main-content" class="hidden">
+
+      <!-- Wealth Cards -->
+      <div class="wealth-cards grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+        <div class="card bg-gray-800 p-6 rounded-lg border border-gray-700">
+          <div class="flex items-center gap-3 mb-2">
+            <span class="text-3xl">💵</span>
+            <h3 class="text-gray-400 font-semibold">Wallet</h3>
+          </div>
+          <p class="text-3xl font-bold text-green-400" id="ed-wallet">$0.00</p>
+          <p class="text-xs text-gray-500 mt-1">Cash on hand</p>
+        </div>
+        <div class="card bg-gray-800 p-6 rounded-lg border border-gray-700">
+          <div class="flex items-center gap-3 mb-2">
+            <span class="text-3xl">🏦</span>
+            <h3 class="text-gray-400 font-semibold">Bank</h3>
+          </div>
+          <p class="text-3xl font-bold text-blue-400" id="ed-bank">$0.00</p>
+          <p class="text-xs text-gray-500 mt-1">Bank balance</p>
+        </div>
+        <div class="card bg-gray-800 p-6 rounded-lg border border-gray-700">
+          <div class="flex items-center gap-3 mb-2">
+            <span class="text-3xl">💰</span>
+            <h3 class="text-gray-400 font-semibold">Total Wealth</h3>
+          </div>
+          <p class="text-3xl font-bold text-yellow-400" id="ed-total">$0.00</p>
+          <p class="text-xs text-gray-500 mt-1">Combined wealth</p>
+        </div>
+      </div>
+
+      <!-- Rank + Stats Summary -->
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+        <div class="bg-gray-800 p-6 rounded-lg border border-gray-700">
+          <p class="text-xl font-bold" id="ed-rank">🏆 Loading rank...</p>
+          <a href="/economy-leaderboard" class="text-sm text-blue-400 hover:text-blue-300 mt-2 inline-block">View full leaderboard →</a>
+        </div>
+        <div class="bg-gray-800 p-6 rounded-lg border border-gray-700">
+          <h3 class="text-gray-400 font-semibold mb-3">Lifetime Summary</h3>
+          <div id="ed-stats-summary">
+            <div class="text-center py-4"><div class="spinner border-4 border-green-600 border-t-transparent rounded-full w-8 h-8 mx-auto"></div></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Charts -->
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+        <div class="bg-gray-800 p-6 rounded-lg border border-gray-700">
+          <h3 class="text-lg font-semibold mb-4">📈 Earnings by Source</h3>
+          <div class="earnings-chart">
+            <canvas id="earningsChart" height="200"></canvas>
+          </div>
+        </div>
+        <div class="bg-gray-800 p-6 rounded-lg border border-gray-700">
+          <h3 class="text-lg font-semibold mb-4">📉 Spending by Type</h3>
+          <div class="spending-chart">
+            <canvas id="spendingChart" height="200"></canvas>
+          </div>
+        </div>
+      </div>
+
+      <!-- Recent Activity + Quick Actions -->
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div class="md:col-span-2 bg-gray-800 p-6 rounded-lg border border-gray-700">
+          <div class="flex justify-between items-center mb-4">
+            <h3 class="text-lg font-semibold">🕐 Recent Activity</h3>
+            <a href="/economy-transactions" class="text-sm text-blue-400 hover:text-blue-300">View all →</a>
+          </div>
+          <div id="ed-activity">
+            <div class="text-center py-4"><div class="spinner border-4 border-green-600 border-t-transparent rounded-full w-8 h-8 mx-auto"></div></div>
+          </div>
+        </div>
+        <div class="bg-gray-800 p-6 rounded-lg border border-gray-700">
+          <h3 class="text-lg font-semibold mb-4">⚡ Quick Actions</h3>
+          <div class="flex flex-col gap-3">
+            <button id="ed-depositBtn" class="bg-green-600 hover:bg-green-700 px-4 py-3 rounded font-semibold w-full">⬆️ Deposit</button>
+            <button id="ed-withdrawBtn" class="bg-blue-600 hover:bg-blue-700 px-4 py-3 rounded font-semibold w-full">⬇️ Withdraw</button>
+            <button id="ed-transferBtn" class="bg-purple-600 hover:bg-purple-700 px-4 py-3 rounded font-semibold w-full">💸 Transfer</button>
+            <a href="/economy-transactions" class="bg-gray-700 hover:bg-gray-600 px-4 py-3 rounded font-semibold w-full text-center">📜 Transactions</a>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Loading state -->
+    <div id="loading-state" class="text-center py-20">
+      <div class="spinner border-4 border-green-600 border-t-transparent rounded-full w-16 h-16 mx-auto mb-4"></div>
+      <p class="text-gray-400">Loading economy data...</p>
+    </div>
+
+  </div>
+
+  <!-- Deposit Modal -->
+  <div id="depositModal" class="fixed inset-0 bg-black bg-opacity-50 hidden flex items-center justify-center z-50">
+    <div class="bg-gray-800 p-8 rounded-lg shadow-xl max-w-md w-full mx-4">
+      <h2 class="text-2xl font-bold mb-4">⬆️ Deposit to Bank</h2>
+      <p class="text-gray-400 mb-1 text-sm">Available wallet balance: <span id="ed-depositWalletBalance" class="text-green-400 font-semibold"></span></p>
+      <div class="mb-4">
+        <label class="block text-sm text-gray-300 mb-1">Amount</label>
+        <input type="number" id="ed-depositAmount" min="0.01" step="0.01"
+               class="bg-gray-700 p-3 rounded w-full focus:ring-2 focus:ring-green-500 outline-none" placeholder="0.00" />
+      </div>
+      <div id="ed-depositFeeInfo" class="bg-yellow-900 border border-yellow-600 p-3 rounded mb-4 text-sm hidden">
+        <p>Fee: <span id="ed-depositFeeAmount" class="font-semibold"></span></p>
+        <p>Net deposit: <span id="ed-depositNetAmount" class="font-semibold text-green-400"></span></p>
+      </div>
+      <div id="ed-depositMsg" class="mb-3 hidden"></div>
+      <div class="flex gap-2">
+        <button id="ed-confirmDeposit" class="bg-green-600 hover:bg-green-700 px-6 py-3 rounded font-semibold flex-1">Confirm Deposit</button>
+        <button id="ed-cancelDeposit" class="bg-gray-600 hover:bg-gray-700 px-6 py-3 rounded font-semibold">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Withdraw Modal -->
+  <div id="withdrawModal" class="fixed inset-0 bg-black bg-opacity-50 hidden flex items-center justify-center z-50">
+    <div class="bg-gray-800 p-8 rounded-lg shadow-xl max-w-md w-full mx-4">
+      <h2 class="text-2xl font-bold mb-4">⬇️ Withdraw from Bank</h2>
+      <p class="text-gray-400 mb-1 text-sm">Available bank balance: <span id="ed-withdrawBankBalance" class="text-blue-400 font-semibold"></span></p>
+      <div class="mb-4">
+        <label class="block text-sm text-gray-300 mb-1">Amount</label>
+        <input type="number" id="ed-withdrawAmount" min="0.01" step="0.01"
+               class="bg-gray-700 p-3 rounded w-full focus:ring-2 focus:ring-blue-500 outline-none" placeholder="0.00" />
+      </div>
+      <div id="ed-withdrawFeeInfo" class="bg-yellow-900 border border-yellow-600 p-3 rounded mb-4 text-sm hidden">
+        <p>Fee: <span id="ed-withdrawFeeAmount" class="font-semibold"></span></p>
+        <p>Net withdrawal: <span id="ed-withdrawNetAmount" class="font-semibold text-blue-400"></span></p>
+      </div>
+      <div id="ed-withdrawMsg" class="mb-3 hidden"></div>
+      <div class="flex gap-2">
+        <button id="ed-confirmWithdraw" class="bg-blue-600 hover:bg-blue-700 px-6 py-3 rounded font-semibold flex-1">Confirm Withdrawal</button>
+        <button id="ed-cancelWithdraw" class="bg-gray-600 hover:bg-gray-700 px-6 py-3 rounded font-semibold">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Transfer Modal -->
+  <div id="transferModal" class="fixed inset-0 bg-black bg-opacity-50 hidden flex items-center justify-center z-50">
+    <div class="bg-gray-800 p-6 rounded-lg max-w-md w-full mx-4">
+      <h3 class="text-2xl font-bold mb-4">💸 Send Money</h3>
+      <div class="mb-4">
+        <label class="block text-sm font-semibold mb-2">Recipient</label>
+        <input type="text" id="ed-recipientSearch" class="w-full bg-gray-700 p-3 rounded focus:ring-2 focus:ring-purple-500 outline-none" placeholder="Search by gamertag...">
+        <div id="ed-recipientResults" class="mt-2 max-h-48 overflow-y-auto bg-gray-700 rounded hidden"></div>
+        <div id="ed-selectedRecipient" class="mt-2 hidden bg-gray-600 p-3 rounded">
+          <p class="font-semibold" id="ed-selectedRecipientName"></p>
+          <p class="text-sm text-gray-400" id="ed-selectedRecipientPlatform"></p>
+          <button id="ed-clearRecipient" class="text-xs text-red-400 hover:text-red-300 mt-1">Change</button>
+        </div>
+      </div>
+      <div class="mb-4">
+        <label class="block text-sm font-semibold mb-2">Amount</label>
+        <input type="number" id="ed-transferAmount" class="w-full bg-gray-700 p-3 rounded focus:ring-2 focus:ring-purple-500 outline-none" min="0" step="0.01" placeholder="0.00">
+        <p class="text-sm text-gray-400 mt-1">Available: <span id="ed-transferAvailable">$0.00</span></p>
+      </div>
+      <div class="mb-4">
+        <label class="block text-sm font-semibold mb-2">Message (Optional)</label>
+        <input type="text" id="ed-transferMessage" class="w-full bg-gray-700 p-3 rounded focus:ring-2 focus:ring-purple-500 outline-none" maxlength="200" placeholder="Add a note...">
+      </div>
+      <div id="ed-transferMsg" class="mb-3 hidden"></div>
+      <div class="flex gap-2">
+        <button id="ed-confirmTransfer" class="bg-purple-600 hover:bg-purple-700 px-4 py-2 rounded flex-1 disabled:opacity-50 disabled:cursor-not-allowed" disabled>Send Money</button>
+        <button id="ed-cancelTransfer" class="bg-gray-600 hover:bg-gray-700 px-4 py-2 rounded flex-1">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js" integrity="sha384-e6nUZLBkQ86NJ6TVVKAeSaK8jWa3NhkYWZFomE39AvDbQWeie9PlQqM3pmYW5d1g" crossorigin="anonymous"></script>
+  <script src="/js/api.js"></script>
+  <script src="/js/csrf-helper.js"></script>
+  <script src="/js/components/economyDashboard.js"></script>
+  <script src="/js/economy-dashboard-init.js"></script>
+</body>
+</html>

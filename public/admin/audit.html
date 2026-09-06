@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Audit Log - Admin Panel</title>
+  <link rel="stylesheet" href="/css/tailwind.css">
+  <style>
+    @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    .spinner { animation: spin 1s linear infinite; }
+  </style>
+  <script src="/js/instance-config.js" defer></script>
+</head>
+<body class="bg-gray-900 text-white">
+  <div class="container mx-auto p-6 max-w-7xl">
+    <!-- Header -->
+    <div class="flex justify-between items-center mb-6">
+      <h1 class="text-4xl font-bold">📜 Audit Log</h1>
+      <div class="flex gap-2">
+        <a href="/admin" class="bg-orange-600 hover:bg-orange-700 px-4 py-2 rounded">← Admin Dashboard</a>
+        <a href="/logout" class="bg-red-600 hover:bg-red-700 px-4 py-2 rounded">Logout</a>
+      </div>
+    </div>
+
+    <!-- Admin Navigation -->
+    <nav class="bg-gray-800 rounded-lg p-4 mb-6">
+      <div class="flex gap-2 flex-wrap">
+        <a href="/admin" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">Dashboard</a>
+        <a href="/admin/guilds" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">Discord Communities</a>
+        <a href="/admin/guilds-approval" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">Guild Approval</a>
+        <a href="/admin/servers" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">All Servers</a>
+        <a href="/admin/users" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">Users</a>
+        <a href="/admin/audit" class="bg-orange-600 px-4 py-2 rounded font-semibold">Audit Log</a>
+      </div>
+    </nav>
+
+    <!-- Filters -->
+    <div class="bg-gray-800 p-6 rounded-lg shadow-lg mb-6">
+      <div class="flex gap-4 items-center flex-wrap">
+        <div class="flex-1 min-w-[200px]">
+          <label class="block text-sm text-gray-400 mb-2">Action Type</label>
+          <select id="actionFilter" class="bg-gray-700 p-3 rounded w-full focus:ring-2 focus:ring-orange-500 outline-none">
+            <option value="">All Actions</option>
+            <option value="ADD_GUILD">Add Guild</option>
+            <option value="REMOVE_GUILD">Remove Guild</option>
+            <option value="DELETE_SERVER">Delete Server</option>
+            <option value="PROMOTE_USER">Promote User</option>
+            <option value="DEMOTE_USER">Demote User</option>
+          </select>
+        </div>
+        <div class="flex-1 min-w-[200px]">
+          <label class="block text-sm text-gray-400 mb-2">Limit</label>
+          <select id="limitSelect" class="bg-gray-700 p-3 rounded w-full focus:ring-2 focus:ring-orange-500 outline-none">
+            <option value="50">50 entries</option>
+            <option value="100" selected>100 entries</option>
+            <option value="200">200 entries</option>
+            <option value="500">500 entries</option>
+          </select>
+        </div>
+        <div class="pt-7">
+          <button id="loadAuditLogBtn" class="bg-orange-600 hover:bg-orange-700 px-6 py-3 rounded font-semibold">
+            🔍 Filter
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Audit Log Table -->
+    <div class="bg-gray-800 p-6 rounded-lg shadow-lg">
+      <div class="flex justify-between items-center mb-4">
+        <h2 class="text-2xl font-semibold">Administrative Actions</h2>
+        <button id="exportCSVBtn" class="bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded text-sm">
+          📥 Export CSV
+        </button>
+      </div>
+      <div id="audit-container">
+        <div class="text-center py-8">
+          <div class="spinner border-4 border-orange-600 border-t-transparent rounded-full w-12 h-12 mx-auto mb-4"></div>
+          <p class="text-gray-400">Loading audit log...</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="/js/api.js"></script>
+  <script src="/js/csrf-helper.js"></script>
+  <script src="/js/admin-audit.js"></script>
+</body>
+</html>

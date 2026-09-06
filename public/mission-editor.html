@@ -1,0 +1,510 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mission File Editor - TSB Dashboard</title>
+
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            margin: 0;
+            padding: 20px;
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 1600px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            height: calc(100vh - 40px);
+        }
+
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 25px 30px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .header h1 {
+            margin: 0;
+            font-size: 28px;
+            font-weight: 600;
+        }
+
+        .back-button {
+            background: rgba(255,255,255,0.2);
+            color: white;
+            border: 2px solid white;
+            padding: 10px 20px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.3s;
+        }
+
+        .back-button:hover {
+            background: white;
+            color: #667eea;
+        }
+
+        .editor-layout {
+            display: flex;
+            flex: 1;
+            overflow: hidden;
+        }
+
+        .file-browser {
+            width: 300px;
+            border-right: 1px solid #e0e0e0;
+            background: #f8f9fa;
+            overflow-y: auto;
+            padding: 15px;
+        }
+
+        .file-browser h3 {
+            margin: 0 0 15px 0;
+            color: #333;
+            font-size: 16px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .file-tree {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+
+        .file-tree-folder {
+            margin-bottom: 8px;
+        }
+
+        .folder-header {
+            display: flex;
+            align-items: center;
+            padding: 8px 12px;
+            background: #e9ecef;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-weight: 600;
+            color: #495057;
+        }
+
+        .folder-header:hover {
+            background: #dee2e6;
+        }
+
+        .folder-icon {
+            margin-right: 8px;
+            transition: transform 0.2s;
+        }
+
+        .folder-header.expanded .folder-icon {
+            transform: rotate(90deg);
+        }
+
+        .folder-files {
+            list-style: none;
+            padding: 0;
+            margin: 5px 0 0 0;
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.3s ease;
+        }
+
+        .folder-files.expanded {
+            max-height: 1000px;
+        }
+
+        .file-item {
+            padding: 8px 12px 8px 32px;
+            cursor: pointer;
+            border-radius: 6px;
+            transition: all 0.2s;
+            font-size: 14px;
+            color: #495057;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .file-item:hover {
+            background: #e3f2fd;
+        }
+
+        .file-item.active {
+            background: #667eea;
+            color: white;
+            font-weight: 600;
+        }
+
+        .file-icon {
+            margin-right: 8px;
+            font-size: 12px;
+        }
+
+        .editor-panel {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .editor-toolbar {
+            background: #f8f9fa;
+            border-bottom: 1px solid #e0e0e0;
+            padding: 15px 20px;
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        .editor-toolbar button {
+            background: #667eea;
+            color: white;
+            border: none;
+            padding: 10px 18px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            transition: all 0.3s;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .editor-toolbar button:hover {
+            background: #5568d3;
+            transform: translateY(-1px);
+        }
+
+        .editor-toolbar button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .editor-toolbar .btn-success {
+            background: #28a745;
+        }
+
+        .editor-toolbar .btn-success:hover {
+            background: #218838;
+        }
+
+        .editor-toolbar .btn-warning {
+            background: #ffc107;
+            color: #333;
+        }
+
+        .editor-toolbar .btn-warning:hover {
+            background: #e0a800;
+        }
+
+        .editor-toolbar .btn-danger {
+            background: #dc3545;
+        }
+
+        .editor-toolbar .btn-danger:hover {
+            background: #c82333;
+        }
+
+        .editor-toolbar .btn-info {
+            background: #17a2b8;
+        }
+
+        .editor-toolbar .btn-info:hover {
+            background: #138496;
+        }
+
+        .file-info {
+            background: #fff3cd;
+            border: 1px solid #ffc107;
+            padding: 12px 20px;
+            color: #856404;
+            font-size: 14px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .editor-container {
+            flex: 1;
+            position: relative;
+            overflow: hidden;
+        }
+
+        #editor {
+            width: 100%;
+            height: 100%;
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+            border: none;
+            padding: 20px;
+            resize: none;
+            background: #282c34;
+            color: #abb2bf;
+            line-height: 1.6;
+        }
+
+        #editor:focus {
+            outline: none;
+        }
+
+        .status-bar {
+            background: #f8f9fa;
+            border-top: 1px solid #e0e0e0;
+            padding: 10px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 13px;
+            color: #666;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #666;
+        }
+
+        .spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #667eea;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 20px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .conflict-modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,0.7);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+        }
+
+        .conflict-modal.active {
+            display: flex;
+        }
+
+        .conflict-content {
+            background: white;
+            border-radius: 15px;
+            padding: 30px;
+            max-width: 800px;
+            max-height: 80vh;
+            overflow-y: auto;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+        }
+
+        .conflict-content h2 {
+            margin: 0 0 20px 0;
+            color: #dc3545;
+        }
+
+        .conflict-buttons {
+            display: flex;
+            gap: 10px;
+            margin-top: 20px;
+        }
+
+        .conflict-buttons button {
+            flex: 1;
+            padding: 12px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 600;
+            transition: all 0.3s;
+        }
+
+        .refresh-indicator {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: #28a745;
+            color: white;
+            padding: 15px 25px;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+            display: none;
+            z-index: 999;
+        }
+
+        .refresh-indicator.active {
+            display: block;
+            animation: slideIn 0.3s;
+        }
+
+        @keyframes slideIn {
+            from {
+                transform: translateX(400px);
+                opacity: 0;
+            }
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
+        }
+
+        .badge {
+            display: inline-block;
+            padding: 3px 8px;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: 600;
+            margin-left: 8px;
+        }
+
+        .badge-xml {
+            background: #e3f2fd;
+            color: #1976d2;
+        }
+
+        .badge-json {
+            background: #fff3e0;
+            color: #f57c00;
+        }
+
+        .badge-txt {
+            background: #f3e5f5;
+            color: #7b1fa2;
+        }
+
+        @media (max-width: 1024px) {
+            .file-browser {
+                width: 250px;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .editor-layout {
+                flex-direction: column;
+            }
+
+            .file-browser {
+                width: 100%;
+                max-height: 200px;
+                border-right: none;
+                border-bottom: 1px solid #e0e0e0;
+            }
+        }
+    </style>
+  <script src="/js/instance-config.js" defer></script>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>📝 Mission File Editor</h1>
+            <button class="back-button" id="backButton">← Back to Dashboard</button>
+        </div>
+
+        <div class="editor-layout">
+            <div class="file-browser">
+                <h3>
+                    📁 Files
+                    <button id="refreshFilesBtn" style="background: transparent; border: none; cursor: pointer; font-size: 18px;" title="Refresh file list">🔄</button>
+                </h3>
+                <div id="fileTree" class="file-tree">
+                    <div class="loading">
+                        <div class="spinner"></div>
+                        Loading files...
+                    </div>
+                </div>
+            </div>
+
+            <div class="editor-panel">
+                <div class="editor-toolbar">
+                    <button id="saveBtn" disabled>
+                        💾 Save
+                    </button>
+                    <button id="formatBtn" class="btn-info" disabled>
+                        ✨ Format / Lint
+                    </button>
+                    <button id="reloadBtn" class="btn-warning" disabled>
+                        🔄 Reload from Server
+                    </button>
+                    <button id="backupBtn" disabled>
+                        📂 View Backups
+                    </button>
+                    <button id="diffBtn" class="btn-warning" disabled>
+                        🔍 Check for Changes
+                    </button>
+                    <span style="flex: 1"></span>
+                    <button id="releaseLockBtn" class="btn-danger" style="margin-left: auto;">
+                        🔓 Release All Locks
+                    </button>
+                </div>
+
+                <div id="fileInfo" class="file-info" style="display: none;">
+                    <span>📄</span>
+                    <span id="fileInfoText">No file selected</span>
+                </div>
+
+                <div class="editor-container">
+                    <textarea id="editor" placeholder="Select a file from the list to begin editing..."></textarea>
+                </div>
+
+                <div class="status-bar">
+                    <span id="statusText">Ready</span>
+                    <span id="fileSize">-</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="refresh-indicator" id="refreshIndicator">
+        ✅ File saved and uploaded to server!
+    </div>
+
+    <div class="conflict-modal" id="conflictModal">
+        <div class="conflict-content">
+            <h2>⚠️ Conflict Detected</h2>
+            <p>The file has been modified on the server since you started editing. What would you like to do?</p>
+            <div class="conflict-buttons">
+                <button id="conflictOverwriteBtn" data-action="overwrite" style="background: #dc3545; color: white;">
+                    Overwrite Server Version
+                </button>
+                <button id="conflictReloadBtn" data-action="reload" style="background: #28a745; color: white;">
+                    Reload Server Version
+                </button>
+                <button id="conflictCancelBtn" data-action="cancel" style="background: #6c757d; color: white;">
+                    Cancel
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script src="/js/api.js"></script>
+    <script src="/js/csrf-helper.js"></script>
+    <script src="/js/mission-editor.js"></script>
+</body>
+</html>

@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Guild Management - Admin Panel</title>
+  <link rel="stylesheet" href="/css/tailwind.css">
+  <style>
+    @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    .spinner { animation: spin 1s linear infinite; }
+  </style>
+  <script src="/js/instance-config.js" defer></script>
+</head>
+<body class="bg-gray-900 text-white">
+  <div class="container mx-auto p-6 max-w-7xl">
+
+    <!-- Header -->
+    <div class="flex justify-between items-center mb-6">
+      <div>
+        <h1 class="text-4xl font-bold">🛡️ Guild Management</h1>
+        <p class="text-gray-400 mt-2">Approve, disable, and manage Discord guilds</p>
+      </div>
+      <div class="flex gap-2">
+        <a href="/admin" class="bg-orange-600 hover:bg-orange-700 px-4 py-2 rounded">← Admin Dashboard</a>
+        <a href="/logout" class="bg-red-600 hover:bg-red-700 px-4 py-2 rounded">Logout</a>
+      </div>
+    </div>
+
+    <!-- Admin Navigation -->
+    <nav class="bg-gray-800 rounded-lg p-4 mb-6">
+      <div class="flex gap-2 flex-wrap">
+        <a href="/admin" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">Dashboard</a>
+        <a href="/admin/guilds" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">Discord Communities</a>
+        <a href="/admin/guilds-approval" class="bg-orange-600 px-4 py-2 rounded font-semibold">Guild Approval</a>
+        <a href="/admin/servers" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">All Servers</a>
+        <a href="/admin/users" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">Users</a>
+        <a href="/admin/audit" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">Audit Log</a>
+      </div>
+    </nav>
+
+    <!-- Tabs -->
+    <div class="flex gap-2 mb-6">
+      <button id="tab-pending" class="tab-btn bg-yellow-600 px-6 py-3 rounded font-semibold">
+        ⏳ Pending
+      </button>
+      <button id="tab-approved" class="tab-btn bg-gray-700 hover:bg-gray-600 px-6 py-3 rounded">
+        ✅ Approved
+      </button>
+      <button id="tab-disabled" class="tab-btn bg-gray-700 hover:bg-gray-600 px-6 py-3 rounded">
+        🚫 Disabled
+      </button>
+    </div>
+
+    <!-- Content -->
+    <div id="guilds-container" class="bg-gray-800 p-6 rounded-lg shadow-lg">
+      <div class="text-center py-8">
+        <div class="spinner border-4 border-blue-600 border-t-transparent rounded-full w-12 h-12 mx-auto mb-4"></div>
+        <p class="text-gray-400">Loading guilds...</p>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Confirmation Modal -->
+  <div id="confirmModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+    <div class="bg-gray-800 p-6 rounded-lg max-w-md w-full">
+      <h3 class="text-2xl font-bold mb-4" id="modalTitle">Confirm Action</h3>
+      <p class="text-gray-300 mb-4" id="modalMessage"></p>
+
+      <div id="reasonInput" class="hidden mb-4">
+        <label class="block text-sm font-semibold mb-2">Reason (optional):</label>
+        <textarea id="actionReason" class="w-full bg-gray-700 p-3 rounded" rows="3"></textarea>
+      </div>
+
+      <div class="flex gap-2 justify-end">
+        <button id="cancelBtn" class="bg-gray-600 hover:bg-gray-500 px-4 py-2 rounded">Cancel</button>
+        <button id="confirmBtn" class="bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded">Confirm</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="/js/api.js"></script>
+  <script src="/js/csrf-helper.js"></script>
+  <script src="/js/admin-guilds-approval.js"></script>
+</body>
+</html>

@@ -1,0 +1,8 @@
+{
+  "name": "S.A.L.T. Development",
+  "dockerComposeFile": "docker-compose.yml",
+  "service": "workspace",
+  "workspaceFolder": "/workspace",
+  "forwardPorts": [3000],
+  "postCreateCommand": "npm ci && npm ci --prefix bot"
+}

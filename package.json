@@ -1,0 +1,78 @@
+{
+  "name": "dayz-dashboard",
+  "version": "1.0.0",
+  "license": "AGPL-3.0-or-later",
+  "engines": {
+    "node": ">=22 <23"
+  },
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "nodemon server.js",
+    "local:setup": "node scripts/local-setup.js",
+    "local:up": "docker compose --env-file .env.local -p dayz-dashboard-local -f docker-compose.local.yml up -d --build",
+    "local:down": "docker compose --env-file .env.local -p dayz-dashboard-local -f docker-compose.local.yml down",
+    "local:logs": "docker compose --env-file .env.local -p dayz-dashboard-local -f docker-compose.local.yml logs -f backend bot",
+    "local:ps": "docker compose --env-file .env.local -p dayz-dashboard-local -f docker-compose.local.yml ps",
+    "local:commands": "docker compose --env-file .env.local -p dayz-dashboard-local -f docker-compose.local.yml exec -T bot node deploy-commands.js",
+    "admin:tui": "node scripts/tui-admin.js",
+    "db:smoke-test": "node scripts/db-smoke-test.js",
+    "manifest:ui": "node scripts/generate-ui-surface-manifest.js --write",
+    "manifest:ui:check": "node scripts/generate-ui-surface-manifest.js --check",
+    "test:ui-contract": "node scripts/ui-contract-test.js && npm run manifest:ui:check",
+    "lint": "eslint routes/ services/ middleware/ db/ bot/ src/app/ scheduler.js server.js --ext .js && eslint --no-ignore scripts/map-coordinate-regression-test.js utils/dayzCoordinates.js scripts/event-health-map-test.js scripts/dashboard-regression-test.js scripts/server-status-restart-test.js scripts/achievement-catalog-test.js scripts/alt-account-candidate-test.js scripts/local-setup.js scripts/local-runtime-test.js scripts/shop-event-position-test.js scripts/shop-map-picker-test.js scripts/shop-provisioning-version-test.js scripts/object-spawner-test.js scripts/shop-checkout-performance-test.js scripts/shop-checkout-ui-test.js scripts/shop-emote-capture-test.js scripts/shop-read-performance-test.js scripts/shop-rental-event-identity-test.js scripts/shop-rental-refund-evidence-test.js scripts/shop-fulfillment-status-test.js scripts/economy-server-scope-test.js scripts/exact-tree-blockers-test.js scripts/release-blockers-remediation-test.js scripts/bounty-system-test.js scripts/faction-bounty-test.js scripts/refund-claim-conflict-test.js scripts/exact-money-test.js scripts/financial-exact-writers-test.js scripts/financial-idempotency-test.js scripts/financial-idempotency-pg-test.js scripts/financial-retention-pg-test.js scripts/admin-rbac-route-test.js scripts/admin-rbac-pg-test.js scripts/link-security-pg-test.js scripts/private-data-authorization-test.js scripts/spawn-exclusion-test.js scripts/log-sync-multiserver-test.js scripts/mission-init-capability-test.js scripts/mission-init-team-test.js scripts/mission-init-composition-test.js scripts/mission-init-deployment-test.js scripts/mission-init-status-test.js scripts/mission-editor-provider-save-test.js scripts/rotation-provider-recovery-test.js scripts/provider-mutation-recovery-test.js scripts/provider-mutation-pg-test.js scripts/effectarea-recovery-test.js scripts/external-integrations-test.js scripts/ai-user-provider-test.js scripts/log-observability-regression-test.js scripts/rebuild-observability-events.js scripts/generate-ui-surface-manifest.js scripts/lib/ui-surface-manifest.js scripts/ui-contract-test.js scripts/faction-security-test.js scripts/player-map-policy-test.js scripts/player-position-parser-test.js scripts/radar-policy-test.js scripts/radar-integration-test.js scripts/teleport-policy-test.js scripts/bot-server-autocomplete-test.js scripts/teleport-persistence-test.js scripts/teleport-service-test.js scripts/teleport-adm-test.js scripts/teleport-pra-test.js scripts/teleport-processor-test.js scripts/shop-capability-policy-test.js scripts/teleport-destination-service-test.js scripts/teleport-route-test.js scripts/teleport-shop-checkout-test.js scripts/teleport-bot-command-test.js scripts/teleport-restriction-service-test.js scripts/teleport-scheduler-test.js utils/economyTransactions.js utils/money.js utils/shopCheckoutCommand.js utils/shopProvisioningVersion.js utils/feedMessageFormatter.js utils/logFileChronology.js utils/logSyncScheduling.js public/js/ai-assistant.js public/js/admin-reports.js public/js/rotation.js public/js/supportHub.js public/js/server-players.js public/js/spawn-exclusions.js public/js/logs.js && eslint --no-ignore --env browser --global TransactionList --global fetchWithCsrf public/js/components/transactionList.js public/js/economy-transactions-init.js public/js/shop-admin.js public/js/dayz-map-tiles.js public/js/dayz-map-coordinates.js && eslint --no-ignore --env browser --rule 'no-undef: off' --rule 'no-unused-vars: off' public/js/map.js public/js/player-map.js public/js/player-map-standalone.js public/js/loot-finder.js public/js/checkout-state.js public/js/shop.js public/js/bounties.js",
+    "test:security-regressions": "node scripts/security-regression-test.js",
+    "test:admin-security": "node scripts/admin-rbac-health-test.js && node scripts/discord-membership-test.js && node scripts/admin-rbac-route-test.js",
+    "test:admin-pg": "node scripts/admin-rbac-pg-test.js",
+    "test:link-security-pg": "node scripts/link-security-pg-test.js",
+    "test:teleport": "node scripts/teleport-policy-test.js && node scripts/teleport-persistence-test.js && node scripts/teleport-service-test.js && node scripts/teleport-adm-test.js && node scripts/teleport-pra-test.js && node scripts/teleport-processor-test.js && node scripts/shop-capability-policy-test.js && node scripts/teleport-destination-service-test.js && node scripts/teleport-route-test.js && node scripts/teleport-shop-checkout-test.js && node scripts/teleport-bot-command-test.js && node scripts/teleport-restriction-service-test.js && node scripts/teleport-scheduler-test.js",
+    "test": "node scripts/release-blockers-remediation-test.js && node scripts/exact-tree-blockers-test.js && node scripts/fail-closed-remediation-test.js && node scripts/bounty-system-test.js && node scripts/faction-bounty-test.js && node scripts/refund-claim-conflict-test.js && node scripts/casino-atomic-settlement-test.js && node scripts/financial-retention-pg-test.js && node scripts/exact-money-test.js && node scripts/financial-exact-writers-test.js && node scripts/financial-idempotency-test.js && node scripts/financial-idempotency-pg-test.js && node scripts/map-coordinate-regression-test.js && node scripts/unit-test.js && node scripts/spawn-exclusion-test.js && node scripts/event-health-map-test.js && node scripts/log-sync-multiserver-test.js && node scripts/mission-init-capability-test.js && node scripts/mission-init-team-test.js && node scripts/mission-init-composition-test.js && node scripts/mission-init-deployment-test.js && node scripts/mission-init-status-test.js && node scripts/mission-editor-provider-save-test.js && node scripts/rotation-provider-recovery-test.js && node scripts/provider-mutation-recovery-test.js && node scripts/provider-mutation-pg-test.js && node scripts/effectarea-recovery-test.js && node scripts/dashboard-regression-test.js && node scripts/server-status-restart-test.js && node scripts/achievement-catalog-test.js && node scripts/alt-account-candidate-test.js && node scripts/local-runtime-test.js && node scripts/shop-event-position-test.js && node scripts/shop-map-picker-test.js && node scripts/shop-provisioning-version-test.js && node scripts/object-spawner-test.js && node scripts/shop-checkout-performance-test.js && node scripts/shop-checkout-ui-test.js && node scripts/shop-emote-capture-test.js && node scripts/shop-read-performance-test.js && node scripts/shop-rental-event-identity-test.js && node scripts/shop-rental-refund-evidence-test.js && node scripts/shop-fulfillment-status-test.js && node scripts/external-integrations-test.js && node scripts/ai-user-provider-test.js && node scripts/log-observability-regression-test.js && node scripts/platform-server-management-test.js && node scripts/server-naming-settings-test.js && node scripts/nitrado-server-selection-route-test.js && node scripts/faction-security-test.js && node scripts/player-map-policy-test.js && node scripts/player-position-parser-test.js && node scripts/radar-policy-test.js && node scripts/radar-integration-test.js && node scripts/bot-server-autocomplete-test.js && npm run test:teleport && npm run test:ui-contract && npm run test:security-regressions && npm run test:admin-security",
+    "audit": "npm audit",
+    "audit:fix": "npm audit fix",
+    "security:check": "npm run security:audit && npm audit",
+    "security:audit": "node scripts/security-audit.js",
+    "build:css": "tailwindcss -i ./styles/input.css -o ./public/css/tailwind.css --minify",
+    "watch:css": "tailwindcss -i ./styles/input.css -o ./public/css/tailwind.css --watch"
+  },
+  "dependencies": {
+    "@github/copilot-sdk": "1.0.11",
+    "axios": "^1.13.5",
+    "blessed": "^0.1.81",
+    "blessed-contrib": "^4.11.0",
+    "connect-pg-simple": "^10.0.0",
+    "cookie-parser": "^1.4.7",
+    "csurf": "^1.11.0",
+    "dotenv": "^17.3.0",
+    "express": "4.22.2",
+    "express-rate-limit": "^8.2.1",
+    "express-session": "^1.18.0",
+    "express-validator": "^7.3.1",
+    "fast-xml-parser": "^5.7.0",
+    "form-data": "^4.0.6",
+    "helmet": "^8.1.0",
+    "node-cron": "^4.6.0",
+    "passport": "^0.7.0",
+    "passport-discord": "^0.1.4",
+    "pg": "^8.20.0",
+    "winston": "^3.19.0",
+    "xml2js": "^0.6.2"
+  },
+  "devDependencies": {
+    "acorn": "^8.18.0",
+    "eslint": "^8.46.0",
+    "tailwindcss": "^3.4.0"
+  },
+  "overrides": {
+    "qs": "6.16.0",
+    "tar": "7.5.21",
+    "minimatch": "3.1.5",
+    "brace-expansion": "1.1.18",
+    "xml2js": "$xml2js",
+    "csurf": {
+      "cookie": "0.7.2"
+    },
+    "blessed-contrib": {
+      "lodash": "4.18.1"
+    }
+  }
+}

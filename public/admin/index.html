@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Admin Dashboard - DayZ Dashboard</title>
+  <link rel="stylesheet" href="/css/tailwind.css">
+  <style>
+    @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    .spinner { animation: spin 1s linear infinite; }
+  </style>
+  <script src="/js/instance-config.js" defer></script>
+</head>
+<body class="bg-gray-900 text-white">
+  <div class="container mx-auto p-6 max-w-7xl">
+    <!-- Header -->
+    <div class="flex justify-between items-center mb-6">
+      <h1 class="text-4xl font-bold">👑 Platform Administration</h1>
+      <div class="flex gap-2">
+        <button id="refresh-btn" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded flex items-center gap-2">
+          🔄 Refresh
+        </button>
+        <a href="/dashboard" class="bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded">Owner Portal</a>
+        <a href="/logout" class="bg-red-600 hover:bg-red-700 px-4 py-2 rounded">Logout</a>
+      </div>
+    </div>
+
+    <!-- Admin Navigation -->
+    <nav class="bg-gray-800 rounded-lg p-4 mb-6">
+      <div class="flex gap-2 flex-wrap">
+        <a href="/admin" class="bg-orange-600 px-4 py-2 rounded font-semibold">Dashboard</a>
+        <a href="/admin/guilds" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">Discord Communities</a>
+        <a href="/admin/guilds-approval" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">Guild Approval</a>
+        <a href="/admin/servers" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">All Servers</a>
+        <a href="/admin/users" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">Users</a>
+        <a href="/admin/audit" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">Audit Log</a>
+        <a href="/admin/database" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">Database Tools</a>
+      </div>
+    </nav>
+
+    <!-- Overview Stats Cards -->
+    <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+      <!-- Guilds Card -->
+      <div class="bg-gray-800 p-6 rounded-lg shadow-lg hover:bg-gray-750 transition-colors">
+        <div class="flex items-start justify-between">
+          <div>
+            <p class="text-gray-400 text-sm mb-1">Guilds</p>
+            <p class="text-3xl font-bold mb-3" id="stat-guilds-total">-</p>
+            <div class="space-y-1 text-sm" id="stat-guilds-breakdown">
+              <p class="text-gray-500">Loading...</p>
+            </div>
+          </div>
+          <div class="text-4xl">🏰</div>
+        </div>
+      </div>
+
+      <!-- Servers Card -->
+      <div class="bg-gray-800 p-6 rounded-lg shadow-lg hover:bg-gray-750 transition-colors">
+        <div class="flex items-start justify-between">
+          <div>
+            <p class="text-gray-400 text-sm mb-1">Servers</p>
+            <p class="text-3xl font-bold" id="stat-servers-total">-</p>
+          </div>
+          <div class="text-4xl">🖥️</div>
+        </div>
+      </div>
+
+      <!-- Players Card -->
+      <div class="bg-gray-800 p-6 rounded-lg shadow-lg hover:bg-gray-750 transition-colors">
+        <div class="flex items-start justify-between">
+          <div>
+            <p class="text-gray-400 text-sm mb-1">Linked Players</p>
+            <p class="text-3xl font-bold" id="stat-players-total">-</p>
+          </div>
+          <div class="text-4xl">👥</div>
+        </div>
+      </div>
+
+      <!-- System Health Card -->
+      <div class="bg-gray-800 p-6 rounded-lg shadow-lg hover:bg-gray-750 transition-colors">
+        <div class="flex items-start justify-between">
+          <div class="flex-1">
+            <p class="text-gray-400 text-sm mb-1">System Health</p>
+            <p class="text-xl font-bold mb-3" id="health-status">-</p>
+            <div class="space-y-1 text-sm" id="health-checks">
+              <p class="text-gray-500">Loading...</p>
+            </div>
+          </div>
+          <div class="text-4xl">🩺</div>
+        </div>
+      </div>
+    </div>
+
+    <section class="bg-gray-800 p-6 rounded-lg shadow-lg mb-6">
+      <div class="flex justify-between items-center mb-4">
+        <h2 class="text-2xl font-semibold">Guild &amp; Server Health</h2>
+        <a href="/admin/servers" class="text-orange-400 hover:text-orange-300 text-sm">View server details →</a>
+      </div>
+      <div id="guild-health-summary" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+        <p class="text-gray-400">Loading authorized guild health…</p>
+      </div>
+    </section>
+
+    <!-- Quick Actions Bar -->
+    <div class="bg-gray-800 p-4 rounded-lg shadow-lg mb-6">
+      <div class="flex flex-wrap justify-center gap-3">
+        <a href="/admin/guilds-approval" id="approval-btn"
+           class="bg-yellow-600 hover:bg-yellow-500 px-5 py-2 rounded-lg font-semibold transition-colors flex items-center gap-2">
+          🛡️ Guild Approval
+        </a>
+        <a href="/admin/guilds"
+           class="bg-gray-700 hover:bg-gray-600 px-5 py-2 rounded-lg font-semibold transition-colors flex items-center gap-2">
+          🏰 Manage Guilds
+        </a>
+        <a href="/admin/servers"
+           class="bg-gray-700 hover:bg-gray-600 px-5 py-2 rounded-lg font-semibold transition-colors flex items-center gap-2">
+          🖥️ All Servers
+        </a>
+        <a href="/admin/users"
+           class="bg-gray-700 hover:bg-gray-600 px-5 py-2 rounded-lg font-semibold transition-colors flex items-center gap-2">
+          👥 Users
+        </a>
+        <a href="/admin/audit"
+           class="bg-gray-700 hover:bg-gray-600 px-5 py-2 rounded-lg font-semibold transition-colors flex items-center gap-2">
+          📜 Audit Log
+        </a>
+        <a href="/admin/database"
+           class="bg-red-700 hover:bg-red-600 px-5 py-2 rounded-lg font-semibold transition-colors flex items-center gap-2">
+          🧹 Database Tools
+        </a>
+      </div>
+    </div>
+
+    <!-- Recent Activity Feed -->
+    <div class="bg-gray-800 p-6 rounded-lg shadow-lg">
+      <div class="flex justify-between items-center mb-4">
+        <h2 class="text-2xl font-semibold">🕐 Recent Activity</h2>
+        <a href="/admin/audit" class="text-orange-400 hover:text-orange-300 text-sm">View All →</a>
+      </div>
+      <div id="activity-feed">
+        <div class="text-center py-8">
+          <div class="spinner border-4 border-orange-600 border-t-transparent rounded-full w-12 h-12 mx-auto mb-4"></div>
+          <p class="text-gray-400">Loading activity...</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="/js/api.js"></script>
+  <script src="/js/csrf-helper.js"></script>
+  <script src="/js/admin-index.js"></script>
+</body>
+</html>

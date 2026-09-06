@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Player Management - DayZ Dashboard</title>
+  <link rel="stylesheet" href="/css/tailwind.css">
+  <script src="/js/instance-config.js" defer></script>
+</head>
+<body class="bg-gray-900 text-white min-h-screen">
+  <div class="mx-auto px-4 py-4" style="max-width:1600px">
+
+    <!-- Header -->
+    <div class="flex justify-between items-center mb-4">
+      <h1 class="text-2xl font-bold">👥 Player Management</h1>
+      <a href="/dashboard" class="bg-blue-600 hover:bg-blue-700 px-3 py-1.5 rounded text-sm">← Dashboard</a>
+    </div>
+
+    <!-- Server Selector -->
+    <div class="bg-gray-800 px-4 py-3 rounded-lg mb-4 flex flex-wrap items-center gap-3 border border-gray-700">
+      <label class="text-sm font-semibold text-gray-300 whitespace-nowrap">Server:</label>
+      <select id="serverSelect" class="bg-gray-700 px-3 py-1.5 rounded text-sm flex-1 max-w-xs focus:ring-2 focus:ring-blue-500 outline-none">
+        <option value="">Loading servers...</option>
+      </select>
+      <button id="wipeServerBtn" class="hidden ml-auto bg-red-900 hover:bg-red-800 border border-red-700 text-red-300 px-3 py-1.5 rounded text-xs font-semibold">🗑️ Wipe Server Data</button>
+    </div>
+
+    <!-- Stats Bar (shown when server selected) -->
+    <div id="statsBar" class="hidden grid grid-cols-2 md:grid-cols-4 gap-3 mb-3">
+      <div class="bg-gray-800 rounded-lg px-4 py-2.5 border border-gray-700">
+        <div class="text-xs text-gray-400 mb-0.5">Total Players</div>
+        <div class="text-xl font-bold text-white" id="statTotal">—</div>
+      </div>
+      <div class="bg-gray-800 rounded-lg px-4 py-2.5 border border-gray-700 cursor-pointer hover:border-red-700 transition-colors" id="altStatCard" title="Click to filter confirmed alts">
+        <div class="text-xs text-gray-400 mb-0.5">Confirmed Alt Accounts <span class="text-gray-600">↗</span></div>
+        <div class="text-xl font-bold text-red-400" id="statAlts">—</div>
+      </div>
+      <div class="bg-gray-800 rounded-lg px-4 py-2.5 border border-gray-700">
+        <div class="text-xs text-gray-400 mb-0.5">Discord Linked</div>
+        <div class="text-xl font-bold text-blue-400" id="statLinked">—</div>
+      </div>
+      <div class="bg-gray-800 rounded-lg px-4 py-2.5 border border-gray-700">
+        <div class="text-xs text-gray-400 mb-0.5">Detection Policy</div>
+        <div class="text-sm font-semibold text-yellow-300">Review only</div>
+        <div class="text-xs text-gray-500">No automatic bans</div>
+      </div>
+    </div>
+
+    <!-- Controls Bar -->
+    <div id="controlsBar" class="hidden bg-gray-800 px-3 py-2 rounded-lg mb-2 flex flex-wrap gap-2 items-center border border-gray-700">
+      <!-- Search -->
+      <input id="searchInput" type="text" placeholder="🔍 Gamertag search..."
+        class="bg-gray-700 px-3 py-1.5 rounded text-sm border border-gray-600 focus:ring-2 focus:ring-blue-500 outline-none w-52">
+
+      <!-- Filter -->
+      <select id="filterSelect" class="bg-gray-700 px-2 py-1.5 rounded text-sm border border-gray-600 focus:ring-2 focus:ring-blue-500 outline-none">
+        <option value="">All Players</option>
+        <option value="alts">⚠️ Alts Only</option>
+        <option value="linked">🔗 Linked Only</option>
+      </select>
+
+      <!-- Right side: showing text + page size + pagination -->
+      <div class="flex items-center gap-2 ml-auto text-xs text-gray-400 flex-wrap">
+        <span id="showingText">—</span>
+
+        <select id="pageSizeSelect" class="bg-gray-700 px-2 py-1 rounded text-xs border border-gray-600 outline-none">
+          <option value="25">25/page</option>
+          <option value="50" selected>50/page</option>
+          <option value="100">100/page</option>
+        </select>
+
+        <div class="flex items-center gap-1">
+          <button id="firstBtn" disabled class="bg-gray-700 hover:bg-gray-600 disabled:opacity-40 disabled:cursor-not-allowed px-2 py-1 rounded text-xs">«</button>
+          <button id="prevBtn"  disabled class="bg-gray-700 hover:bg-gray-600 disabled:opacity-40 disabled:cursor-not-allowed px-2 py-1 rounded text-xs">‹</button>
+          <span id="pageIndicator" class="px-2 text-gray-300 font-medium">—</span>
+          <button id="nextBtn"  disabled class="bg-gray-700 hover:bg-gray-600 disabled:opacity-40 disabled:cursor-not-allowed px-2 py-1 rounded text-xs">›</button>
+          <button id="lastBtn"  disabled class="bg-gray-700 hover:bg-gray-600 disabled:opacity-40 disabled:cursor-not-allowed px-2 py-1 rounded text-xs">»</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Player Table -->
+    <div id="playerSection" class="hidden bg-gray-800 rounded-lg border border-gray-700 overflow-hidden mb-3">
+      <div class="overflow-x-auto">
+        <table class="w-full text-sm">
+          <thead>
+            <tr class="text-xs uppercase tracking-wider text-gray-500 border-b border-gray-700 bg-gray-900/50">
+              <th class="px-3 py-2 text-left cursor-pointer hover:text-gray-200 select-none whitespace-nowrap" data-sort="gamertag">
+                Gamertag <span class="sort-indicator text-gray-600" data-col="gamertag"></span>
+              </th>
+              <th class="px-3 py-2 text-left cursor-pointer hover:text-gray-200 select-none" data-sort="platform">
+                Plat <span class="sort-indicator text-gray-600" data-col="platform"></span>
+              </th>
+              <th class="px-3 py-2 text-left cursor-pointer hover:text-gray-200 select-none whitespace-nowrap" data-sort="lastSeen">
+                Last Seen <span class="sort-indicator text-gray-600" data-col="lastSeen">↓</span>
+              </th>
+              <th class="px-3 py-2 text-left cursor-pointer hover:text-gray-200 select-none whitespace-nowrap" data-sort="totalPlaytime">
+                Playtime <span class="sort-indicator text-gray-600" data-col="totalPlaytime"></span>
+              </th>
+              <th class="px-3 py-2 text-left cursor-pointer hover:text-gray-200 select-none" data-sort="totalKills">
+                K / D <span class="sort-indicator text-gray-600" data-col="totalKills"></span>
+              </th>
+              <th class="px-3 py-2 text-left cursor-pointer hover:text-gray-200 select-none whitespace-nowrap" data-sort="platform_user_id">
+                Account UID <span class="sort-indicator text-gray-600" data-col="platform_user_id"></span>
+              </th>
+              <th class="px-3 py-2 text-left whitespace-nowrap">Discord</th>
+              <th class="px-3 py-2 text-left">Actions</th>
+            </tr>
+          </thead>
+          <tbody id="playerTableBody">
+            <tr>
+              <td colspan="8" class="text-gray-500 py-8 text-center text-sm">
+                Select a server above to view players.
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Possible Alt Review Panel (collapsible) -->
+    <div id="altPanel" class="hidden">
+      <button id="altPanelToggle"
+        class="w-full bg-gray-800 hover:bg-gray-700 border border-gray-700 rounded-lg px-4 py-2.5 text-left flex justify-between items-center text-sm font-semibold transition-colors">
+        <span>⚠️ Possible Alt Review</span>
+        <span id="altPanelIcon" class="text-gray-500 text-xs font-normal">▶ Expand</span>
+      </button>
+
+      <div id="altPanelContent" class="hidden bg-gray-800 border border-t-0 border-gray-700 rounded-b-lg p-4">
+        <div class="rounded border border-yellow-900 bg-yellow-950/20 px-3 py-2 mb-3 text-xs text-yellow-200">
+          Behavioral matches are leads for human review, not proof. This screen never bans accounts automatically.
+        </div>
+        <div class="flex justify-between items-center mb-2">
+          <h3 class="text-sm font-semibold text-gray-200">Evidence-based candidates</h3>
+          <span id="altScanStatus" class="text-xs text-gray-600"></span>
+        </div>
+        <div id="altStatus" class="text-xs text-gray-500 mb-2"></div>
+        <div id="altGroups" class="space-y-2 max-h-96 overflow-y-auto pr-1"></div>
+      </div>
+    </div>
+
+    <!-- List Management Panel (whitelist / banlist / priority) -->
+    <div id="listPanel" class="hidden mt-3">
+      <button id="listPanelToggle"
+        class="w-full bg-gray-800 hover:bg-gray-700 border border-gray-700 rounded-lg px-4 py-2.5 text-left flex justify-between items-center text-sm font-semibold transition-colors">
+        <span>📋 List Management — Whitelist / Banlist / Priority</span>
+        <span id="listPanelIcon" class="text-gray-500 text-xs font-normal">▶ Expand</span>
+      </button>
+
+      <div id="listPanelContent" class="hidden bg-gray-800 border border-t-0 border-gray-700 rounded-b-lg p-4">
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+
+          <!-- Whitelist -->
+          <div class="flex flex-col gap-2">
+            <div class="flex items-center justify-between">
+              <h3 class="text-sm font-semibold text-green-300">✅ Whitelist <span id="whitelistCount" class="text-gray-500 font-normal"></span></h3>
+              <div class="flex gap-2">
+                <button data-reload-list="whitelist" class="text-xs text-gray-500 hover:text-gray-300" title="Refresh">↻</button>
+                <button data-clear-list="whitelist" class="text-xs text-red-600 hover:text-red-400" title="Clear all entries">🗑 Clear</button>
+              </div>
+            </div>
+            <div class="flex gap-1">
+              <input id="whitelistInput" type="text" placeholder="Add gamertag…"
+                class="bg-gray-700 border border-gray-600 rounded px-2 py-1 text-xs flex-1 outline-none focus:ring-1 focus:ring-green-500">
+              <button data-add-list="whitelist" class="bg-green-800 hover:bg-green-700 px-2 py-1 rounded text-xs whitespace-nowrap">+ Add</button>
+            </div>
+            <div id="whitelistItems" class="max-h-60 overflow-y-auto space-y-px text-xs"></div>
+          </div>
+
+          <!-- Banlist -->
+          <div class="flex flex-col gap-2">
+            <div class="flex items-center justify-between">
+              <h3 class="text-sm font-semibold text-red-300">🚫 Banlist <span id="blacklistCount" class="text-gray-500 font-normal"></span></h3>
+              <div class="flex gap-2">
+                <button data-reload-list="blacklist" class="text-xs text-gray-500 hover:text-gray-300" title="Refresh">↻</button>
+                <button data-clear-list="blacklist" class="text-xs text-red-600 hover:text-red-400" title="Clear all entries">🗑 Clear</button>
+              </div>
+            </div>
+            <div class="flex gap-1">
+              <input id="blacklistInput" type="text" placeholder="Add gamertag…"
+                class="bg-gray-700 border border-gray-600 rounded px-2 py-1 text-xs flex-1 outline-none focus:ring-1 focus:ring-red-500">
+              <button data-add-list="blacklist" class="bg-red-800 hover:bg-red-700 px-2 py-1 rounded text-xs whitespace-nowrap">+ Add</button>
+            </div>
+            <div id="blacklistItems" class="max-h-60 overflow-y-auto space-y-px text-xs"></div>
+          </div>
+
+          <!-- Priority list -->
+          <div class="flex flex-col gap-2">
+            <div class="flex items-center justify-between">
+              <h3 class="text-sm font-semibold text-yellow-300">⭐ Priority <span id="prioritylistCount" class="text-gray-500 font-normal"></span></h3>
+              <div class="flex gap-2">
+                <button data-reload-list="prioritylist" class="text-xs text-gray-500 hover:text-gray-300" title="Refresh">↻</button>
+                <button data-clear-list="prioritylist" class="text-xs text-red-600 hover:text-red-400" title="Clear all entries">🗑 Clear</button>
+              </div>
+            </div>
+            <div class="flex gap-1">
+              <input id="prioritylistInput" type="text" placeholder="Add gamertag…"
+                class="bg-gray-700 border border-gray-600 rounded px-2 py-1 text-xs flex-1 outline-none focus:ring-1 focus:ring-yellow-500">
+              <button data-add-list="prioritylist" class="bg-yellow-700 hover:bg-yellow-600 px-2 py-1 rounded text-xs whitespace-nowrap">+ Add</button>
+            </div>
+            <div id="prioritylistItems" class="max-h-60 overflow-y-auto space-y-px text-xs"></div>
+          </div>
+
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="toastArea" class="fixed bottom-4 right-4 z-50 flex flex-col gap-2 items-end pointer-events-none"></div>
+
+  <script src="/js/api.js"></script>
+  <script src="/js/csrf-helper.js"></script>
+  <script src="/js/server-players.js"></script>
+</body>
+</html>

@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Database Tools - Admin Panel</title>
+  <link rel="stylesheet" href="/css/tailwind.css">
+  <script src="/js/instance-config.js" defer></script>
+</head>
+<body class="bg-gray-900 text-white">
+  <div class="container mx-auto p-6 max-w-6xl">
+    <div class="flex justify-between items-center mb-6">
+      <h1 class="text-4xl font-bold">🧹 Database Tools</h1>
+      <div class="flex gap-2">
+        <a href="/admin" class="bg-orange-600 hover:bg-orange-700 px-4 py-2 rounded">← Admin Dashboard</a>
+        <a href="/logout" class="bg-red-600 hover:bg-red-700 px-4 py-2 rounded">Logout</a>
+      </div>
+    </div>
+
+    <nav class="bg-gray-800 rounded-lg p-4 mb-6">
+      <div class="flex gap-2 flex-wrap">
+        <a href="/admin" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">Dashboard</a>
+        <a href="/admin/guilds" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">Discord Communities</a>
+        <a href="/admin/guilds-approval" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">Guild Approval</a>
+        <a href="/admin/servers" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">All Servers</a>
+        <a href="/admin/users" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">Users</a>
+        <a href="/admin/audit" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">Audit Log</a>
+        <a href="/admin/database" class="bg-orange-600 px-4 py-2 rounded font-semibold">Database Tools</a>
+      </div>
+    </nav>
+
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <section class="bg-gray-800 rounded-lg p-6 border border-gray-700">
+        <h2 class="text-2xl font-semibold mb-3">Reset Individual Player Stats</h2>
+        <p class="text-gray-300 text-sm mb-4">
+          Removes tracked stats/events for one identity while keeping linked account mappings and privileges intact.
+        </p>
+
+        <div class="mb-4">
+          <label class="block text-sm text-gray-400 mb-2">Search linked player</label>
+          <input id="player-search" type="text" class="w-full bg-gray-700 rounded px-3 py-2" placeholder="Gamertag or platform user id">
+        </div>
+
+        <div id="player-results" class="max-h-72 overflow-y-auto border border-gray-700 rounded mb-4"></div>
+
+        <div class="mb-4">
+          <label class="block text-sm text-gray-400 mb-2">Selected identity ID</label>
+          <input id="identity-id" type="number" min="1" class="w-full bg-gray-700 rounded px-3 py-2" placeholder="Identity ID">
+        </div>
+
+        <button id="reset-player-btn" class="bg-yellow-600 hover:bg-yellow-500 px-4 py-2 rounded font-semibold">
+          Reset Player Stats
+        </button>
+      </section>
+
+      <section class="bg-gray-800 rounded-lg p-6 border border-red-700">
+        <h2 class="text-2xl font-semibold mb-3 text-red-400">Full Tracked-Data Reset</h2>
+        <p class="text-gray-300 text-sm mb-4">
+          Wipes tracked data for a fresh analytics state while preserving linked accounts, privileges, servers, and tokens.
+        </p>
+        <p class="text-red-300 text-sm mb-3">
+          Type <code class="bg-gray-900 px-1 rounded">RESET TRACKED DATA</code> to confirm.
+        </p>
+        <input id="full-reset-confirm" type="text" class="w-full bg-gray-700 rounded px-3 py-2 mb-4" placeholder="Confirmation phrase">
+        <button id="full-reset-btn" class="bg-red-700 hover:bg-red-600 px-4 py-2 rounded font-semibold">
+          Run Full Reset
+        </button>
+      </section>
+    </div>
+
+    <section class="bg-gray-800 rounded-lg p-6 border border-gray-700 mt-6">
+      <h3 class="text-xl font-semibold mb-3">Output</h3>
+      <pre id="output" class="bg-gray-900 border border-gray-700 rounded p-3 text-sm whitespace-pre-wrap">Ready.</pre>
+    </section>
+  </div>
+
+  <script src="/js/api.js"></script>
+  <script src="/js/csrf-helper.js"></script>
+  <script src="/js/admin-database.js"></script>
+</body>
+</html>

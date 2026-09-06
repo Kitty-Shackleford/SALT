@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Support Hub - DayZ Dashboard</title>
+  <link rel="stylesheet" href="/css/tailwind.css">
+  <script src="/js/instance-config.js" defer></script>
+</head>
+<body class="bg-gray-900 text-white">
+  <div class="container mx-auto p-6 max-w-7xl">
+    <div class="flex justify-between items-center mb-6">
+      <h1 class="text-4xl font-bold">🎫 Support Hub</h1>
+      <a href="/dashboard" class="bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded">← Back</a>
+    </div>
+
+    <!-- Dashboard Navigation -->
+    <nav class="bg-gray-800 rounded-lg p-3 mb-6 border border-gray-700">
+      <div class="flex gap-2 flex-wrap">
+        <a href="/dashboard" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">🎮 Servers</a>
+        <a href="/dashboard/economy" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">💰 Economy</a>
+        <a href="/map" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">🗺️ Map</a>
+        <a href="/dashboard/feeds" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">📢 Feeds</a>
+        <a href="/dashboard/automation" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">⚙️ Automation</a>
+        <a href="/dashboard/tasks" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">🕒 Tasks</a>
+        <a href="/dashboard/server-control" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">🎮 Control</a>
+        <a href="/dashboard/backups" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">💾 Backups</a>
+        <a href="/dashboard/rotation" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">🔄 Rotation</a>
+        <a href="/dashboard/ai-assistant" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">🤖 AI</a>
+        <a href="/dashboard/server-stats" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">📊 Stats</a>
+        <a href="/dashboard/activity-log" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">📋 Activity</a>
+        <a href="/dashboard/console" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">🖥️ Console</a>
+        <a href="/dashboard/boost" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">🚀 Boost</a>
+        <a href="/dashboard/support" class="bg-blue-600 px-4 py-2 rounded font-semibold">🎫 Support</a>
+        <a href="/dashboard/settings" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">🔧 Settings</a>
+        <a href="/player-portal" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">👤 Player Portal</a>
+        <a href="/dashboard/shop-admin" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">🛒 Shop</a>
+      </div>
+    </nav>
+
+    <!-- Server selector -->
+    <div class="bg-gray-800 p-4 rounded-lg mb-6 border border-gray-700">
+      <label class="block mb-2 font-semibold">Select Server</label>
+      <select id="serverSelect" class="bg-gray-700 p-2 rounded w-full max-w-sm">
+        <option value="">Loading servers…</option>
+      </select>
+      <p class="text-gray-400 text-sm mt-2">
+        Service ID: <span id="serviceIdDisplay" class="font-mono text-yellow-400">—</span>
+      </p>
+    </div>
+
+    <!-- Support channel availability -->
+    <div class="bg-gray-800 rounded-lg p-6 mb-6 border border-gray-700">
+      <h2 class="text-xl font-bold mb-4">📡 Nitrado Support Channels</h2>
+      <div id="channelsWrap">
+        <p class="text-gray-400 text-sm">Loading channel availability…</p>
+      </div>
+    </div>
+
+    <!-- Quick links card -->
+    <div class="bg-gray-800 rounded-lg p-6 mb-6 border border-gray-700">
+      <h2 class="text-xl font-bold mb-4">🔗 Quick Links</h2>
+      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+
+        <a id="linkOpenTicket" href="https://server.nitrado.net/en/gameserver/support" target="_blank"
+          class="flex items-center gap-3 bg-blue-600 hover:bg-blue-700 p-4 rounded-lg">
+          <span class="text-2xl">🎟️</span>
+          <div>
+            <p class="font-semibold">Open a Ticket</p>
+            <p class="text-sm text-blue-200">Create a support request on Nitrado</p>
+          </div>
+        </a>
+
+        <a href="https://server.nitrado.net/en/gameserver/logs" target="_blank"
+          class="flex items-center gap-3 bg-gray-700 hover:bg-gray-600 p-4 rounded-lg">
+          <span class="text-2xl">📋</span>
+          <div>
+            <p class="font-semibold">Nitrado Service Logs</p>
+            <p class="text-sm text-gray-400">View logs on Nitrado's web panel</p>
+          </div>
+        </a>
+
+        <a href="https://wiki.nitrado.net/" target="_blank"
+          class="flex items-center gap-3 bg-gray-700 hover:bg-gray-600 p-4 rounded-lg">
+          <span class="text-2xl">📖</span>
+          <div>
+            <p class="font-semibold">Nitrado Wiki</p>
+            <p class="text-sm text-gray-400">Documentation and guides</p>
+          </div>
+        </a>
+
+        <a href="https://discord.gg/nitrado" target="_blank"
+          class="flex items-center gap-3 bg-gray-700 hover:bg-gray-600 p-4 rounded-lg">
+          <span class="text-2xl">💬</span>
+          <div>
+            <p class="font-semibold">Nitrado Discord</p>
+            <p class="text-sm text-gray-400">Community help and announcements</p>
+          </div>
+        </a>
+
+        <a href="https://twitter.com/Nitrado" target="_blank"
+          class="flex items-center gap-3 bg-gray-700 hover:bg-gray-600 p-4 rounded-lg">
+          <span class="text-2xl">🐦</span>
+          <div>
+            <p class="font-semibold">Nitrado Twitter / X</p>
+            <p class="text-sm text-gray-400">Status updates and outage notices</p>
+          </div>
+        </a>
+
+        <a href="https://status.nitrado.net/" target="_blank"
+          class="flex items-center gap-3 bg-gray-700 hover:bg-gray-600 p-4 rounded-lg">
+          <span class="text-2xl">🟢</span>
+          <div>
+            <p class="font-semibold">Nitrado Status Page</p>
+            <p class="text-sm text-gray-400">Check for active incidents or outages</p>
+          </div>
+        </a>
+
+      </div>
+    </div>
+
+    <!-- Phone contacts -->
+    <div class="bg-gray-800 rounded-lg p-6 border border-gray-700">
+      <h2 class="text-xl font-bold mb-4">📞 Phone Support</h2>
+      <div id="phoneWrap">
+        <p class="text-gray-400 text-sm">Loading phone support details…</p>
+      </div>
+    </div>
+
+  </div>
+  <script src="/js/supportHub.js"></script>
+</body>
+</html>

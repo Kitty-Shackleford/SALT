@@ -1,0 +1,2866 @@
+{
+  "schemaVersion": 1,
+  "routes": [
+    {
+      "method": "GET",
+      "path": "/",
+      "kind": "mixed",
+      "pageTargets": [
+        "public/splash.html"
+      ],
+      "redirectTargets": [
+        "{dynamic}"
+      ],
+      "declaredMiddleware": [],
+      "inheritedMiddleware": []
+    },
+    {
+      "method": "GET",
+      "path": "/admin",
+      "kind": "page",
+      "pageTargets": [
+        "public/admin/index.html"
+      ],
+      "redirectTargets": [],
+      "declaredMiddleware": [
+        "ensureAuthenticated",
+        "ensureAdmin"
+      ],
+      "inheritedMiddleware": []
+    },
+    {
+      "method": "GET",
+      "path": "/admin/audit",
+      "kind": "page",
+      "pageTargets": [
+        "public/admin/audit.html"
+      ],
+      "redirectTargets": [],
+      "declaredMiddleware": [],
+      "inheritedMiddleware": [
+        "ensureAuthenticated",
+        "ensureAdmin",
+        "apiLimiter"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/admin/database",
+      "kind": "page",
+      "pageTargets": [
+        "public/admin/database.html"
+      ],
+      "redirectTargets": [],
+      "declaredMiddleware": [],
+      "inheritedMiddleware": [
+        "ensureAuthenticated",
+        "ensureAdmin",
+        "apiLimiter"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/admin/economy-analytics",
+      "kind": "page",
+      "pageTargets": [
+        "public/admin/economy-analytics.html"
+      ],
+      "redirectTargets": [],
+      "declaredMiddleware": [
+        "apiLimiter",
+        "ensureAdmin"
+      ],
+      "inheritedMiddleware": [
+        "ensureAuthenticated",
+        "ensureAdmin",
+        "apiLimiter"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/admin/feeds",
+      "kind": "redirect",
+      "pageTargets": [],
+      "redirectTargets": [
+        "/dashboard/feeds"
+      ],
+      "declaredMiddleware": [],
+      "inheritedMiddleware": [
+        "ensureAuthenticated",
+        "ensureAdmin",
+        "apiLimiter"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/admin/guilds",
+      "kind": "page",
+      "pageTargets": [
+        "public/admin/guilds.html"
+      ],
+      "redirectTargets": [],
+      "declaredMiddleware": [],
+      "inheritedMiddleware": [
+        "ensureAuthenticated",
+        "ensureAdmin",
+        "apiLimiter"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/admin/guilds-approval",
+      "kind": "page",
+      "pageTargets": [
+        "public/admin/guilds-approval.html"
+      ],
+      "redirectTargets": [],
+      "declaredMiddleware": [],
+      "inheritedMiddleware": [
+        "ensureAuthenticated",
+        "ensureAdmin",
+        "apiLimiter"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/admin/reports",
+      "kind": "page",
+      "pageTargets": [
+        "public/admin/reports.html"
+      ],
+      "redirectTargets": [],
+      "declaredMiddleware": [
+        "ensureAuthenticated",
+        "ensureAdmin"
+      ],
+      "inheritedMiddleware": [
+        "ensureAuthenticated",
+        "ensureAdmin",
+        "apiLimiter"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/admin/roles",
+      "kind": "page",
+      "pageTargets": [
+        "public/admin/users.html"
+      ],
+      "redirectTargets": [],
+      "declaredMiddleware": [],
+      "inheritedMiddleware": [
+        "ensureAuthenticated",
+        "ensureAdmin",
+        "apiLimiter"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/admin/servers",
+      "kind": "page",
+      "pageTargets": [
+        "public/admin/servers.html"
+      ],
+      "redirectTargets": [],
+      "declaredMiddleware": [],
+      "inheritedMiddleware": [
+        "ensureAuthenticated",
+        "ensureAdmin",
+        "apiLimiter"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/admin/supply-monitor",
+      "kind": "page",
+      "pageTargets": [
+        "public/admin/supply-monitor.html"
+      ],
+      "redirectTargets": [],
+      "declaredMiddleware": [
+        "apiLimiter",
+        "ensureAdmin"
+      ],
+      "inheritedMiddleware": [
+        "ensureAuthenticated",
+        "ensureAdmin",
+        "apiLimiter"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/admin/users",
+      "kind": "page",
+      "pageTargets": [
+        "public/admin/users.html"
+      ],
+      "redirectTargets": [],
+      "declaredMiddleware": [],
+      "inheritedMiddleware": [
+        "ensureAuthenticated",
+        "ensureAdmin",
+        "apiLimiter"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/auth/discord",
+      "kind": "redirect",
+      "pageTargets": [],
+      "redirectTargets": [
+        "/"
+      ],
+      "declaredMiddleware": [],
+      "inheritedMiddleware": []
+    },
+    {
+      "method": "GET",
+      "path": "/auth/discord/callback",
+      "kind": "redirect",
+      "pageTargets": [],
+      "redirectTargets": [
+        "/",
+        "/dashboard",
+        "/player"
+      ],
+      "declaredMiddleware": [],
+      "inheritedMiddleware": []
+    },
+    {
+      "method": "GET",
+      "path": "/automation",
+      "kind": "redirect",
+      "pageTargets": [],
+      "redirectTargets": [
+        "/dashboard/automation"
+      ],
+      "declaredMiddleware": [
+        "ensureAuthenticated",
+        "apiLimiter",
+        "ensureHasServers"
+      ],
+      "inheritedMiddleware": []
+    },
+    {
+      "method": "GET",
+      "path": "/dashboard",
+      "kind": "mixed",
+      "pageTargets": [
+        "public/dashboard.html",
+        "public/splash.html"
+      ],
+      "redirectTargets": [
+        "/player"
+      ],
+      "declaredMiddleware": [
+        "ensureAuthenticated"
+      ],
+      "inheritedMiddleware": []
+    },
+    {
+      "method": "GET",
+      "path": "/dashboard/activity-log",
+      "kind": "page",
+      "pageTargets": [
+        "public/dashboard/activity-log.html"
+      ],
+      "redirectTargets": [],
+      "declaredMiddleware": [
+        "apiLimiter",
+        "ensureAuthenticated",
+        "ensureHasServers"
+      ],
+      "inheritedMiddleware": []
+    },
+    {
+      "method": "GET",
+      "path": "/dashboard/ai-assistant",
+      "kind": "page",
+      "pageTargets": [
+        "public/dashboard/ai-assistant.html"
+      ],
+      "redirectTargets": [],
+      "declaredMiddleware": [
+        "apiLimiter",
+        "ensureAuthenticated",
+        "ensureHasServers"
+      ],
+      "inheritedMiddleware": []
+    },
+    {
+      "method": "GET",
+      "path": "/dashboard/automation",
+      "kind": "page",
+      "pageTargets": [
+        "public/dashboard/automation.html"
+      ],
+      "redirectTargets": [],
+      "declaredMiddleware": [
+        "apiLimiter",
+        "ensureAuthenticated",
+        "ensureHasOperableServers"
+      ],
+      "inheritedMiddleware": []
+    },
+    {
+      "method": "GET",
+      "path": "/dashboard/backups",
+      "kind": "page",
+      "pageTargets": [
+        "public/dashboard/backups.html"
+      ],
+      "redirectTargets": [],
+      "declaredMiddleware": [
+        "apiLimiter",
+        "ensureAuthenticated",
+        "ensureHasServers"
+      ],
+      "inheritedMiddleware": []
+    },
+    {
+      "method": "GET",
+      "path": "/dashboard/boost",
+      "kind": "page",
+      "pageTargets": [
+        "public/dashboard/boost.html"
+      ],
+      "redirectTargets": [],
+      "declaredMiddleware": [
+        "apiLimiter",
+        "ensureAuthenticated",
+        "ensureHasServers"
+      ],
+      "inheritedMiddleware": []
+    },
+    {
+      "method": "GET",
+      "path": "/dashboard/casino",
+      "kind": "page",
+      "pageTargets": [
+        "public/dashboard/casino.html"
+      ],
+      "redirectTargets": [],
+      "declaredMiddleware": [
+        "apiLimiter",
+        "ensureAuthenticated",
+        "ensureAdmin"
+      ],
+      "inheritedMiddleware": []
+    },
+    {
+      "method": "GET",
+      "path": "/dashboard/console",
+      "kind": "page",
+      "pageTargets": [
+        "public/dashboard/console.html"
+      ],
+      "redirectTargets": [],
+      "declaredMiddleware": [
+        "apiLimiter",
+        "ensureAuthenticated",
+        "ensureHasServers"
+      ],
+      "inheritedMiddleware": []
+    },
+    {
+      "method": "GET",
+      "path": "/dashboard/economy",
+      "kind": "page",
+      "pageTargets": [
+        "public/dashboard/economy.html"
+      ],
+      "redirectTargets": [],
+      "declaredMiddleware": [
+        "apiLimiter",
+        "ensureAuthenticated"
+      ],
+      "inheritedMiddleware": []
+    },
+    {
+      "method": "GET",
+      "path": "/dashboard/economy-leaderboard",
+      "kind": "page",
+      "pageTargets": [
+        "public/dashboard/economy-leaderboard.html"
+      ],
+      "redirectTargets": [],
+      "declaredMiddleware": [
+        "apiLimiter",
+        "ensureAuthenticated"
+      ],
+      "inheritedMiddleware": []
+    },
+    {
+      "method": "GET",
+      "path": "/dashboard/economy-settings",
+      "kind": "page",
+      "pageTargets": [
+        "public/dashboard/economy-settings.html"
+      ],
+      "redirectTargets": [],
+      "declaredMiddleware": [
+        "apiLimiter",
+        "ensureAuthenticated"
+      ],
+      "inheritedMiddleware": []
+    },
+    {
+      "method": "GET",
+      "path": "/dashboard/economy-transactions",
+      "kind": "page",
+      "pageTargets": [
+        "public/dashboard/economy-transactions.html"
+      ],
+      "redirectTargets": [],
+      "declaredMiddleware": [
+        "apiLimiter",
+        "ensureAuthenticated"
+      ],
+      "inheritedMiddleware": []
+    },
+    {
+      "method": "GET",
+      "path": "/dashboard/feeds",
+      "kind": "page",
+      "pageTargets": [
+        "public/dashboard/feeds.html"
+      ],
+      "redirectTargets": [],
+      "declaredMiddleware": [
+        "apiLimiter",
+        "ensureAuthenticated"
+      ],
+      "inheritedMiddleware": []
+    },
+    {
+      "method": "GET",
+      "path": "/dashboard/roles",
+      "kind": "page",
+      "pageTargets": [
+        "public/admin/users.html"
+      ],
+      "redirectTargets": [],
+      "declaredMiddleware": [
+        "ensureAuthenticated"
+      ],
+      "inheritedMiddleware": []
+    },
+    {
+      "method": "GET",
+      "path": "/dashboard/rotation",
+      "kind": "page",
+      "pageTargets": [
+        "public/dashboard/rotation.html"
+      ],
+      "redirectTargets": [],
+      "declaredMiddleware": [
+        "apiLimiter",
+        "ensureAuthenticated",
+        "ensureHasServers"
+      ],
+      "inheritedMiddleware": []
+    },
+    {
+      "method": "GET",
+      "path": "/dashboard/server-control",
+      "kind": "page",
+      "pageTargets": [
+        "public/dashboard/server-control.html"
+      ],
+      "redirectTargets": [],
+      "declaredMiddleware": [
+        "apiLimiter",
+        "ensureAuthenticated",
+        "ensureHasServers"
+      ],
+      "inheritedMiddleware": []
+    },
+    {
+      "method": "GET",
+      "path": "/dashboard/server-stats",
+      "kind": "page",
+      "pageTargets": [
+        "public/dashboard/server-stats.html"
+      ],
+      "redirectTargets": [],
+      "declaredMiddleware": [
+        "apiLimiter",
+        "ensureAuthenticated",
+        "ensureHasServers"
+      ],
+      "inheritedMiddleware": []
+    },
+    {
+      "method": "GET",
+      "path": "/dashboard/settings",
+      "kind": "page",
+      "pageTargets": [
+        "public/dashboard/settings.html"
+      ],
+      "redirectTargets": [],
+      "declaredMiddleware": [
+        "apiLimiter",
+        "ensureAuthenticated",
+        "ensureHasServers"
+      ],
+      "inheritedMiddleware": []
+    },
+    {
+      "method": "GET",
+      "path": "/dashboard/shop-admin",
+      "kind": "page",
+      "pageTargets": [
+        "public/dashboard/shop-admin.html"
+      ],
+      "redirectTargets": [],
+      "declaredMiddleware": [
+        "apiLimiter",
+        "ensureAuthenticated"
+      ],
+      "inheritedMiddleware": []
+    },
+    {
+      "method": "GET",
+      "path": "/dashboard/spawn-exclusions",
+      "kind": "page",
+      "pageTargets": [
+        "public/dashboard/spawn-exclusions.html"
+      ],
+      "redirectTargets": [],
+      "declaredMiddleware": [
+        "apiLimiter",
+        "ensureAuthenticated",
+        "ensureHasServers"
+      ],
+      "inheritedMiddleware": []
+    },
+    {
+      "method": "GET",
+      "path": "/dashboard/support",
+      "kind": "page",
+      "pageTargets": [
+        "public/dashboard/support.html"
+      ],
+      "redirectTargets": [],
+      "declaredMiddleware": [
+        "apiLimiter",
+        "ensureAuthenticated",
+        "ensureHasServers"
+      ],
+      "inheritedMiddleware": []
+    },
+    {
+      "method": "GET",
+      "path": "/dashboard/tasks",
+      "kind": "page",
+      "pageTargets": [
+        "public/dashboard/tasks.html"
+      ],
+      "redirectTargets": [],
+      "declaredMiddleware": [
+        "apiLimiter",
+        "ensureAuthenticated",
+        "ensureHasServers"
+      ],
+      "inheritedMiddleware": []
+    },
+    {
+      "method": "GET",
+      "path": "/economy-dashboard",
+      "kind": "redirect",
+      "pageTargets": [],
+      "redirectTargets": [
+        "/dashboard/economy"
+      ],
+      "declaredMiddleware": [
+        "apiLimiter",
+        "ensureAuthenticated"
+      ],
+      "inheritedMiddleware": []
+    },
+    {
+      "method": "GET",
+      "path": "/economy-leaderboard",
+      "kind": "redirect",
+      "pageTargets": [],
+      "redirectTargets": [
+        "/dashboard/economy-leaderboard"
+      ],
+      "declaredMiddleware": [
+        "apiLimiter",
+        "ensureAuthenticated"
+      ],
+      "inheritedMiddleware": []
+    },
+    {
+      "method": "GET",
+      "path": "/economy-transactions",
+      "kind": "redirect",
+      "pageTargets": [],
+      "redirectTargets": [
+        "/dashboard/economy-transactions"
+      ],
+      "declaredMiddleware": [
+        "apiLimiter",
+        "ensureAuthenticated"
+      ],
+      "inheritedMiddleware": []
+    },
+    {
+      "method": "GET",
+      "path": "/logout",
+      "kind": "redirect",
+      "pageTargets": [],
+      "redirectTargets": [
+        "/"
+      ],
+      "declaredMiddleware": [],
+      "inheritedMiddleware": []
+    },
+    {
+      "method": "GET",
+      "path": "/logs",
+      "kind": "page",
+      "pageTargets": [
+        "public/logs.html"
+      ],
+      "redirectTargets": [],
+      "declaredMiddleware": [
+        "ensureAuthenticated",
+        "apiLimiter",
+        "ensureHasOperableServers"
+      ],
+      "inheritedMiddleware": []
+    },
+    {
+      "method": "GET",
+      "path": "/loot-finder",
+      "kind": "page",
+      "pageTargets": [
+        "public/loot-finder.html"
+      ],
+      "redirectTargets": [],
+      "declaredMiddleware": [
+        "ensureAuthenticated",
+        "apiLimiter"
+      ],
+      "inheritedMiddleware": []
+    },
+    {
+      "method": "GET",
+      "path": "/map",
+      "kind": "page",
+      "pageTargets": [
+        "public/map.html"
+      ],
+      "redirectTargets": [],
+      "declaredMiddleware": [
+        "ensureAuthenticated",
+        "apiLimiter",
+        "ensureHasServers"
+      ],
+      "inheritedMiddleware": []
+    },
+    {
+      "method": "GET",
+      "path": "/mission-editor",
+      "kind": "page",
+      "pageTargets": [
+        "public/mission-editor.html"
+      ],
+      "redirectTargets": [],
+      "declaredMiddleware": [
+        "ensureAuthenticated",
+        "apiLimiter",
+        "ensureHasServers"
+      ],
+      "inheritedMiddleware": []
+    },
+    {
+      "method": "GET",
+      "path": "/nitrado-settings",
+      "kind": "redirect",
+      "pageTargets": [],
+      "redirectTargets": [
+        "/dashboard/settings"
+      ],
+      "declaredMiddleware": [
+        "ensureAuthenticated",
+        "apiLimiter",
+        "ensureHasServers"
+      ],
+      "inheritedMiddleware": []
+    },
+    {
+      "method": "GET",
+      "path": "/player",
+      "kind": "page",
+      "pageTargets": [
+        "public/player-portal.html"
+      ],
+      "redirectTargets": [],
+      "declaredMiddleware": [
+        "ensureAuthenticated"
+      ],
+      "inheritedMiddleware": []
+    },
+    {
+      "method": "GET",
+      "path": "/player-map",
+      "kind": "page",
+      "pageTargets": [
+        "public/player-map.html"
+      ],
+      "redirectTargets": [],
+      "declaredMiddleware": [
+        "ensureAuthenticated"
+      ],
+      "inheritedMiddleware": []
+    },
+    {
+      "method": "GET",
+      "path": "/player-portal",
+      "kind": "page",
+      "pageTargets": [
+        "public/player-portal.html"
+      ],
+      "redirectTargets": [],
+      "declaredMiddleware": [
+        "ensureAuthenticated",
+        "apiLimiter"
+      ],
+      "inheritedMiddleware": []
+    },
+    {
+      "method": "GET",
+      "path": "/server-lists",
+      "kind": "page",
+      "pageTargets": [
+        "public/server-lists.html"
+      ],
+      "redirectTargets": [],
+      "declaredMiddleware": [
+        "ensureAuthenticated",
+        "apiLimiter"
+      ],
+      "inheritedMiddleware": []
+    },
+    {
+      "method": "GET",
+      "path": "/server-players",
+      "kind": "page",
+      "pageTargets": [
+        "public/server-players.html"
+      ],
+      "redirectTargets": [],
+      "declaredMiddleware": [
+        "ensureAuthenticated",
+        "apiLimiter"
+      ],
+      "inheritedMiddleware": []
+    },
+    {
+      "method": "GET",
+      "path": "/shop",
+      "kind": "page",
+      "pageTargets": [
+        "public/shop.html"
+      ],
+      "redirectTargets": [],
+      "declaredMiddleware": [
+        "apiLimiter",
+        "ensureAuthenticated"
+      ],
+      "inheritedMiddleware": []
+    }
+  ],
+  "pages": [
+    {
+      "file": "public/admin/audit.html",
+      "routes": [
+        "/admin/audit"
+      ],
+      "scripts": [
+        "/js/instance-config.js",
+        "/js/api.js",
+        "/js/csrf-helper.js",
+        "/js/admin-audit.js"
+      ]
+    },
+    {
+      "file": "public/admin/database.html",
+      "routes": [
+        "/admin/database"
+      ],
+      "scripts": [
+        "/js/instance-config.js",
+        "/js/api.js",
+        "/js/csrf-helper.js",
+        "/js/admin-database.js"
+      ]
+    },
+    {
+      "file": "public/admin/economy-analytics.html",
+      "routes": [
+        "/admin/economy-analytics"
+      ],
+      "scripts": [
+        "/js/instance-config.js",
+        "https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js",
+        "/js/admin/economy-analytics.js"
+      ]
+    },
+    {
+      "file": "public/admin/feeds.html",
+      "routes": [],
+      "scripts": [
+        "/js/instance-config.js",
+        "/js/api.js",
+        "/js/csrf-helper.js",
+        "/js/admin-feeds.js"
+      ]
+    },
+    {
+      "file": "public/admin/guilds-approval.html",
+      "routes": [
+        "/admin/guilds-approval"
+      ],
+      "scripts": [
+        "/js/instance-config.js",
+        "/js/api.js",
+        "/js/csrf-helper.js",
+        "/js/admin-guilds-approval.js"
+      ]
+    },
+    {
+      "file": "public/admin/guilds.html",
+      "routes": [
+        "/admin/guilds"
+      ],
+      "scripts": [
+        "/js/instance-config.js",
+        "/js/api.js",
+        "/js/csrf-helper.js",
+        "/js/admin-guilds.js"
+      ]
+    },
+    {
+      "file": "public/admin/index.html",
+      "routes": [
+        "/admin"
+      ],
+      "scripts": [
+        "/js/instance-config.js",
+        "/js/api.js",
+        "/js/csrf-helper.js",
+        "/js/admin-index.js"
+      ]
+    },
+    {
+      "file": "public/admin/reports.html",
+      "routes": [
+        "/admin/reports"
+      ],
+      "scripts": [
+        "/js/instance-config.js",
+        "/js/api.js",
+        "/js/csrf-helper.js",
+        "/js/admin-reports.js"
+      ]
+    },
+    {
+      "file": "public/admin/servers.html",
+      "routes": [
+        "/admin/servers"
+      ],
+      "scripts": [
+        "/js/instance-config.js",
+        "/js/api.js",
+        "/js/csrf-helper.js",
+        "/js/admin-servers.js"
+      ]
+    },
+    {
+      "file": "public/admin/supply-monitor.html",
+      "routes": [
+        "/admin/supply-monitor"
+      ],
+      "scripts": [
+        "/js/instance-config.js",
+        "/js/api.js",
+        "/js/csrf-helper.js",
+        "/js/admin/supply-monitor.js"
+      ]
+    },
+    {
+      "file": "public/admin/users.html",
+      "routes": [
+        "/admin/roles",
+        "/admin/users",
+        "/dashboard/roles"
+      ],
+      "scripts": [
+        "/js/instance-config.js",
+        "/js/api.js",
+        "/js/csrf-helper.js",
+        "/js/admin-users.js"
+      ]
+    },
+    {
+      "file": "public/automation.html",
+      "routes": [],
+      "scripts": [
+        "/js/instance-config.js",
+        "/js/api.js",
+        "/js/csrf-helper.js",
+        "/js/automation.js"
+      ]
+    },
+    {
+      "file": "public/dashboard.html",
+      "routes": [
+        "/dashboard"
+      ],
+      "scripts": [
+        "/js/instance-config.js",
+        "/js/api.js",
+        "/js/csrf-helper.js",
+        "/js/dashboard.js"
+      ]
+    },
+    {
+      "file": "public/dashboard/activity-log.html",
+      "routes": [
+        "/dashboard/activity-log"
+      ],
+      "scripts": [
+        "/js/instance-config.js",
+        "/js/activityLog.js"
+      ]
+    },
+    {
+      "file": "public/dashboard/ai-assistant.html",
+      "routes": [
+        "/dashboard/ai-assistant"
+      ],
+      "scripts": [
+        "/js/instance-config.js",
+        "/js/ai-assistant.js"
+      ]
+    },
+    {
+      "file": "public/dashboard/automation.html",
+      "routes": [
+        "/dashboard/automation"
+      ],
+      "scripts": [
+        "/js/instance-config.js",
+        "/js/api.js",
+        "/js/csrf-helper.js",
+        "/js/automation.js"
+      ]
+    },
+    {
+      "file": "public/dashboard/backups.html",
+      "routes": [
+        "/dashboard/backups"
+      ],
+      "scripts": [
+        "/js/instance-config.js",
+        "/js/backupManager.js"
+      ]
+    },
+    {
+      "file": "public/dashboard/boost.html",
+      "routes": [
+        "/dashboard/boost"
+      ],
+      "scripts": [
+        "/js/instance-config.js",
+        "/js/boostManager.js"
+      ]
+    },
+    {
+      "file": "public/dashboard/casino.html",
+      "routes": [
+        "/dashboard/casino"
+      ],
+      "scripts": [
+        "/js/instance-config.js",
+        "/js/api.js",
+        "/js/csrf-helper.js",
+        "/js/casino-stats.js"
+      ]
+    },
+    {
+      "file": "public/dashboard/console.html",
+      "routes": [
+        "/dashboard/console"
+      ],
+      "scripts": [
+        "/js/instance-config.js",
+        "/js/consoleCommands.js"
+      ]
+    },
+    {
+      "file": "public/dashboard/economy-leaderboard.html",
+      "routes": [
+        "/dashboard/economy-leaderboard"
+      ],
+      "scripts": [
+        "/js/instance-config.js",
+        "/js/components/leaderboardTable.js",
+        "/js/economy-leaderboard-init.js"
+      ]
+    },
+    {
+      "file": "public/dashboard/economy-settings.html",
+      "routes": [
+        "/dashboard/economy-settings"
+      ],
+      "scripts": [
+        "/js/instance-config.js",
+        "/js/api.js",
+        "/js/csrf-helper.js",
+        "/js/admin/economy-settings.js"
+      ]
+    },
+    {
+      "file": "public/dashboard/economy-transactions.html",
+      "routes": [
+        "/dashboard/economy-transactions"
+      ],
+      "scripts": [
+        "/js/instance-config.js",
+        "/js/components/transactionList.js",
+        "/js/economy-transactions-init.js"
+      ]
+    },
+    {
+      "file": "public/dashboard/economy.html",
+      "routes": [
+        "/dashboard/economy"
+      ],
+      "scripts": [
+        "/js/instance-config.js",
+        "/js/api.js",
+        "/js/csrf-helper.js",
+        "/js/admin/economy-settings.js"
+      ]
+    },
+    {
+      "file": "public/dashboard/feeds.html",
+      "routes": [
+        "/dashboard/feeds"
+      ],
+      "scripts": [
+        "/js/instance-config.js",
+        "/js/api.js",
+        "/js/csrf-helper.js",
+        "/js/dashboard-feeds.js"
+      ]
+    },
+    {
+      "file": "public/dashboard/rotation.html",
+      "routes": [
+        "/dashboard/rotation"
+      ],
+      "scripts": [
+        "/js/instance-config.js",
+        "/js/rotation.js"
+      ]
+    },
+    {
+      "file": "public/dashboard/server-control.html",
+      "routes": [
+        "/dashboard/server-control"
+      ],
+      "scripts": [
+        "/js/instance-config.js",
+        "/js/serverControlPanel.js"
+      ]
+    },
+    {
+      "file": "public/dashboard/server-stats.html",
+      "routes": [
+        "/dashboard/server-stats"
+      ],
+      "scripts": [
+        "https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js",
+        "/js/instance-config.js",
+        "/js/serverStats.js"
+      ]
+    },
+    {
+      "file": "public/dashboard/settings.html",
+      "routes": [
+        "/dashboard/settings"
+      ],
+      "scripts": [
+        "/js/instance-config.js",
+        "/js/api.js",
+        "/js/csrf-helper.js",
+        "/js/nitrado-settings.js"
+      ]
+    },
+    {
+      "file": "public/dashboard/shop-admin.html",
+      "routes": [
+        "/dashboard/shop-admin"
+      ],
+      "scripts": [
+        "/js/instance-config.js",
+        "/js/api.js",
+        "/js/csrf-helper.js",
+        "/js/shop-admin.js"
+      ]
+    },
+    {
+      "file": "public/dashboard/spawn-exclusions.html",
+      "routes": [
+        "/dashboard/spawn-exclusions"
+      ],
+      "scripts": [
+        "/js/instance-config.js",
+        "/js/spawn-exclusions.js"
+      ]
+    },
+    {
+      "file": "public/dashboard/support.html",
+      "routes": [
+        "/dashboard/support"
+      ],
+      "scripts": [
+        "/js/instance-config.js",
+        "/js/supportHub.js"
+      ]
+    },
+    {
+      "file": "public/dashboard/tasks.html",
+      "routes": [
+        "/dashboard/tasks"
+      ],
+      "scripts": [
+        "/js/instance-config.js",
+        "/js/taskManager.js"
+      ]
+    },
+    {
+      "file": "public/economy-dashboard.html",
+      "routes": [],
+      "scripts": [
+        "/js/instance-config.js",
+        "https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js",
+        "/js/api.js",
+        "/js/csrf-helper.js",
+        "/js/components/economyDashboard.js",
+        "/js/economy-dashboard-init.js"
+      ]
+    },
+    {
+      "file": "public/economy-leaderboard.html",
+      "routes": [],
+      "scripts": [
+        "/js/instance-config.js",
+        "/js/components/leaderboardTable.js",
+        "/js/economy-leaderboard-init.js"
+      ]
+    },
+    {
+      "file": "public/economy-transactions.html",
+      "routes": [],
+      "scripts": [
+        "/js/instance-config.js",
+        "/js/components/transactionList.js",
+        "/js/economy-transactions-init.js"
+      ]
+    },
+    {
+      "file": "public/index.html",
+      "routes": [],
+      "scripts": [
+        "/js/instance-config.js"
+      ]
+    },
+    {
+      "file": "public/logs.html",
+      "routes": [
+        "/logs"
+      ],
+      "scripts": [
+        "/js/instance-config.js",
+        "/js/api.js",
+        "/js/csrf-helper.js",
+        "/js/logs.js"
+      ]
+    },
+    {
+      "file": "public/loot-finder.html",
+      "routes": [
+        "/loot-finder"
+      ],
+      "scripts": [
+        "/vendor/leaflet/leaflet.js",
+        "/js/instance-config.js",
+        "/js/dayz-map-coordinates.js",
+        "/js/loot-finder.js"
+      ]
+    },
+    {
+      "file": "public/map.html",
+      "routes": [
+        "/map"
+      ],
+      "scripts": [
+        "/vendor/leaflet/leaflet.js",
+        "/vendor/leaflet/leaflet-heat.js",
+        "/js/instance-config.js",
+        "/js/api.js",
+        "/js/csrf-helper.js",
+        "/js/dayz-map-coordinates.js",
+        "/js/dayz-map-tiles.js",
+        "/js/map.js"
+      ]
+    },
+    {
+      "file": "public/mission-editor.html",
+      "routes": [
+        "/mission-editor"
+      ],
+      "scripts": [
+        "/js/instance-config.js",
+        "/js/api.js",
+        "/js/csrf-helper.js",
+        "/js/mission-editor.js"
+      ]
+    },
+    {
+      "file": "public/nitrado-settings.html",
+      "routes": [],
+      "scripts": [
+        "/js/instance-config.js",
+        "/js/api.js",
+        "/js/csrf-helper.js",
+        "/js/nitrado-settings.js"
+      ]
+    },
+    {
+      "file": "public/onboarding.html",
+      "routes": [],
+      "scripts": [
+        "/js/instance-config.js",
+        "/js/onboarding.js"
+      ]
+    },
+    {
+      "file": "public/player-map.html",
+      "routes": [
+        "/player-map"
+      ],
+      "scripts": [
+        "/vendor/leaflet/leaflet.js",
+        "/vendor/leaflet/leaflet-heat.js",
+        "/js/instance-config.js",
+        "/js/api.js",
+        "/js/csrf-helper.js",
+        "/js/dayz-map-coordinates.js",
+        "/js/dayz-map-tiles.js",
+        "/js/player-map-standalone.js"
+      ]
+    },
+    {
+      "file": "public/player-portal.html",
+      "routes": [
+        "/player",
+        "/player-portal"
+      ],
+      "scripts": [
+        "/js/instance-config.js",
+        "/js/casino/horseracing.js",
+        "/js/casino/coursing.js",
+        "/js/casino/roulette.js",
+        "/js/casino/holdem.js",
+        "/js/casino/craps.js",
+        "/js/casino/baccarat.js",
+        "/js/api.js",
+        "/js/csrf-helper.js",
+        "/js/casino/slots.js",
+        "/js/casino/blackjack.js",
+        "/js/factions.js",
+        "/js/bounties.js?v=faction-bounty-idempotency-v1",
+        "/js/player-portal.js"
+      ]
+    },
+    {
+      "file": "public/server-lists.html",
+      "routes": [
+        "/server-lists"
+      ],
+      "scripts": [
+        "/js/instance-config.js",
+        "/js/api.js",
+        "/js/csrf-helper.js",
+        "/js/server-lists.js"
+      ]
+    },
+    {
+      "file": "public/server-players.html",
+      "routes": [
+        "/server-players"
+      ],
+      "scripts": [
+        "/js/instance-config.js",
+        "/js/api.js",
+        "/js/csrf-helper.js",
+        "/js/server-players.js"
+      ]
+    },
+    {
+      "file": "public/shop.html",
+      "routes": [
+        "/shop"
+      ],
+      "scripts": [
+        "/js/instance-config.js",
+        "/js/api.js",
+        "/js/csrf-helper.js",
+        "/vendor/leaflet/leaflet.js",
+        "/js/dayz-map-coordinates.js",
+        "/js/checkout-state.js?v=checkout-idempotency-v1",
+        "/js/shop.js?v=checkout-idempotency-v1"
+      ]
+    },
+    {
+      "file": "public/splash.html",
+      "routes": [
+        "/",
+        "/dashboard"
+      ],
+      "scripts": [
+        "/js/instance-config.js",
+        "/js/onboarding.js"
+      ]
+    }
+  ],
+  "capabilities": [
+    {
+      "script": "public/js/activityLog.js",
+      "transport": "fetch",
+      "method": "GET",
+      "target": "/api/activity/{dynamic}?page={dynamic}",
+      "targetKind": "template"
+    },
+    {
+      "script": "public/js/activityLog.js",
+      "transport": "fetch",
+      "method": "GET",
+      "target": "/api/nitrado/registered-servers",
+      "targetKind": "literal"
+    },
+    {
+      "script": "public/js/admin-audit.js",
+      "transport": "fetch",
+      "method": "GET",
+      "target": "{dynamic}",
+      "targetKind": "unresolved"
+    },
+    {
+      "script": "public/js/admin-database.js",
+      "transport": "fetch",
+      "method": "GET",
+      "target": "/api/user",
+      "targetKind": "literal"
+    },
+    {
+      "script": "public/js/admin-feeds.js",
+      "transport": "fetch",
+      "method": "GET",
+      "target": "/api/admin/guilds",
+      "targetKind": "literal"
+    },
+    {
+      "script": "public/js/admin-feeds.js",
+      "transport": "fetch",
+      "method": "GET",
+      "target": "/api/discord/guilds/{dynamic}/channels",
+      "targetKind": "template"
+    },
+    {
+      "script": "public/js/admin-feeds.js",
+      "transport": "fetch",
+      "method": "GET",
+      "target": "/api/feeds/{dynamic}/{dynamic}",
+      "targetKind": "template"
+    },
+    {
+      "script": "public/js/admin-feeds.js",
+      "transport": "fetch",
+      "method": "GET",
+      "target": "/api/feeds/{dynamic}/{dynamic}/templates",
+      "targetKind": "template"
+    },
+    {
+      "script": "public/js/admin-feeds.js",
+      "transport": "fetch",
+      "method": "GET",
+      "target": "/api/guilds/{dynamic}/servers",
+      "targetKind": "template"
+    },
+    {
+      "script": "public/js/admin-guilds-approval.js",
+      "transport": "fetch",
+      "method": "GET",
+      "target": "{dynamic}",
+      "targetKind": "unresolved"
+    },
+    {
+      "script": "public/js/admin-guilds.js",
+      "transport": "fetch",
+      "method": "GET",
+      "target": "/api/admin/servers?guildId={dynamic}",
+      "targetKind": "template"
+    },
+    {
+      "script": "public/js/admin-index.js",
+      "transport": "fetch",
+      "method": "GET",
+      "target": "/api/admin/overview/activity",
+      "targetKind": "literal"
+    },
+    {
+      "script": "public/js/admin-index.js",
+      "transport": "fetch",
+      "method": "GET",
+      "target": "/api/admin/overview/health",
+      "targetKind": "literal"
+    },
+    {
+      "script": "public/js/admin-index.js",
+      "transport": "fetch",
+      "method": "GET",
+      "target": "/api/admin/overview/stats",
+      "targetKind": "literal"
+    },
+    {
+      "script": "public/js/admin-index.js",
+      "transport": "fetch",
+      "method": "GET",
+      "target": "/api/health/guilds",
+      "targetKind": "literal"
+    },
+    {
+      "script": "public/js/admin-reports.js",
+      "transport": "fetch",
+      "method": "GET",
+      "target": "/api/admin/reports?{dynamic}",
+      "targetKind": "template"
+    },
+    {
+      "script": "public/js/admin-reports.js",
+      "transport": "fetch",
+      "method": "GET",
+      "target": "/api/user/guilds",
+      "targetKind": "literal"
+    },
+    {
+      "script": "public/js/admin/economy-analytics.js",
+      "transport": "fetch",
+      "method": "GET",
+      "target": "/api/admin/guilds",
+      "targetKind": "literal"
+    },
+    {
+      "script": "public/js/admin/economy-analytics.js",
+      "transport": "fetch",
+      "method": "GET",
+      "target": "/api/economy/admin/{dynamic}/analytics?days={dynamic}",
+      "targetKind": "template"
+    },
+    {
+      "script": "public/js/admin/economy-analytics.js",
+      "transport": "fetch",
+      "method": "GET",
+      "target": "/api/guilds/{dynamic}/servers",
+      "targetKind": "template"
+    },
+    {
+      "script": "public/js/admin/economy-settings.js",
+      "transport": "fetch",
+      "method": "GET",
+      "target": "/api/bounties/admin/{dynamic}/settings",
+      "targetKind": "template"
+    },
+    {
+      "script": "public/js/admin/economy-settings.js",
+      "transport": "fetch",
+      "method": "GET",
+      "target": "/api/economy/admin/{dynamic}/config",
+      "targetKind": "template"
+    },
+    {
+      "script": "public/js/admin/economy-settings.js",
+      "transport": "fetch",
+      "method": "GET",
+      "target": "/api/economy/admin/{dynamic}/stats",
+      "targetKind": "template"
+    },
+    {
+      "script": "public/js/admin/economy-settings.js",
+      "transport": "fetch",
+      "method": "GET",
+      "target": "/api/guilds/{dynamic}/servers",
+      "targetKind": "template"
+    },
+    {
+      "script": "public/js/admin/economy-settings.js",
+      "transport": "fetch",
+      "method": "GET",
+      "target": "/api/user/guilds",
+      "targetKind": "literal"
+    },
+    {
+      "script": "public/js/admin/supply-monitor.js",
+      "transport": "fetch",
+      "method": "GET",
+      "target": "/api/admin/guilds",
+      "targetKind": "literal"
+    },
+    {
+      "script": "public/js/admin/supply-monitor.js",
+      "transport": "fetch",
+      "method": "GET",
+      "target": "/api/economy/admin/{dynamic}/supply-log?limit={dynamic}&offset={dynamic}{dynamic}",
+      "targetKind": "template"
+    },
+    {
+      "script": "public/js/admin/supply-monitor.js",
+      "transport": "fetch",
+      "method": "GET",
+      "target": "/api/economy/admin/{dynamic}/supply-stats?days={dynamic}",
+      "targetKind": "template"
+    },
+    {
+      "script": "public/js/admin/supply-monitor.js",
+      "transport": "fetch",
+      "method": "GET",
+      "target": "/api/guilds/{dynamic}/servers",
+      "targetKind": "template"
+    },
+    {
+      "script": "public/js/ai-assistant.js",
+      "transport": "fetch",
+      "method": "DELETE",
+      "target": "/api/ai/chat/history",
+      "targetKind": "literal"
+    },
+    {
+      "script": "public/js/ai-assistant.js",
+      "transport": "fetch",
+      "method": "DELETE",
+      "target": "/api/ai/github/disconnect",
+      "targetKind": "literal"
+    },
+    {
+      "script": "public/js/ai-assistant.js",
+      "transport": "fetch",
+      "method": "DELETE",
+      "target": "/api/ai/provider/connection",
+      "targetKind": "literal"
+    },
+    {
+      "script": "public/js/ai-assistant.js",
+      "transport": "fetch",
+      "method": "DELETE",
+      "target": "/api/ai/server/{dynamic}/repo",
+      "targetKind": "template"
+    },
+    {
+      "script": "public/js/ai-assistant.js",
+      "transport": "fetch",
+      "method": "GET",
+      "target": "/api/ai/context/{dynamic}",
+      "targetKind": "template"
+    },
+    {
+      "script": "public/js/ai-assistant.js",
+      "transport": "fetch",
+      "method": "GET",
+      "target": "/api/ai/github/status",
+      "targetKind": "literal"
+    },
+    {
+      "script": "public/js/ai-assistant.js",
+      "transport": "fetch",
+      "method": "GET",
+      "target": "/api/ai/provider/status",
+      "targetKind": "literal"
+    },
+    {
+      "script": "public/js/ai-assistant.js",
+      "transport": "fetch",
+      "method": "GET",
+      "target": "/api/ai/repos",
+      "targetKind": "literal"
+    },
+    {
+      "script": "public/js/ai-assistant.js",
+      "transport": "fetch",
+      "method": "GET",
+      "target": "/api/ai/repos/{dynamic}/{dynamic}/branches",
+      "targetKind": "template"
+    },
+    {
+      "script": "public/js/ai-assistant.js",
+      "transport": "fetch",
+      "method": "GET",
+      "target": "/api/ai/server/{dynamic}/github/integration",
+      "targetKind": "template"
+    },
+    {
+      "script": "public/js/ai-assistant.js",
+      "transport": "fetch",
+      "method": "GET",
+      "target": "/api/ai/server/{dynamic}/repo",
+      "targetKind": "template"
+    },
+    {
+      "script": "public/js/ai-assistant.js",
+      "transport": "fetch",
+      "method": "GET",
+      "target": "/api/ai/servers",
+      "targetKind": "literal"
+    },
+    {
+      "script": "public/js/ai-assistant.js",
+      "transport": "fetch",
+      "method": "GET",
+      "target": "/api/ai/suggestions/{dynamic}",
+      "targetKind": "template"
+    },
+    {
+      "script": "public/js/ai-assistant.js",
+      "transport": "fetch",
+      "method": "GET",
+      "target": "/api/ai/suggestions/detail/{dynamic}",
+      "targetKind": "template"
+    },
+    {
+      "script": "public/js/ai-assistant.js",
+      "transport": "fetch",
+      "method": "GET",
+      "target": "/api/csrf-token",
+      "targetKind": "literal"
+    },
+    {
+      "script": "public/js/ai-assistant.js",
+      "transport": "fetch",
+      "method": "GET",
+      "target": "/api/mission-files/{dynamic}/{dynamic}",
+      "targetKind": "template"
+    },
+    {
+      "script": "public/js/ai-assistant.js",
+      "transport": "fetch",
+      "method": "PATCH",
+      "target": "/api/ai/github/settings",
+      "targetKind": "literal"
+    },
+    {
+      "script": "public/js/ai-assistant.js",
+      "transport": "fetch",
+      "method": "PATCH",
+      "target": "/api/ai/suggestions/{dynamic}",
+      "targetKind": "template"
+    },
+    {
+      "script": "public/js/ai-assistant.js",
+      "transport": "fetch",
+      "method": "POST",
+      "target": "/api/ai/analyze",
+      "targetKind": "literal"
+    },
+    {
+      "script": "public/js/ai-assistant.js",
+      "transport": "fetch",
+      "method": "POST",
+      "target": "/api/ai/chat",
+      "targetKind": "literal"
+    },
+    {
+      "script": "public/js/ai-assistant.js",
+      "transport": "fetch",
+      "method": "POST",
+      "target": "/api/ai/github/connect-pat",
+      "targetKind": "literal"
+    },
+    {
+      "script": "public/js/ai-assistant.js",
+      "transport": "fetch",
+      "method": "POST",
+      "target": "/api/ai/server/{dynamic}/repo",
+      "targetKind": "template"
+    },
+    {
+      "script": "public/js/ai-assistant.js",
+      "transport": "fetch",
+      "method": "POST",
+      "target": "/api/ai/suggestions/{dynamic}/apply",
+      "targetKind": "template"
+    },
+    {
+      "script": "public/js/ai-assistant.js",
+      "transport": "fetch",
+      "method": "PUT",
+      "target": "/api/ai/provider/connection",
+      "targetKind": "literal"
+    },
+    {
+      "script": "public/js/api.js",
+      "transport": "fetch",
+      "method": "DYNAMIC",
+      "target": "{dynamic}",
+      "targetKind": "unresolved"
+    },
+    {
+      "script": "public/js/automation.js",
+      "transport": "fetch",
+      "method": "GET",
+      "target": "/api/automation/settings",
+      "targetKind": "literal"
+    },
+    {
+      "script": "public/js/automation.js",
+      "transport": "fetch",
+      "method": "GET",
+      "target": "/api/guilds/{dynamic}/servers",
+      "targetKind": "template"
+    },
+    {
+      "script": "public/js/automation.js",
+      "transport": "fetch",
+      "method": "GET",
+      "target": "/api/user/guilds",
+      "targetKind": "literal"
+    },
+    {
+      "script": "public/js/backupManager.js",
+      "transport": "fetch",
+      "method": "GET",
+      "target": "/api/backups/{dynamic}",
+      "targetKind": "template"
+    },
+    {
+      "script": "public/js/backupManager.js",
+      "transport": "fetch",
+      "method": "GET",
+      "target": "/api/csrf-token",
+      "targetKind": "literal"
+    },
+    {
+      "script": "public/js/backupManager.js",
+      "transport": "fetch",
+      "method": "GET",
+      "target": "/api/nitrado/registered-servers",
+      "targetKind": "literal"
+    },
+    {
+      "script": "public/js/backupManager.js",
+      "transport": "fetch",
+      "method": "POST",
+      "target": "{dynamic}",
+      "targetKind": "unresolved"
+    },
+    {
+      "script": "public/js/boostManager.js",
+      "transport": "fetch",
+      "method": "GET",
+      "target": "/api/boost/{dynamic}/history?page={dynamic}",
+      "targetKind": "template"
+    },
+    {
+      "script": "public/js/boostManager.js",
+      "transport": "fetch",
+      "method": "GET",
+      "target": "/api/boost/{dynamic}/settings",
+      "targetKind": "template"
+    },
+    {
+      "script": "public/js/boostManager.js",
+      "transport": "fetch",
+      "method": "GET",
+      "target": "/api/csrf-token",
+      "targetKind": "literal"
+    },
+    {
+      "script": "public/js/boostManager.js",
+      "transport": "fetch",
+      "method": "GET",
+      "target": "/api/nitrado/registered-servers",
+      "targetKind": "literal"
+    },
+    {
+      "script": "public/js/boostManager.js",
+      "transport": "fetch",
+      "method": "PUT",
+      "target": "/api/boost/{dynamic}/settings",
+      "targetKind": "template"
+    },
+    {
+      "script": "public/js/bounties.js",
+      "transport": "fetch",
+      "method": "DYNAMIC",
+      "target": "{dynamic}",
+      "targetKind": "unresolved"
+    },
+    {
+      "script": "public/js/casino-stats.js",
+      "transport": "fetch",
+      "method": "GET",
+      "target": "/api/casino/admin-stats?{dynamic}",
+      "targetKind": "template"
+    },
+    {
+      "script": "public/js/casino-stats.js",
+      "transport": "fetch",
+      "method": "GET",
+      "target": "/api/user/guilds",
+      "targetKind": "literal"
+    },
+    {
+      "script": "public/js/casino/baccarat.js",
+      "transport": "fetch",
+      "method": "GET",
+      "target": "/api/casino/status/{dynamic}?serverId={dynamic}",
+      "targetKind": "template"
+    },
+    {
+      "script": "public/js/casino/blackjack.js",
+      "transport": "fetch",
+      "method": "GET",
+      "target": "/api/casino/status/{dynamic}?serverId={dynamic}",
+      "targetKind": "template"
+    },
+    {
+      "script": "public/js/casino/coursing.js",
+      "transport": "fetch",
+      "method": "GET",
+      "target": "/api/casino/status/{dynamic}?serverId={dynamic}",
+      "targetKind": "template"
+    },
+    {
+      "script": "public/js/casino/craps.js",
+      "transport": "fetch",
+      "method": "GET",
+      "target": "/api/casino/status/{dynamic}?serverId={dynamic}",
+      "targetKind": "template"
+    },
+    {
+      "script": "public/js/casino/holdem.js",
+      "transport": "fetch",
+      "method": "GET",
+      "target": "/api/casino/status/{dynamic}?serverId={dynamic}",
+      "targetKind": "template"
+    },
+    {
+      "script": "public/js/casino/horseracing.js",
+      "transport": "fetch",
+      "method": "GET",
+      "target": "/api/casino/status/{dynamic}?serverId={dynamic}",
+      "targetKind": "template"
+    },
+    {
+      "script": "public/js/casino/roulette.js",
+      "transport": "fetch",
+      "method": "GET",
+      "target": "/api/casino/status/{dynamic}?serverId={dynamic}",
+      "targetKind": "template"
+    },
+    {
+      "script": "public/js/casino/slots.js",
+      "transport": "fetch",
+      "method": "GET",
+      "target": "/api/casino/status/{dynamic}?serverId={dynamic}",
+      "targetKind": "template"
+    },
+    {
+      "script": "public/js/components/economyDashboard.js",
+      "transport": "fetch",
+      "method": "GET",
+      "target": "/api/economy/player/{dynamic}?serverId={dynamic}",
+      "targetKind": "template"
+    },
+    {
+      "script": "public/js/components/economyDashboard.js",
+      "transport": "fetch",
+      "method": "GET",
+      "target": "/api/economy/player/{dynamic}/stats?serverId={dynamic}",
+      "targetKind": "template"
+    },
+    {
+      "script": "public/js/components/economyDashboard.js",
+      "transport": "fetch",
+      "method": "GET",
+      "target": "/api/economy/player/{dynamic}/transactions?serverId={dynamic}&limit=10",
+      "targetKind": "template"
+    },
+    {
+      "script": "public/js/components/leaderboardTable.js",
+      "transport": "fetch",
+      "method": "GET",
+      "target": "/api/economy/{dynamic}/leaderboard?limit=100&sortBy={dynamic}",
+      "targetKind": "template"
+    },
+    {
+      "script": "public/js/components/transactionList.js",
+      "transport": "fetch",
+      "method": "GET",
+      "target": "/api/economy/player/{dynamic}/transactions?serverId={dynamic}&limit=200&offset={dynamic}{dynamic}",
+      "targetKind": "template"
+    },
+    {
+      "script": "public/js/consoleCommands.js",
+      "transport": "fetch",
+      "method": "GET",
+      "target": "/api/nitrado/registered-servers",
+      "targetKind": "literal"
+    },
+    {
+      "script": "public/js/consoleCommands.js",
+      "transport": "fetch",
+      "method": "POST",
+      "target": "/api/console/{dynamic}/command",
+      "targetKind": "template"
+    },
+    {
+      "script": "public/js/csrf-helper.js",
+      "transport": "fetch",
+      "method": "DYNAMIC",
+      "target": "{dynamic}",
+      "targetKind": "unresolved"
+    },
+    {
+      "script": "public/js/dashboard-feeds.js",
+      "transport": "fetch",
+      "method": "GET",
+      "target": "/api/discord/guilds/{dynamic}/channels",
+      "targetKind": "template"
+    },
+    {
+      "script": "public/js/dashboard-feeds.js",
+      "transport": "fetch",
+      "method": "GET",
+      "target": "/api/feeds/{dynamic}/{dynamic}",
+      "targetKind": "template"
+    },
+    {
+      "script": "public/js/dashboard-feeds.js",
+      "transport": "fetch",
+      "method": "GET",
+      "target": "/api/feeds/{dynamic}/{dynamic}/templates",
+      "targetKind": "template"
+    },
+    {
+      "script": "public/js/dashboard-feeds.js",
+      "transport": "fetch",
+      "method": "GET",
+      "target": "/api/guilds/{dynamic}/servers",
+      "targetKind": "template"
+    },
+    {
+      "script": "public/js/dashboard-feeds.js",
+      "transport": "fetch",
+      "method": "GET",
+      "target": "/api/user",
+      "targetKind": "literal"
+    },
+    {
+      "script": "public/js/dashboard-feeds.js",
+      "transport": "fetch",
+      "method": "GET",
+      "target": "/api/user/guilds",
+      "targetKind": "literal"
+    },
+    {
+      "script": "public/js/dashboard.js",
+      "transport": "fetch",
+      "method": "GET",
+      "target": "/api/detect-structure/{dynamic}",
+      "targetKind": "template"
+    },
+    {
+      "script": "public/js/dashboard.js",
+      "transport": "fetch",
+      "method": "GET",
+      "target": "/api/mission-files/list/{dynamic}",
+      "targetKind": "template"
+    },
+    {
+      "script": "public/js/dashboard.js",
+      "transport": "fetch",
+      "method": "GET",
+      "target": "/api/nitrado/account-servers?guildId={dynamic}",
+      "targetKind": "template"
+    },
+    {
+      "script": "public/js/dashboard.js",
+      "transport": "fetch",
+      "method": "GET",
+      "target": "/api/nitrado/registered-servers",
+      "targetKind": "literal"
+    },
+    {
+      "script": "public/js/dashboard.js",
+      "transport": "fetch",
+      "method": "GET",
+      "target": "/api/owner/dashboard/activity",
+      "targetKind": "literal"
+    },
+    {
+      "script": "public/js/dashboard.js",
+      "transport": "fetch",
+      "method": "GET",
+      "target": "/api/owner/dashboard/stats",
+      "targetKind": "literal"
+    },
+    {
+      "script": "public/js/dashboard.js",
+      "transport": "fetch",
+      "method": "GET",
+      "target": "/api/player/session-analytics?{dynamic}",
+      "targetKind": "template"
+    },
+    {
+      "script": "public/js/dashboard.js",
+      "transport": "fetch",
+      "method": "GET",
+      "target": "/api/public-config",
+      "targetKind": "literal"
+    },
+    {
+      "script": "public/js/dashboard.js",
+      "transport": "fetch",
+      "method": "GET",
+      "target": "/api/sync-jobs",
+      "targetKind": "literal"
+    },
+    {
+      "script": "public/js/dashboard.js",
+      "transport": "fetch",
+      "method": "GET",
+      "target": "/api/sync-status/{dynamic}",
+      "targetKind": "template"
+    },
+    {
+      "script": "public/js/dashboard.js",
+      "transport": "fetch",
+      "method": "GET",
+      "target": "/api/user",
+      "targetKind": "literal"
+    },
+    {
+      "script": "public/js/dashboard.js",
+      "transport": "fetch",
+      "method": "GET",
+      "target": "/api/user/guilds",
+      "targetKind": "literal"
+    },
+    {
+      "script": "public/js/economy-dashboard-init.js",
+      "transport": "fetch",
+      "method": "GET",
+      "target": "/api/accounts/linked",
+      "targetKind": "literal"
+    },
+    {
+      "script": "public/js/economy-dashboard-init.js",
+      "transport": "fetch",
+      "method": "GET",
+      "target": "/api/economy/player/{dynamic}?serverId={dynamic}",
+      "targetKind": "template"
+    },
+    {
+      "script": "public/js/economy-dashboard-init.js",
+      "transport": "fetch",
+      "method": "GET",
+      "target": "/api/economy/search-players?query={dynamic}&serverId={dynamic}&limit=10",
+      "targetKind": "template"
+    },
+    {
+      "script": "public/js/economy-leaderboard-init.js",
+      "transport": "fetch",
+      "method": "GET",
+      "target": "/api/accounts/linked",
+      "targetKind": "literal"
+    },
+    {
+      "script": "public/js/economy-transactions-init.js",
+      "transport": "fetch",
+      "method": "GET",
+      "target": "/api/accounts/linked",
+      "targetKind": "literal"
+    },
+    {
+      "script": "public/js/economy-transactions-init.js",
+      "transport": "fetch",
+      "method": "GET",
+      "target": "/api/economy/player/{dynamic}?serverId={dynamic}",
+      "targetKind": "template"
+    },
+    {
+      "script": "public/js/factions.js",
+      "transport": "fetch",
+      "method": "DELETE",
+      "target": "/api/factions/{dynamic}/{dynamic}",
+      "targetKind": "template"
+    },
+    {
+      "script": "public/js/factions.js",
+      "transport": "fetch",
+      "method": "DELETE",
+      "target": "/api/factions/{dynamic}/{dynamic}/members/{dynamic}",
+      "targetKind": "template"
+    },
+    {
+      "script": "public/js/factions.js",
+      "transport": "fetch",
+      "method": "DELETE",
+      "target": "/api/factions/invites/{dynamic}",
+      "targetKind": "template"
+    },
+    {
+      "script": "public/js/factions.js",
+      "transport": "fetch",
+      "method": "DYNAMIC",
+      "target": "{dynamic}",
+      "targetKind": "unresolved"
+    },
+    {
+      "script": "public/js/factions.js",
+      "transport": "fetch",
+      "method": "GET",
+      "target": "/api/factions/{dynamic}",
+      "targetKind": "template"
+    },
+    {
+      "script": "public/js/factions.js",
+      "transport": "fetch",
+      "method": "GET",
+      "target": "/api/factions/{dynamic}/{dynamic}",
+      "targetKind": "template"
+    },
+    {
+      "script": "public/js/factions.js",
+      "transport": "fetch",
+      "method": "GET",
+      "target": "/api/factions/{dynamic}/invites/pending",
+      "targetKind": "template"
+    },
+    {
+      "script": "public/js/factions.js",
+      "transport": "fetch",
+      "method": "POST",
+      "target": "/api/factions/{dynamic}/{dynamic}/invites",
+      "targetKind": "template"
+    },
+    {
+      "script": "public/js/factions.js",
+      "transport": "fetch",
+      "method": "POST",
+      "target": "/api/factions/{dynamic}/{dynamic}/join",
+      "targetKind": "template"
+    },
+    {
+      "script": "public/js/factions.js",
+      "transport": "fetch",
+      "method": "POST",
+      "target": "/api/factions/{dynamic}/{dynamic}/leave",
+      "targetKind": "template"
+    },
+    {
+      "script": "public/js/factions.js",
+      "transport": "fetch",
+      "method": "POST",
+      "target": "/api/factions/invites/{dynamic}/accept",
+      "targetKind": "template"
+    },
+    {
+      "script": "public/js/factions.js",
+      "transport": "fetch",
+      "method": "PUT",
+      "target": "/api/factions/{dynamic}/{dynamic}/members/{dynamic}",
+      "targetKind": "template"
+    },
+    {
+      "script": "public/js/instance-config.js",
+      "transport": "fetch",
+      "method": "GET",
+      "target": "/api/public-config",
+      "targetKind": "literal"
+    },
+    {
+      "script": "public/js/logs.js",
+      "transport": "fetch",
+      "method": "GET",
+      "target": "{dynamic}",
+      "targetKind": "unresolved"
+    },
+    {
+      "script": "public/js/logs.js",
+      "transport": "fetch",
+      "method": "GET",
+      "target": "/api/guilds/{dynamic}/servers",
+      "targetKind": "template"
+    },
+    {
+      "script": "public/js/logs.js",
+      "transport": "fetch",
+      "method": "GET",
+      "target": "/api/user/guilds",
+      "targetKind": "literal"
+    },
+    {
+      "script": "public/js/loot-finder.js",
+      "transport": "fetch",
+      "method": "DYNAMIC",
+      "target": "{dynamic}",
+      "targetKind": "unresolved"
+    },
+    {
+      "script": "public/js/map.js",
+      "transport": "fetch",
+      "method": "GET",
+      "target": "{dynamic}?{dynamic}",
+      "targetKind": "template"
+    },
+    {
+      "script": "public/js/map.js",
+      "transport": "fetch",
+      "method": "GET",
+      "target": "/api/event-health?serverId={dynamic}&map={dynamic}&guildId={dynamic}",
+      "targetKind": "template"
+    },
+    {
+      "script": "public/js/map.js",
+      "transport": "fetch",
+      "method": "GET",
+      "target": "/api/event-spawns/{dynamic}/{dynamic}?guildId={dynamic}",
+      "targetKind": "template"
+    },
+    {
+      "script": "public/js/map.js",
+      "transport": "fetch",
+      "method": "GET",
+      "target": "/api/guilds/{dynamic}/servers",
+      "targetKind": "template"
+    },
+    {
+      "script": "public/js/map.js",
+      "transport": "fetch",
+      "method": "GET",
+      "target": "/api/loot/heatmap?{dynamic}",
+      "targetKind": "template"
+    },
+    {
+      "script": "public/js/map.js",
+      "transport": "fetch",
+      "method": "GET",
+      "target": "/api/server-active-mission/{dynamic}?guildId={dynamic}",
+      "targetKind": "template"
+    },
+    {
+      "script": "public/js/map.js",
+      "transport": "fetch",
+      "method": "GET",
+      "target": "/api/server-maps/{dynamic}?guildId={dynamic}",
+      "targetKind": "template"
+    },
+    {
+      "script": "public/js/map.js",
+      "transport": "fetch",
+      "method": "GET",
+      "target": "/api/user/guilds",
+      "targetKind": "literal"
+    },
+    {
+      "script": "public/js/mission-editor.js",
+      "transport": "fetch",
+      "method": "GET",
+      "target": "/api/mission-files/{dynamic}/{dynamic}",
+      "targetKind": "template"
+    },
+    {
+      "script": "public/js/mission-editor.js",
+      "transport": "fetch",
+      "method": "GET",
+      "target": "/api/mission-files/list/{dynamic}",
+      "targetKind": "template"
+    },
+    {
+      "script": "public/js/nitrado-settings.js",
+      "transport": "fetch",
+      "method": "GET",
+      "target": "/api/guilds/{dynamic}/servers",
+      "targetKind": "template"
+    },
+    {
+      "script": "public/js/nitrado-settings.js",
+      "transport": "fetch",
+      "method": "GET",
+      "target": "/api/link-settings/{dynamic}",
+      "targetKind": "template"
+    },
+    {
+      "script": "public/js/nitrado-settings.js",
+      "transport": "fetch",
+      "method": "GET",
+      "target": "/api/nitrado/account-servers/{dynamic}/naming?guildId={dynamic}",
+      "targetKind": "template"
+    },
+    {
+      "script": "public/js/nitrado-settings.js",
+      "transport": "fetch",
+      "method": "GET",
+      "target": "/api/nitrado/settings/{dynamic}?guildId={dynamic}",
+      "targetKind": "template"
+    },
+    {
+      "script": "public/js/nitrado-settings.js",
+      "transport": "fetch",
+      "method": "GET",
+      "target": "/api/player-map-settings/{dynamic}",
+      "targetKind": "template"
+    },
+    {
+      "script": "public/js/nitrado-settings.js",
+      "transport": "fetch",
+      "method": "GET",
+      "target": "/api/user/guilds",
+      "targetKind": "literal"
+    },
+    {
+      "script": "public/js/onboarding.js",
+      "transport": "fetch",
+      "method": "GET",
+      "target": "/api/access/setup",
+      "targetKind": "literal"
+    },
+    {
+      "script": "public/js/onboarding.js",
+      "transport": "fetch",
+      "method": "GET",
+      "target": "/api/config",
+      "targetKind": "literal"
+    },
+    {
+      "script": "public/js/player-map-standalone.js",
+      "transport": "fetch",
+      "method": "DELETE",
+      "target": "/api/factions/{dynamic}/{dynamic}/markers/{dynamic}?serverId={dynamic}",
+      "targetKind": "template"
+    },
+    {
+      "script": "public/js/player-map-standalone.js",
+      "transport": "fetch",
+      "method": "GET",
+      "target": "/api/factions/{dynamic}/{dynamic}/map?mapName={dynamic}&serverId={dynamic}",
+      "targetKind": "template"
+    },
+    {
+      "script": "public/js/player-map-standalone.js",
+      "transport": "fetch",
+      "method": "GET",
+      "target": "/api/player/map-data/{dynamic}?serverId={dynamic}",
+      "targetKind": "template"
+    },
+    {
+      "script": "public/js/player-map-standalone.js",
+      "transport": "fetch",
+      "method": "POST",
+      "target": "/api/factions/{dynamic}/{dynamic}/markers",
+      "targetKind": "template"
+    },
+    {
+      "script": "public/js/player-portal.js",
+      "transport": "fetch",
+      "method": "GET",
+      "target": "{dynamic}",
+      "targetKind": "unresolved"
+    },
+    {
+      "script": "public/js/player-portal.js",
+      "transport": "fetch",
+      "method": "GET",
+      "target": "/api/accounts/linked",
+      "targetKind": "literal"
+    },
+    {
+      "script": "public/js/player-portal.js",
+      "transport": "fetch",
+      "method": "GET",
+      "target": "/api/economy/player/{dynamic}?serverId={dynamic}",
+      "targetKind": "template"
+    },
+    {
+      "script": "public/js/player-portal.js",
+      "transport": "fetch",
+      "method": "GET",
+      "target": "/api/economy/player/{dynamic}/earnings-summary?serverId={dynamic}",
+      "targetKind": "template"
+    },
+    {
+      "script": "public/js/player-portal.js",
+      "transport": "fetch",
+      "method": "GET",
+      "target": "/api/economy/player/{dynamic}/rank?serverId={dynamic}",
+      "targetKind": "template"
+    },
+    {
+      "script": "public/js/player-portal.js",
+      "transport": "fetch",
+      "method": "GET",
+      "target": "/api/economy/player/{dynamic}/transactions?serverId={dynamic}&limit={dynamic}",
+      "targetKind": "template"
+    },
+    {
+      "script": "public/js/player-portal.js",
+      "transport": "fetch",
+      "method": "GET",
+      "target": "/api/economy/player/{dynamic}/transactions?serverId={dynamic}&limit=1000&offset=0",
+      "targetKind": "template"
+    },
+    {
+      "script": "public/js/player-portal.js",
+      "transport": "fetch",
+      "method": "GET",
+      "target": "/api/economy/player/{dynamic}/transfers?serverId={dynamic}&direction={dynamic}&limit=50",
+      "targetKind": "template"
+    },
+    {
+      "script": "public/js/player-portal.js",
+      "transport": "fetch",
+      "method": "GET",
+      "target": "/api/economy/search-players?query={dynamic}&serverId={dynamic}&limit=10",
+      "targetKind": "template"
+    },
+    {
+      "script": "public/js/player-portal.js",
+      "transport": "fetch",
+      "method": "GET",
+      "target": "/api/player/discover/{dynamic}",
+      "targetKind": "template"
+    },
+    {
+      "script": "public/js/player-portal.js",
+      "transport": "fetch",
+      "method": "GET",
+      "target": "/api/player/guilds",
+      "targetKind": "literal"
+    },
+    {
+      "script": "public/js/rotation.js",
+      "transport": "fetch",
+      "method": "DELETE",
+      "target": "/api/rotation/presets/{dynamic}/{dynamic}",
+      "targetKind": "template"
+    },
+    {
+      "script": "public/js/rotation.js",
+      "transport": "fetch",
+      "method": "DELETE",
+      "target": "/api/rotation/snippets/{dynamic}/{dynamic}",
+      "targetKind": "template"
+    },
+    {
+      "script": "public/js/rotation.js",
+      "transport": "fetch",
+      "method": "DYNAMIC",
+      "target": "{dynamic}",
+      "targetKind": "unresolved"
+    },
+    {
+      "script": "public/js/rotation.js",
+      "transport": "fetch",
+      "method": "GET",
+      "target": "/api/csrf-token",
+      "targetKind": "literal"
+    },
+    {
+      "script": "public/js/rotation.js",
+      "transport": "fetch",
+      "method": "GET",
+      "target": "/api/owner/servers",
+      "targetKind": "literal"
+    },
+    {
+      "script": "public/js/rotation.js",
+      "transport": "fetch",
+      "method": "GET",
+      "target": "/api/rotation/history/{dynamic}",
+      "targetKind": "template"
+    },
+    {
+      "script": "public/js/rotation.js",
+      "transport": "fetch",
+      "method": "GET",
+      "target": "/api/rotation/presets/{dynamic}",
+      "targetKind": "template"
+    },
+    {
+      "script": "public/js/rotation.js",
+      "transport": "fetch",
+      "method": "GET",
+      "target": "/api/rotation/setup/{dynamic}",
+      "targetKind": "template"
+    },
+    {
+      "script": "public/js/rotation.js",
+      "transport": "fetch",
+      "method": "GET",
+      "target": "/api/rotation/snippets/{dynamic}",
+      "targetKind": "template"
+    },
+    {
+      "script": "public/js/rotation.js",
+      "transport": "fetch",
+      "method": "POST",
+      "target": "/api/rotation/presets/{dynamic}/{dynamic}/activate",
+      "targetKind": "template"
+    },
+    {
+      "script": "public/js/rotation.js",
+      "transport": "fetch",
+      "method": "POST",
+      "target": "/api/rotation/presets/{dynamic}/{dynamic}/deactivate",
+      "targetKind": "template"
+    },
+    {
+      "script": "public/js/rotation.js",
+      "transport": "fetch",
+      "method": "POST",
+      "target": "/api/rotation/presets/{dynamic}/{dynamic}/snippets",
+      "targetKind": "template"
+    },
+    {
+      "script": "public/js/rotation.js",
+      "transport": "fetch",
+      "method": "POST",
+      "target": "/api/rotation/recovery/{dynamic}/{dynamic}/restore",
+      "targetKind": "template"
+    },
+    {
+      "script": "public/js/rotation.js",
+      "transport": "fetch",
+      "method": "POST",
+      "target": "/api/rotation/setup/{dynamic}",
+      "targetKind": "template"
+    },
+    {
+      "script": "public/js/server-lists.js",
+      "transport": "fetch",
+      "method": "GET",
+      "target": "/api/owner/servers",
+      "targetKind": "literal"
+    },
+    {
+      "script": "public/js/server-lists.js",
+      "transport": "fetch",
+      "method": "GET",
+      "target": "/api/owner/servers/{dynamic}/list/{dynamic}",
+      "targetKind": "template"
+    },
+    {
+      "script": "public/js/server-players.js",
+      "transport": "fetch",
+      "method": "GET",
+      "target": "/api/owner/servers",
+      "targetKind": "literal"
+    },
+    {
+      "script": "public/js/server-players.js",
+      "transport": "fetch",
+      "method": "GET",
+      "target": "/api/owner/servers/{dynamic}/alts",
+      "targetKind": "template"
+    },
+    {
+      "script": "public/js/server-players.js",
+      "transport": "fetch",
+      "method": "GET",
+      "target": "/api/owner/servers/{dynamic}/list/{dynamic}",
+      "targetKind": "template"
+    },
+    {
+      "script": "public/js/server-players.js",
+      "transport": "fetch",
+      "method": "GET",
+      "target": "/api/owner/servers/{dynamic}/players?{dynamic}",
+      "targetKind": "template"
+    },
+    {
+      "script": "public/js/serverControlPanel.js",
+      "transport": "fetch",
+      "method": "GET",
+      "target": "/api/control/{dynamic}/details",
+      "targetKind": "template"
+    },
+    {
+      "script": "public/js/serverControlPanel.js",
+      "transport": "fetch",
+      "method": "GET",
+      "target": "/api/control/{dynamic}/notifications",
+      "targetKind": "template"
+    },
+    {
+      "script": "public/js/serverControlPanel.js",
+      "transport": "fetch",
+      "method": "GET",
+      "target": "/api/control/{dynamic}/status",
+      "targetKind": "template"
+    },
+    {
+      "script": "public/js/serverControlPanel.js",
+      "transport": "fetch",
+      "method": "GET",
+      "target": "/api/csrf-token",
+      "targetKind": "literal"
+    },
+    {
+      "script": "public/js/serverControlPanel.js",
+      "transport": "fetch",
+      "method": "GET",
+      "target": "/api/nitrado/registered-servers",
+      "targetKind": "literal"
+    },
+    {
+      "script": "public/js/serverControlPanel.js",
+      "transport": "fetch",
+      "method": "POST",
+      "target": "/api/control/{dynamic}/{dynamic}",
+      "targetKind": "template"
+    },
+    {
+      "script": "public/js/serverStats.js",
+      "transport": "fetch",
+      "method": "GET",
+      "target": "/api/nitrado/registered-servers",
+      "targetKind": "literal"
+    },
+    {
+      "script": "public/js/serverStats.js",
+      "transport": "fetch",
+      "method": "GET",
+      "target": "/api/stats/{dynamic}?hours={dynamic}",
+      "targetKind": "template"
+    },
+    {
+      "script": "public/js/shop-admin.js",
+      "transport": "fetch",
+      "method": "GET",
+      "target": "/api/owner/servers",
+      "targetKind": "literal"
+    },
+    {
+      "script": "public/js/shop-admin.js",
+      "transport": "fetch",
+      "method": "GET",
+      "target": "/api/radar/admin/{dynamic}",
+      "targetKind": "template"
+    },
+    {
+      "script": "public/js/shop-admin.js",
+      "transport": "fetch",
+      "method": "GET",
+      "target": "/api/shop/admin/items/{dynamic}",
+      "targetKind": "template"
+    },
+    {
+      "script": "public/js/shop-admin.js",
+      "transport": "fetch",
+      "method": "GET",
+      "target": "/api/shop/admin/items/{dynamic}/presets",
+      "targetKind": "template"
+    },
+    {
+      "script": "public/js/shop-admin.js",
+      "transport": "fetch",
+      "method": "GET",
+      "target": "/api/shop/admin/orders/{dynamic}",
+      "targetKind": "template"
+    },
+    {
+      "script": "public/js/shop-admin.js",
+      "transport": "fetch",
+      "method": "GET",
+      "target": "/api/shop/admin/orders/{dynamic}/items",
+      "targetKind": "template"
+    },
+    {
+      "script": "public/js/shop-admin.js",
+      "transport": "fetch",
+      "method": "GET",
+      "target": "/api/shop/admin/rentals/{dynamic}",
+      "targetKind": "template"
+    },
+    {
+      "script": "public/js/shop-admin.js",
+      "transport": "fetch",
+      "method": "GET",
+      "target": "/api/shop/admin/stats/{dynamic}",
+      "targetKind": "template"
+    },
+    {
+      "script": "public/js/shop.js",
+      "transport": "fetch",
+      "method": "GET",
+      "target": "/api/accounts/my-accounts",
+      "targetKind": "literal"
+    },
+    {
+      "script": "public/js/shop.js",
+      "transport": "fetch",
+      "method": "GET",
+      "target": "/api/shop/active-rentals/{dynamic}/{dynamic}",
+      "targetKind": "template"
+    },
+    {
+      "script": "public/js/shop.js",
+      "transport": "fetch",
+      "method": "GET",
+      "target": "/api/shop/balance/{dynamic}/{dynamic}",
+      "targetKind": "template"
+    },
+    {
+      "script": "public/js/shop.js",
+      "transport": "fetch",
+      "method": "GET",
+      "target": "/api/shop/cart/{dynamic}/{dynamic}",
+      "targetKind": "template"
+    },
+    {
+      "script": "public/js/shop.js",
+      "transport": "fetch",
+      "method": "GET",
+      "target": "/api/shop/items/{dynamic}",
+      "targetKind": "template"
+    },
+    {
+      "script": "public/js/shop.js",
+      "transport": "fetch",
+      "method": "GET",
+      "target": "/api/shop/maps/{dynamic}",
+      "targetKind": "template"
+    },
+    {
+      "script": "public/js/shop.js",
+      "transport": "fetch",
+      "method": "GET",
+      "target": "/api/shop/orders/{dynamic}?serverId={dynamic}",
+      "targetKind": "template"
+    },
+    {
+      "script": "public/js/shop.js",
+      "transport": "fetch",
+      "method": "GET",
+      "target": "/api/shop/servers",
+      "targetKind": "literal"
+    },
+    {
+      "script": "public/js/spawn-exclusions.js",
+      "transport": "fetch",
+      "method": "GET",
+      "target": "/api/csrf-token",
+      "targetKind": "literal"
+    },
+    {
+      "script": "public/js/spawn-exclusions.js",
+      "transport": "fetch",
+      "method": "GET",
+      "target": "/api/nitrado/registered-servers",
+      "targetKind": "literal"
+    },
+    {
+      "script": "public/js/spawn-exclusions.js",
+      "transport": "fetch",
+      "method": "GET",
+      "target": "/api/spawn-exclusions/{dynamic}?{dynamic}",
+      "targetKind": "template"
+    },
+    {
+      "script": "public/js/spawn-exclusions.js",
+      "transport": "fetch",
+      "method": "PATCH",
+      "target": "/api/spawn-exclusions/{dynamic}/{dynamic}",
+      "targetKind": "template"
+    },
+    {
+      "script": "public/js/spawn-exclusions.js",
+      "transport": "fetch",
+      "method": "POST",
+      "target": "/api/spawn-exclusions/{dynamic}/refresh",
+      "targetKind": "template"
+    },
+    {
+      "script": "public/js/supportHub.js",
+      "transport": "fetch",
+      "method": "GET",
+      "target": "/api/nitrado/registered-servers",
+      "targetKind": "literal"
+    },
+    {
+      "script": "public/js/supportHub.js",
+      "transport": "fetch",
+      "method": "GET",
+      "target": "/api/support/channels",
+      "targetKind": "literal"
+    },
+    {
+      "script": "public/js/supportHub.js",
+      "transport": "fetch",
+      "method": "GET",
+      "target": "/api/support/service-id/{dynamic}",
+      "targetKind": "template"
+    },
+    {
+      "script": "public/js/taskManager.js",
+      "transport": "fetch",
+      "method": "DELETE",
+      "target": "/api/tasks/{dynamic}/{dynamic}",
+      "targetKind": "template"
+    },
+    {
+      "script": "public/js/taskManager.js",
+      "transport": "fetch",
+      "method": "DYNAMIC",
+      "target": "{dynamic}",
+      "targetKind": "unresolved"
+    },
+    {
+      "script": "public/js/taskManager.js",
+      "transport": "fetch",
+      "method": "GET",
+      "target": "/api/csrf-token",
+      "targetKind": "literal"
+    },
+    {
+      "script": "public/js/taskManager.js",
+      "transport": "fetch",
+      "method": "GET",
+      "target": "/api/nitrado/registered-servers",
+      "targetKind": "literal"
+    },
+    {
+      "script": "public/js/taskManager.js",
+      "transport": "fetch",
+      "method": "GET",
+      "target": "/api/tasks/{dynamic}",
+      "targetKind": "template"
+    },
+    {
+      "script": "public/js/taskManager.js",
+      "transport": "fetch",
+      "method": "GET",
+      "target": "/api/tasks/{dynamic}/list",
+      "targetKind": "template"
+    }
+  ]
+}

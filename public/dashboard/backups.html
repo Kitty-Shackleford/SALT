@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Backup Manager - DayZ Dashboard</title>
+  <link rel="stylesheet" href="/css/tailwind.css">
+  <script src="/js/instance-config.js" defer></script>
+</head>
+<body class="bg-gray-900 text-white">
+  <div class="container mx-auto p-6 max-w-7xl">
+    <div class="flex justify-between items-center mb-6">
+      <h1 class="text-4xl font-bold">💾 Backup Manager</h1>
+      <a href="/dashboard" class="bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded">← Back</a>
+    </div>
+
+    <!-- Dashboard Navigation -->
+    <nav class="bg-gray-800 rounded-lg p-3 mb-6 border border-gray-700">
+      <div class="flex gap-2 flex-wrap">
+        <a href="/dashboard" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">🎮 Servers</a>
+        <a href="/dashboard/economy" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">💰 Economy</a>
+        <a href="/map" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">🗺️ Map</a>
+        <a href="/dashboard/feeds" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">📢 Feeds</a>
+        <a href="/dashboard/automation" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">⚙️ Automation</a>
+        <a href="/dashboard/tasks" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">🕒 Tasks</a>
+        <a href="/dashboard/server-control" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">🎮 Control</a>
+        <a href="/dashboard/backups" class="bg-blue-600 px-4 py-2 rounded font-semibold">💾 Backups</a>
+        <a href="/dashboard/rotation" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">🔄 Rotation</a>
+        <a href="/dashboard/ai-assistant" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">🤖 AI</a>
+        <a href="/dashboard/server-stats" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">📊 Stats</a>
+        <a href="/dashboard/activity-log" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">📋 Activity</a>
+        <a href="/dashboard/console" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">🖥️ Console</a>
+        <a href="/dashboard/boost" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">🚀 Boost</a>
+        <a href="/dashboard/support" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">🎫 Support</a>
+        <a href="/dashboard/settings" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">🔧 Settings</a>
+        <a href="/player-portal" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">👤 Player Portal</a>
+        <a href="/dashboard/shop-admin" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">🛒 Shop</a>
+      </div>
+    </nav>
+
+    <!-- Warning banner -->
+    <div class="bg-yellow-900 border border-yellow-600 text-yellow-200 p-4 rounded-lg mb-6 text-sm">
+      ⚠️ <strong>Restoring a backup will overwrite your current server data and restart the server.</strong>
+      This cannot be undone. Only restore if you are certain.
+    </div>
+
+    <!-- Server selector -->
+    <div class="bg-gray-800 p-4 rounded-lg mb-6 border border-gray-700">
+      <label class="block mb-2 font-semibold">Select Server</label>
+      <select id="serverSelect" class="bg-gray-700 p-2 rounded w-full max-w-sm">
+        <option value="">Loading servers…</option>
+      </select>
+    </div>
+
+    <!-- Status banner -->
+    <div id="statusBanner" class="hidden mb-4 p-4 rounded-lg text-sm"></div>
+
+    <!-- Gameserver backups -->
+    <div class="bg-gray-800 p-6 rounded-lg shadow-lg mb-6">
+      <div class="flex items-center justify-between mb-4">
+        <h2 class="text-2xl font-bold">🗂️ Gameserver Backups</h2>
+        <button id="refreshBackupsBtn" class="bg-gray-700 hover:bg-gray-600 px-3 py-1 rounded text-sm">🔄 Refresh</button>
+      </div>
+      <p class="text-gray-400 text-sm mb-4">
+        These are point-in-time snapshots of your server's game data files (map, player saves, etc.)
+        created automatically by Nitrado. Restoring overwrites the current game data.
+      </p>
+      <div id="gameserverBackupsWrap">
+        <p class="text-gray-400">Select a server to view backups.</p>
+      </div>
+    </div>
+
+    <!-- Database backups -->
+    <div class="bg-gray-800 p-6 rounded-lg shadow-lg">
+      <h2 class="text-2xl font-bold mb-4">🗃️ Database Backups</h2>
+      <p class="text-gray-400 text-sm mb-4">
+        Database backups contain server configuration and player data stored in Nitrado's database layer.
+      </p>
+      <div id="databaseBackupsWrap">
+        <p class="text-gray-400">Select a server to view database backups.</p>
+      </div>
+    </div>
+
+    <!-- Confirmation modal -->
+    <div id="confirmModal" class="hidden fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50">
+      <div class="bg-gray-800 border border-red-600 p-6 rounded-lg max-w-md w-full mx-4 shadow-xl">
+        <h3 class="text-xl font-bold text-red-400 mb-3">⚠️ Confirm Restore</h3>
+        <p id="confirmModalMsg" class="text-gray-200 mb-2"></p>
+        <p class="text-yellow-300 text-sm mb-6">This will overwrite current server data and cannot be undone.</p>
+        <div class="flex gap-3">
+          <button id="confirmModalYes" class="bg-red-600 hover:bg-red-700 px-5 py-2 rounded font-semibold">
+            Yes, Restore
+          </button>
+          <button id="confirmModalCancel" class="bg-gray-600 hover:bg-gray-500 px-5 py-2 rounded">
+            Cancel
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="/js/backupManager.js"></script>
+</body>
+</html>

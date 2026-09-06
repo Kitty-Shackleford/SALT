@@ -1,0 +1,301 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Rotation Manager - DayZ Dashboard</title>
+  <link rel="stylesheet" href="/css/tailwind.css">
+  <script src="/js/instance-config.js" defer></script>
+</head>
+<body class="bg-gray-900 text-white">
+  <div class="container mx-auto p-6 max-w-7xl">
+    <div class="flex justify-between items-center mb-6">
+      <h1 class="text-4xl font-bold">🔄 Rotation Manager</h1>
+      <a href="/dashboard" class="bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded">← Back</a>
+    </div>
+
+    <!-- Dashboard Navigation -->
+    <nav class="bg-gray-800 rounded-lg p-3 mb-6 border border-gray-700">
+      <div class="flex gap-2 flex-wrap">
+        <a href="/dashboard" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">🎮 Servers</a>
+        <a href="/dashboard/economy" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">💰 Economy</a>
+        <a href="/map" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">🗺️ Map</a>
+        <a href="/dashboard/feeds" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">📢 Feeds</a>
+        <a href="/dashboard/automation" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">⚙️ Automation</a>
+        <a href="/dashboard/tasks" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">🕒 Tasks</a>
+        <a href="/dashboard/server-control" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">🎮 Control</a>
+        <a href="/dashboard/backups" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">💾 Backups</a>
+        <a href="/dashboard/rotation" class="bg-blue-600 px-4 py-2 rounded font-semibold">🔄 Rotation</a>
+        <a href="/dashboard/ai-assistant" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">🤖 AI</a>
+        <a href="/dashboard/server-stats" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">📊 Stats</a>
+        <a href="/dashboard/activity-log" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">📋 Activity</a>
+        <a href="/dashboard/console" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">🖥️ Console</a>
+        <a href="/dashboard/boost" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">🚀 Boost</a>
+        <a href="/dashboard/support" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">🎫 Support</a>
+        <a href="/dashboard/settings" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">🔧 Settings</a>
+        <a href="/player-portal" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">👤 Player Portal</a>
+        <a href="/dashboard/shop-admin" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">🛒 Shop</a>
+      </div>
+    </nav>
+
+    <!-- Server Selector -->
+    <div class="bg-gray-800 p-4 rounded-lg mb-6 border border-gray-700">
+      <label class="block mb-2 font-semibold">Select Server</label>
+      <select id="serverSelect" class="bg-gray-700 p-2 rounded w-full max-w-sm">
+        <option value="">Loading servers…</option>
+      </select>
+    </div>
+
+    <!-- Setup Wizard Banner -->
+    <div id="setupBanner" class="hidden bg-yellow-900 border border-yellow-600 rounded-lg p-4 mb-6">
+      <div class="flex items-center justify-between">
+        <div>
+          <p class="font-semibold text-yellow-200">⚙️ One-time Setup Required</p>
+          <p class="text-yellow-300 text-sm mt-1">
+            The ce/ folder rotation placeholders need to be registered in your
+            <code>cfgeconomycore.xml</code> before ce-folder snippets can be used.
+            This is a safe, one-time operation.
+          </p>
+        </div>
+        <button id="runSetupBtn"
+          class="ml-4 bg-yellow-600 hover:bg-yellow-500 text-white px-4 py-2 rounded whitespace-nowrap">
+          Run Setup
+        </button>
+      </div>
+    </div>
+    <div id="setupDoneBanner" class="hidden bg-green-900 border border-green-700 rounded-lg p-3 mb-6 text-sm text-green-300">
+      ✅ ce/ folder setup complete — rotation_*.xml placeholders are registered.
+    </div>
+
+    <!-- Tab Navigation -->
+    <div class="flex gap-2 mb-6 border-b border-gray-700 pb-2">
+      <button class="tab-btn bg-blue-600 px-4 py-2 rounded" data-tab="presets">📦 Presets</button>
+      <button class="tab-btn bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded" data-tab="snippets">📝 Snippet Library</button>
+      <button class="tab-btn bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded" data-tab="history">📋 History</button>
+    </div>
+
+    <!-- ── Presets Tab ────────────────────────────────────────────────────── -->
+    <div id="tab-presets" class="tab-content">
+      <div class="flex justify-between items-center mb-4">
+        <h2 class="text-2xl font-semibold">Presets</h2>
+        <button id="newPresetBtn" class="bg-green-600 hover:bg-green-500 px-4 py-2 rounded">+ New Preset</button>
+      </div>
+      <p class="text-gray-400 text-sm mb-4">
+        A preset is a named collection of snippets that get applied together.
+        Activate one to deploy all its snippets to the server at once.
+      </p>
+      <div id="presetList" class="space-y-4">
+        <p class="text-gray-400">Select a server above to load presets.</p>
+      </div>
+    </div>
+
+    <!-- ── Snippets Tab ──────────────────────────────────────────────────── -->
+    <div id="tab-snippets" class="tab-content hidden">
+      <div class="flex justify-between items-center mb-4">
+        <h2 class="text-2xl font-semibold">Snippet Library</h2>
+        <button id="newSnippetBtn" class="bg-green-600 hover:bg-green-500 px-4 py-2 rounded">+ New Snippet</button>
+      </div>
+      <p class="text-gray-400 text-sm mb-4">
+        Snippets are reusable XML/JSON fragments. Add them to presets to deploy them.
+      </p>
+      <div id="snippetList" class="space-y-3">
+        <p class="text-gray-400">Select a server above to load snippets.</p>
+      </div>
+    </div>
+
+    <!-- ── History Tab ──────────────────────────────────────────────────── -->
+    <div id="tab-history" class="tab-content hidden">
+      <h2 class="text-2xl font-semibold mb-4">Activation History</h2>
+      <div id="historyList" class="space-y-2">
+        <p class="text-gray-400">Select a server above to load history.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── New/Edit Snippet Modal ────────────────────────────────────────── -->
+  <div id="snippetModal" class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 hidden">
+    <div class="bg-gray-800 rounded-lg p-6 w-full max-w-2xl max-h-screen overflow-y-auto border border-gray-600">
+      <h2 id="snippetModalTitle" class="text-xl font-bold mb-4">New Snippet</h2>
+
+      <div class="space-y-4">
+        <div>
+          <label class="block text-sm font-medium mb-1">Name *</label>
+          <input id="sName" type="text" placeholder="e.g. Christmas Types" class="w-full bg-gray-700 p-2 rounded">
+        </div>
+        <div>
+          <label class="block text-sm font-medium mb-1">Description</label>
+          <input id="sDesc" type="text" placeholder="Optional description" class="w-full bg-gray-700 p-2 rounded">
+        </div>
+        <div>
+          <label class="block text-sm font-medium mb-1">Tags (comma-separated)</label>
+          <input id="sTags" type="text" placeholder="e.g. holiday, christmas, loot" class="w-full bg-gray-700 p-2 rounded">
+        </div>
+
+        <!-- Pattern selector -->
+        <div>
+          <label class="block text-sm font-medium mb-1">Pattern *</label>
+          <select id="sPattern" class="w-full bg-gray-700 p-2 rounded">
+            <option value="ce_folder">ce/ Folder (types, events, spawnabletypes…)</option>
+            <option value="cfggameplay_array">cfgGameplay.json Array (gear presets, object spawners, restricted areas)</option>
+            <option value="location_bundle">Location Bundle (object spawner + mapgrouppos pair)</option>
+            <option value="xml_patch">XML Patch (inject block into mapgrouppos, cfgeventspawns…)</option>
+            <option value="file_swap">Full File Swap (replaces entire file, backs up original)</option>
+          </select>
+        </div>
+
+        <!-- ce_folder fields -->
+        <div id="fields-ce_folder" class="pattern-fields space-y-2">
+          <div>
+            <label class="block text-sm font-medium mb-1">CE Type *</label>
+            <select id="sCeType" class="w-full bg-gray-700 p-2 rounded">
+              <option value="types">types</option>
+              <option value="spawnabletypes">spawnabletypes</option>
+              <option value="events">events</option>
+              <option value="randompresets">randompresets</option>
+              <option value="globals">globals</option>
+              <option value="messages">messages</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- cfggameplay_array fields -->
+        <div id="fields-cfggameplay_array" class="pattern-fields space-y-2 hidden">
+          <div>
+            <label class="block text-sm font-medium mb-1">cfgGameplay.json Array *</label>
+            <select id="sGameplayArray" class="w-full bg-gray-700 p-2 rounded">
+              <option value="spawnGearPresetFiles">spawnGearPresetFiles</option>
+              <option value="objectSpawnersArr">objectSpawnersArr</option>
+              <option value="playerRestrictedAreaFiles">playerRestrictedAreaFiles</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-sm font-medium mb-1">Deploy Path on Server *
+              <span class="text-gray-400 font-normal">(path relative to mission folder, e.g. custom/myspawner.json)</span>
+            </label>
+            <input id="sDeployPath" type="text" placeholder="custom/myspawner.json" class="w-full bg-gray-700 p-2 rounded">
+          </div>
+        </div>
+
+        <!-- location_bundle fields -->
+        <div id="fields-location_bundle" class="pattern-fields space-y-2 hidden">
+          <div>
+            <label class="block text-sm font-medium mb-1">Object Spawner Deploy Path *
+              <span class="text-gray-400 font-normal">(relative to mission folder)</span>
+            </label>
+            <input id="sBundleDeployPath" type="text" placeholder="custom/spawners/mybase.json" class="w-full bg-gray-700 p-2 rounded">
+          </div>
+        </div>
+
+        <!-- xml_patch fields -->
+        <div id="fields-xml_patch" class="pattern-fields space-y-2 hidden">
+          <div>
+            <label class="block text-sm font-medium mb-1">Target File *
+              <span class="text-gray-400 font-normal">(relative to mission folder)</span>
+            </label>
+            <input id="sTargetFile" type="text" placeholder="mapgrouppos.xml" class="w-full bg-gray-700 p-2 rounded">
+          </div>
+        </div>
+
+        <!-- file_swap fields -->
+        <div id="fields-file_swap" class="pattern-fields space-y-2 hidden">
+          <div>
+            <label class="block text-sm font-medium mb-1">Full Server Path *
+              <span class="text-gray-400 font-normal">(absolute Nitrado path, e.g. /noftp/dayzxb/mpmissions/xxx/cfgWeather.xml)</span>
+            </label>
+            <input id="sTargetPath" type="text" placeholder="/noftp/dayzxb/mpmissions/xxx/cfgWeather.xml" class="w-full bg-gray-700 p-2 rounded">
+          </div>
+        </div>
+
+        <!-- Main content -->
+        <div>
+          <label class="block text-sm font-medium mb-1" id="contentLabel">Content * (XML)</label>
+          <textarea id="sContent" rows="8" placeholder="Paste your XML or JSON snippet here…"
+            class="w-full bg-gray-700 p-2 rounded font-mono text-sm"></textarea>
+        </div>
+
+        <!-- location_bundle extra content fields -->
+        <div id="bundle-extra-fields" class="space-y-4 hidden">
+          <div>
+            <label class="block text-sm font-medium mb-1">mapgrouppos.xml Block
+              <span class="text-gray-400 font-normal">(the &lt;group&gt; entries to inject)</span>
+            </label>
+            <textarea id="sMapgrouppos" rows="6" placeholder="&lt;group name=&quot;myBase&quot; pos=&quot;…&quot; /&gt;"
+              class="w-full bg-gray-700 p-2 rounded font-mono text-sm"></textarea>
+          </div>
+          <div>
+            <label class="block text-sm font-medium mb-1">types.xml additions <span class="text-gray-400 font-normal">(optional)</span></label>
+            <textarea id="sTypesContent" rows="4" placeholder="&lt;type name=&quot;…&quot;&gt;…&lt;/type&gt;"
+              class="w-full bg-gray-700 p-2 rounded font-mono text-sm"></textarea>
+          </div>
+          <div>
+            <label class="block text-sm font-medium mb-1">spawnabletypes.xml additions <span class="text-gray-400 font-normal">(optional)</span></label>
+            <textarea id="sSpawnableTypes" rows="4" placeholder="&lt;type name=&quot;…&quot;&gt;…&lt;/type&gt;"
+              class="w-full bg-gray-700 p-2 rounded font-mono text-sm"></textarea>
+          </div>
+        </div>
+      </div>
+
+      <div class="flex gap-3 mt-6">
+        <button id="saveSnippetBtn" class="bg-green-600 hover:bg-green-500 px-4 py-2 rounded">Save</button>
+        <button id="cancelSnippetBtn" class="bg-gray-600 hover:bg-gray-500 px-4 py-2 rounded">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── New/Edit Preset Modal ─────────────────────────────────────────── -->
+  <div id="presetModal" class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 hidden">
+    <div class="bg-gray-800 rounded-lg p-6 w-full max-w-xl border border-gray-600">
+      <h2 id="presetModalTitle" class="text-xl font-bold mb-4">New Preset</h2>
+
+      <div class="space-y-4">
+        <div>
+          <label class="block text-sm font-medium mb-1">Name *</label>
+          <input id="pName" type="text" placeholder="e.g. Christmas 2026" class="w-full bg-gray-700 p-2 rounded">
+        </div>
+        <div>
+          <label class="block text-sm font-medium mb-1">Description</label>
+          <input id="pDesc" type="text" placeholder="Optional" class="w-full bg-gray-700 p-2 rounded">
+        </div>
+        <div>
+          <label class="block text-sm font-medium mb-1">Schedule</label>
+          <select id="pScheduleType" class="w-full bg-gray-700 p-2 rounded">
+            <option value="none">No schedule (manual only)</option>
+            <option value="date_range">Date range (auto on/off)</option>
+          </select>
+        </div>
+        <div id="dateRangeFields" class="hidden space-y-2">
+          <div class="flex gap-3">
+            <div class="flex-1">
+              <label class="block text-sm font-medium mb-1">Start Date</label>
+              <input id="pStartDate" type="datetime-local" class="w-full bg-gray-700 p-2 rounded">
+            </div>
+            <div class="flex-1">
+              <label class="block text-sm font-medium mb-1">End Date</label>
+              <input id="pEndDate" type="datetime-local" class="w-full bg-gray-700 p-2 rounded">
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="flex gap-3 mt-6">
+        <button id="savePresetBtn" class="bg-green-600 hover:bg-green-500 px-4 py-2 rounded">Save</button>
+        <button id="cancelPresetBtn" class="bg-gray-600 hover:bg-gray-500 px-4 py-2 rounded">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Add Snippet to Preset Modal ──────────────────────────────────── -->
+  <div id="addSnippetModal" class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 hidden">
+    <div class="bg-gray-800 rounded-lg p-6 w-full max-w-md border border-gray-600">
+      <h2 class="text-xl font-bold mb-4">Add Snippet to Preset</h2>
+      <select id="snippetPickerSelect" class="w-full bg-gray-700 p-2 rounded mb-4">
+        <option value="">Select a snippet…</option>
+      </select>
+      <div class="flex gap-3">
+        <button id="confirmAddSnippetBtn" class="bg-green-600 hover:bg-green-500 px-4 py-2 rounded">Add</button>
+        <button id="cancelAddSnippetBtn" class="bg-gray-600 hover:bg-gray-500 px-4 py-2 rounded">Cancel</button>
+      </div>
+    </div>
+  </div>
+  <script src="/js/rotation.js"></script>
+</body>
+</html>

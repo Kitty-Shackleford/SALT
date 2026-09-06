@@ -1,0 +1,83 @@
+version: '3.8'
+
+# Isolated, loopback-only runtime for local development and testing.
+# Start through `npm run local:up` so the dedicated project name and env file
+# are applied consistently.
+services:
+  postgres:
+    image: postgres:15-alpine
+    env_file:
+      - .env.local
+    environment:
+      POSTGRES_HOST: postgres
+    ports:
+      - "127.0.0.1:${LOCAL_POSTGRES_PORT:-55432}:5432"
+    volumes:
+      - local-postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-dayz-dashboard} -d ${POSTGRES_DB:-dayz-dashboard}"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+    restart: unless-stopped
+
+  db-init:
+    build: .
+    env_file:
+      - .env.local
+    environment:
+      NODE_ENV: development
+      DEPLOYMENT_MODE: local
+      POSTGRES_HOST: postgres
+    command: ["node", "scripts/init-db.js"]
+    restart: "no"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  backend:
+    build: .
+    env_file:
+      - .env.local
+    environment:
+      NODE_ENV: development
+      DEPLOYMENT_MODE: local
+      POSTGRES_HOST: postgres
+      SESSION_SECURE_COOKIE: "false"
+      LISTEN_HOST: "0.0.0.0"
+      LOCAL_CONTAINER_RUNTIME: "true"
+      PORT: "3000"
+    ports:
+      - "127.0.0.1:${LOCAL_DASHBOARD_PORT:-3000}:3000"
+    volumes:
+      - local-downloads:/app/downloads
+      - local-data:/app/data
+      - ./bin:/app/bin
+    restart: unless-stopped
+    depends_on:
+      db-init:
+        condition: service_completed_successfully
+
+  bot:
+    build:
+      context: .
+      dockerfile: Dockerfile.bot
+    env_file:
+      - .env.local
+    environment:
+      NODE_ENV: development
+      DEPLOYMENT_MODE: local
+      POSTGRES_HOST: postgres
+    volumes:
+      - local-downloads:/app/downloads
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      db-init:
+        condition: service_completed_successfully
+
+volumes:
+  local-postgres-data:
+  local-downloads:
+  local-data:

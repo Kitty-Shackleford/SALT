@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Spawn Exclusions - DayZ Dashboard</title>
+  <link rel="stylesheet" href="/css/tailwind.css">
+  <script src="/js/instance-config.js" defer></script>
+</head>
+<body class="bg-gray-900 text-white">
+  <main class="container mx-auto p-6 max-w-7xl">
+    <header class="flex flex-wrap justify-between items-center gap-3 mb-6">
+      <div>
+        <h1 class="text-4xl font-bold">🛡️ Spawn Exclusions</h1>
+        <p class="text-gray-400 mt-2">Review flag-derived base candidates before they affect directed event placement.</p>
+      </div>
+      <a href="/dashboard" class="bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded">← Dashboard</a>
+    </header>
+
+    <nav class="bg-gray-800 rounded-lg p-3 mb-6 border border-gray-700">
+      <div class="flex gap-2 flex-wrap">
+        <a href="/dashboard" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">🎮 Servers</a>
+        <a href="/dashboard/shop-admin" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">🛒 Shop</a>
+        <a href="/dashboard/spawn-exclusions" class="bg-blue-600 px-4 py-2 rounded font-semibold">🛡️ Exclusions</a>
+      </div>
+    </nav>
+
+    <section class="bg-blue-950 border border-blue-700 text-blue-100 p-4 rounded-lg mb-6 text-sm">
+      A raised Territory Flag creates evidence only. Pending candidates do not block spawning. Confirm a candidate only after verifying it represents an established base core.
+    </section>
+
+    <section class="bg-gray-800 p-4 rounded-lg mb-6 border border-gray-700 flex flex-wrap gap-4 items-end">
+      <div class="flex-1 min-w-64">
+        <label for="serverSelect" class="block mb-2 font-semibold">Select Server</label>
+        <select id="serverSelect" class="bg-gray-700 border border-gray-600 rounded px-3 py-2 w-full">
+          <option value="">Loading servers…</option>
+        </select>
+      </div>
+      <button id="refreshCandidatesBtn" disabled class="bg-green-700 hover:bg-green-600 disabled:opacity-50 disabled:cursor-not-allowed px-4 py-2 rounded font-semibold">Refresh Flag Evidence</button>
+    </section>
+
+    <div id="statusBanner" class="hidden mb-4 p-4 rounded-lg text-sm" role="status"></div>
+
+    <section class="bg-gray-800 p-6 rounded-lg border border-gray-700">
+      <div class="flex flex-wrap justify-between items-center gap-3 mb-4">
+        <div>
+          <h2 class="text-2xl font-bold">Review Queue</h2>
+          <p class="text-gray-400 text-sm">Only confirmed zones are enforced. Decisions remain reversible.</p>
+        </div>
+        <span id="pageLabel" class="text-sm text-gray-400">Page 1</span>
+      </div>
+      <div id="zonesContainer"><p class="text-gray-400">Select a server to load candidates.</p></div>
+      <div class="flex justify-between mt-6">
+        <button id="previousPageBtn" disabled class="bg-gray-700 hover:bg-gray-600 disabled:opacity-40 px-4 py-2 rounded">← Previous</button>
+        <button id="nextPageBtn" disabled class="bg-gray-700 hover:bg-gray-600 disabled:opacity-40 px-4 py-2 rounded">Next →</button>
+      </div>
+    </section>
+  </main>
+  <script src="/js/spawn-exclusions.js"></script>
+</body>
+</html>

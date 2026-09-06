@@ -1,0 +1,61 @@
+name: CI
+
+on: [push, pull_request]
+
+permissions:
+  contents: read
+
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_DB: dayz-dashboard-test
+          POSTGRES_USER: dayz-dashboard
+          POSTGRES_PASSWORD: dayz-dashboard
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U dayz-dashboard"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Use Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Use supported npm audit client
+        run: npm install --global npm@12.0.2
+      - name: Install dependencies
+        run: |
+          npm ci
+          npm ci --prefix bot
+      - name: Lint
+        run: npm run lint
+      - name: Syntax check
+        run: |
+          node --check server.js
+          node --check scripts/release-ready-checks.js
+      - name: Secret audit
+        run: npm run security:audit
+      - name: Run unit tests
+        env:
+          FINANCIAL_IDEMPOTENCY_PG_TEST_DATABASE: postgres://dayz-dashboard:dayz-dashboard@127.0.0.1:5432/dayz-dashboard-test
+          FINANCIAL_RETENTION_PG_TEST_DATABASE: postgres://dayz-dashboard:dayz-dashboard@127.0.0.1:5432/dayz-dashboard-test
+          PROVIDER_MUTATION_PG_TEST_DATABASE: postgres://dayz-dashboard:dayz-dashboard@127.0.0.1:5432/dayz-dashboard-test
+        run: ENCRYPTION_KEY=$(node -e "process.stdout.write(require('crypto').randomBytes(32).toString('hex'))") npm test
+      - name: Database smoke test
+        env:
+          POSTGRES_HOST: 127.0.0.1
+          POSTGRES_PORT: 5432
+          POSTGRES_DB: dayz-dashboard-test
+          POSTGRES_USER: dayz-dashboard
+          POSTGRES_PASSWORD: dayz-dashboard
+        run: npm run db:smoke-test
+      - name: npm audit
+        run: npm audit --audit-level=high

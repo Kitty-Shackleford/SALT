@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Economy Analytics - DayZ Dashboard</title>
+  <link rel="stylesheet" href="/css/tailwind.css">
+  <style>
+    @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    .spinner { animation: spin 1s linear infinite; }
+    .chart-container { position: relative; height: 280px; }
+  </style>
+  <script src="/js/instance-config.js" defer></script>
+</head>
+<body class="bg-gray-900 text-white">
+  <div class="container mx-auto p-6 max-w-7xl">
+
+    <!-- Header -->
+    <div class="flex justify-between items-center mb-6">
+      <h1 class="text-4xl font-bold">📊 Economy Analytics</h1>
+      <div class="flex gap-2">
+        <a href="/admin" class="bg-orange-600 hover:bg-orange-700 px-4 py-2 rounded">← Admin Dashboard</a>
+        <a href="/logout" class="bg-red-600 hover:bg-red-700 px-4 py-2 rounded">Logout</a>
+      </div>
+    </div>
+
+    <!-- Admin Navigation -->
+    <nav class="bg-gray-800 rounded-lg p-4 mb-6">
+      <div class="flex gap-2 flex-wrap">
+        <a href="/admin" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">Dashboard</a>
+        <a href="/admin/guilds" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">Discord Communities</a>
+        <a href="/admin/guilds-approval" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">Guild Approval</a>
+        <a href="/admin/servers" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">All Servers</a>
+        <a href="/admin/users" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">Users</a>
+        <a href="/admin/audit" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">Audit Log</a>
+        <a href="/admin/supply-monitor" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">💎 Supply Monitor</a>
+        <a href="/admin/economy-analytics" class="bg-orange-600 px-4 py-2 rounded font-semibold">📊 Analytics</a>
+      </div>
+    </nav>
+
+    <!-- Guild Selector + Controls -->
+    <div class="bg-gray-800 p-6 rounded-lg shadow-lg mb-6">
+      <div class="flex flex-wrap gap-4 items-end">
+        <div class="flex-1 min-w-48">
+          <label class="block text-gray-300 mb-2 font-semibold">Select Guild</label>
+          <select id="guildSelect" class="bg-gray-700 border border-gray-600 rounded p-2 w-full text-white">
+            <option value="">-- Loading guilds... --</option>
+          </select>
+        </div>
+        <div>
+          <label class="block text-gray-300 mb-2 font-semibold">Date Range</label>
+          <select id="dateRange" class="bg-gray-700 border border-gray-600 rounded p-2 text-white">
+            <option value="7">Last 7 days</option>
+            <option value="30">Last 30 days</option>
+            <option value="90">Last 90 days</option>
+          </select>
+        </div>
+        <div>
+          <button id="exportBtn" class="bg-green-700 hover:bg-green-600 px-4 py-2 rounded font-semibold" disabled>
+            ⬇️ Export CSV
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- No Guild State -->
+    <div id="noGuildState" class="bg-gray-800 p-8 rounded-lg text-center text-gray-400">
+      <p class="text-2xl mb-2">📊</p>
+      <p>Select a guild above to view its economy analytics.</p>
+    </div>
+
+    <!-- Loading State -->
+    <div id="loadingState" class="hidden bg-gray-800 p-8 rounded-lg text-center">
+      <div class="spinner border-4 border-orange-600 border-t-transparent rounded-full w-12 h-12 mx-auto mb-4"></div>
+      <p class="text-gray-400">Loading analytics...</p>
+    </div>
+
+    <!-- Main Dashboard -->
+    <div id="mainDashboard" class="hidden">
+
+      <!-- Overview Cards -->
+      <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+        <div class="bg-gray-800 p-6 rounded-lg border border-gray-700">
+          <h3 class="text-sm text-gray-400 mb-1">Total Money</h3>
+          <p class="text-3xl font-bold text-green-400" id="ovTotalMoney">$0</p>
+          <p class="text-xs text-gray-500 mt-1">In circulation</p>
+        </div>
+        <div class="bg-gray-800 p-6 rounded-lg border border-gray-700">
+          <h3 class="text-sm text-gray-400 mb-1">Players</h3>
+          <p class="text-3xl font-bold text-blue-400" id="ovPlayerCount">0</p>
+          <p class="text-xs text-gray-500 mt-1">Total players</p>
+        </div>
+        <div class="bg-gray-800 p-6 rounded-lg border border-gray-700">
+          <h3 class="text-sm text-gray-400 mb-1">Avg Wealth</h3>
+          <p class="text-3xl font-bold text-yellow-400" id="ovAvgWealth">$0</p>
+          <p class="text-xs text-gray-500 mt-1">Per player</p>
+        </div>
+        <div class="bg-gray-800 p-6 rounded-lg border border-gray-700">
+          <h3 class="text-sm text-gray-400 mb-1">Money Velocity</h3>
+          <p class="text-3xl font-bold text-purple-400" id="ovVelocity">$0</p>
+          <p class="text-xs text-gray-500 mt-1">Earned per active player</p>
+        </div>
+      </div>
+
+      <!-- Money Flow Chart -->
+      <div class="bg-gray-800 p-6 rounded-lg border border-gray-700 mb-6">
+        <h3 class="text-xl font-bold mb-4">💹 Money Flow (Earned vs Spent)</h3>
+        <div class="chart-container">
+          <canvas id="moneyFlowChart"></canvas>
+        </div>
+      </div>
+
+      <!-- Transaction Volume Chart -->
+      <div class="bg-gray-800 p-6 rounded-lg border border-gray-700 mb-6">
+        <h3 class="text-xl font-bold mb-4">📦 Transaction Volume by Day</h3>
+        <div class="chart-container">
+          <canvas id="txVolumeChart"></canvas>
+        </div>
+      </div>
+
+      <!-- Source / Sink Breakdown -->
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+        <div class="bg-gray-800 p-6 rounded-lg border border-gray-700">
+          <h3 class="text-xl font-bold mb-4">💧 Money Sources</h3>
+          <div class="chart-container relative" style="height:240px;">
+            <canvas id="sourcesChart"></canvas>
+            <p id="sourcesEmpty" class="hidden absolute inset-0 flex items-center justify-center text-gray-500 text-sm">No source data for this period.</p>
+          </div>
+        </div>
+        <div class="bg-gray-800 p-6 rounded-lg border border-gray-700">
+          <h3 class="text-xl font-bold mb-4">🕳️ Money Sinks</h3>
+          <div class="chart-container relative" style="height:240px;">
+            <canvas id="sinksChart"></canvas>
+            <p id="sinksEmpty" class="hidden absolute inset-0 flex items-center justify-center text-gray-500 text-sm">No sink data for this period.</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Top Earners / Spenders Tables -->
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+        <div class="bg-gray-800 p-6 rounded-lg border border-gray-700">
+          <h3 class="text-xl font-bold mb-4">🏆 Top Earners</h3>
+          <div id="topEarnersList" class="space-y-2"></div>
+        </div>
+        <div class="bg-gray-800 p-6 rounded-lg border border-gray-700">
+          <h3 class="text-xl font-bold mb-4">💸 Top Spenders</h3>
+          <div id="topSpendersList" class="space-y-2"></div>
+        </div>
+      </div>
+
+    </div><!-- end #mainDashboard -->
+
+  </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js" integrity="sha384-e6nUZLBkQ86NJ6TVVKAeSaK8jWa3NhkYWZFomE39AvDbQWeie9PlQqM3pmYW5d1g" crossorigin="anonymous"></script>
+  <script src="/js/admin/economy-analytics.js"></script>
+</body>
+</html>

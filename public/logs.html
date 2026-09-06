@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Player Tracking - DayZ Dashboard</title>
+  <link rel="stylesheet" href="/css/tailwind.css">
+  <script src="/js/instance-config.js" defer></script>
+</head>
+<body class="bg-gray-900 text-white">
+  <div class="container mx-auto p-6 max-w-7xl">
+    <div class="flex justify-between items-center mb-6">
+      <h1 class="text-4xl font-bold">👥 Player Tracking</h1>
+      <a href="/dashboard" class="bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded">← Back</a>
+    </div>
+
+    <!-- Scan Local Logs -->
+    <div class="bg-gray-800 p-6 rounded-lg shadow-lg mb-6">
+      <h2 class="text-2xl mb-4">📂 Scan Local Logs</h2>
+
+      <div class="mb-4">
+        <label class="block mb-2 font-semibold">Server ID:</label>
+        <select id="serverSelect" class="bg-gray-700 p-3 rounded w-full focus:ring-2 focus:ring-blue-500 outline-none">
+          <option value="">Loading servers...</option>
+        </select>
+      </div>
+
+      <button id="scanLocalLogsBtn" class="bg-green-600 hover:bg-green-700 px-6 py-3 rounded font-semibold w-full md:w-auto">
+        🔍 Scan Server Logs
+      </button>
+
+      <div id="scanStatus" class="mt-4"></div>
+    </div>
+
+
+    <!-- Alt Detection -->
+    <div class="bg-gray-800 p-6 rounded-lg shadow-lg mb-6">
+      <div class="flex justify-between items-center mb-4">
+        <h2 class="text-2xl">🔍 Alt Account Detection</h2>
+        <button id="detectAltsBtn" class="bg-orange-600 hover:bg-orange-700 px-4 py-2 rounded text-sm">
+          🔄 Scan for Alts
+        </button>
+      </div>
+
+      <div id="altsContainer">
+        <p class="text-gray-400">Click "Scan for Alts" to find players sharing device IDs</p>
+      </div>
+    </div>
+
+    <!-- Tracked Players -->
+    <div class="bg-gray-800 p-6 rounded-lg shadow-lg">
+      <div class="flex justify-between items-center mb-4">
+        <h2 class="text-2xl">📋 All Tracked Players</h2>
+        <div class="flex gap-2">
+          <button id="scanLocalLogsBtn2" class="bg-green-600 hover:bg-green-700 px-4 py-2 rounded text-sm">
+            📂 Scan Local Logs
+          </button>
+          <button id="scanAllLogsBtn" class="bg-purple-600 hover:bg-purple-700 px-4 py-2 rounded text-sm">
+            🔄 Scan All Logs
+          </button>
+          <button id="loadPlayersBtn" class="bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded text-sm">
+            🔄 Refresh
+          </button>
+        </div>
+      </div>
+
+      <!-- Display Controls -->
+      <div class="flex gap-4 mb-4 items-center">
+        <div>
+          <label class="text-sm text-gray-400 mr-2">Show:</label>
+          <select id="limitSelect" class="bg-gray-700 px-3 py-1 rounded">
+            <option value="50">50</option>
+            <option value="100" selected>100</option>
+            <option value="250">250</option>
+            <option value="-1">All</option>
+          </select>
+        </div>
+        <div>
+          <label class="text-sm text-gray-400 mr-2">Sort by:</label>
+          <select id="sortBySelect" class="bg-gray-700 px-3 py-1 rounded">
+            <option value="lastSeenAt">Last Seen</option>
+            <option value="firstSeenAt">First Seen</option>
+            <option value="currentName">Name</option>
+            <option value="bohemiaId">Bohemia ID</option>
+            <option value="deviceId">Device ID</option>
+          </select>
+        </div>
+        <div>
+          <label class="text-sm text-gray-400 mr-2">Order:</label>
+          <select id="sortOrderSelect" class="bg-gray-700 px-3 py-1 rounded">
+            <option value="DESC">Newest First</option>
+            <option value="ASC">Oldest First</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Pagination Info -->
+      <div id="paginationInfo" class="text-sm text-gray-400 mb-2"></div>
+
+      <div id="playersContainer">
+        <p class="text-gray-400">Select a server and scan logs to start tracking players</p>
+      </div>
+
+      <!-- Pagination Controls -->
+      <div id="paginationControls" class="flex justify-center gap-2 mt-4" style="display: none;">
+        <button id="firstPageBtn" class="bg-gray-700 hover:bg-gray-600 px-3 py-1 rounded text-sm">First</button>
+        <button id="prevPageBtn" class="bg-gray-700 hover:bg-gray-600 px-3 py-1 rounded text-sm">Previous</button>
+        <span id="pageNumbers" class="flex gap-1"></span>
+        <button id="nextPageBtn" class="bg-gray-700 hover:bg-gray-600 px-3 py-1 rounded text-sm">Next</button>
+        <button id="lastPageBtn" class="bg-gray-700 hover:bg-gray-600 px-3 py-1 rounded text-sm">Last</button>
+      </div>
+    </div>
+  </div>
+
+      <div id="playersContainer">
+        <p class="text-gray-400">Select a server and scan logs to start tracking players</p>
+      </div>
+    </div>
+  </div>
+
+  </div>
+
+  <script src="/js/api.js"></script>
+  <script src="/js/csrf-helper.js"></script>
+  <script src="/js/logs.js"></script>
+</body>
+</html>

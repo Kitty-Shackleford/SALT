@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Casino Statistics - DayZ Dashboard</title>
+  <link rel="stylesheet" href="/css/tailwind.css">
+  <style>
+    @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    .spinner { animation: spin 1s linear infinite; }
+    .bar-fill { transition: width 0.4s ease; }
+  </style>
+  <script src="/js/instance-config.js" defer></script>
+</head>
+<body class="bg-gray-900 text-white">
+  <div class="container mx-auto p-6 max-w-7xl">
+
+    <!-- Header -->
+    <div class="flex justify-between items-center mb-6">
+      <div>
+        <h1 class="text-4xl font-bold">🎰 Casino Statistics</h1>
+        <p class="text-gray-400 mt-1">House analytics and player activity</p>
+      </div>
+      <div class="flex gap-2">
+        <a href="/dashboard/economy" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">💰 Economy</a>
+        <a href="/dashboard" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">← Dashboard</a>
+        <a href="/logout" class="bg-red-600 hover:bg-red-700 px-4 py-2 rounded">Logout</a>
+      </div>
+    </div>
+
+    <!-- Controls -->
+    <div class="bg-gray-800 p-4 rounded-lg border border-gray-700 mb-6">
+      <div class="flex flex-col md:flex-row gap-3 items-start md:items-center">
+        <div>
+          <label class="text-sm text-gray-400 mr-2">Community:</label>
+          <select id="guildSelect" class="bg-gray-700 px-3 py-2 rounded focus:ring-2 focus:ring-purple-500 outline-none">
+            <option value="">Loading…</option>
+          </select>
+        </div>
+        <div>
+          <label class="text-sm text-gray-400 mr-2">Period:</label>
+          <select id="daysSelect" class="bg-gray-700 px-3 py-2 rounded focus:ring-2 focus:ring-purple-500 outline-none">
+            <option value="7">Last 7 days</option>
+            <option value="30" selected>Last 30 days</option>
+            <option value="90">Last 90 days</option>
+          </select>
+        </div>
+        <button id="refreshBtn" class="bg-purple-600 hover:bg-purple-700 px-4 py-2 rounded font-semibold">
+          🔄 Refresh
+        </button>
+      </div>
+    </div>
+
+    <!-- No guild message -->
+    <div id="no-guild" class="hidden bg-gray-800 p-8 rounded-lg text-center mb-6">
+      <p class="text-4xl mb-4">🎰</p>
+      <h2 class="text-2xl font-bold mb-2">Select a Community</h2>
+      <p class="text-gray-400">Choose a community above to view casino statistics.</p>
+    </div>
+
+    <!-- Main content -->
+    <div id="main-content" class="hidden">
+
+      <!-- Summary Cards -->
+      <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+        <div class="bg-gray-800 p-6 rounded-lg border border-gray-700">
+          <p class="text-sm text-gray-400">Total Games</p>
+          <p class="text-3xl font-bold text-purple-400" id="stat-total-games">-</p>
+        </div>
+        <div class="bg-gray-800 p-6 rounded-lg border border-gray-700">
+          <p class="text-sm text-gray-400">Total Wagered</p>
+          <p class="text-3xl font-bold text-yellow-400" id="stat-total-wagered">-</p>
+        </div>
+        <div class="bg-gray-800 p-6 rounded-lg border border-gray-700">
+          <p class="text-sm text-gray-400">Total Paid Out</p>
+          <p class="text-3xl font-bold text-green-400" id="stat-total-payout">-</p>
+        </div>
+        <div class="bg-gray-800 p-6 rounded-lg border border-gray-700">
+          <p class="text-sm text-gray-400">House Profit</p>
+          <p class="text-3xl font-bold text-red-400" id="stat-house-profit">-</p>
+        </div>
+      </div>
+
+      <!-- Per-game breakdown -->
+      <div class="bg-gray-800 rounded-lg border border-gray-700 mb-6 overflow-hidden">
+        <div class="p-4 border-b border-gray-700">
+          <h2 class="text-xl font-bold">📊 By Game Type</h2>
+        </div>
+        <div class="overflow-x-auto">
+          <table class="w-full text-sm">
+            <thead class="bg-gray-700">
+              <tr>
+                <th class="px-4 py-3 text-left text-gray-300">Game</th>
+                <th class="px-4 py-3 text-right text-gray-300">Games</th>
+                <th class="px-4 py-3 text-right text-gray-300">Wagered</th>
+                <th class="px-4 py-3 text-right text-gray-300">Paid Out</th>
+                <th class="px-4 py-3 text-right text-gray-300">Win Rate</th>
+                <th class="px-4 py-3 text-right text-gray-300">House Profit</th>
+              </tr>
+            </thead>
+            <tbody id="by-game-body">
+              <tr><td colspan="6" class="text-center py-6 text-gray-400">Loading…</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Top Winners / Top Losers -->
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+
+        <!-- Top Winners -->
+        <div class="bg-gray-800 rounded-lg border border-gray-700 overflow-hidden">
+          <div class="p-4 border-b border-gray-700">
+            <h2 class="text-xl font-bold">🏆 Top Winners</h2>
+          </div>
+          <div id="top-winners-container" class="p-4">
+            <div class="text-center text-gray-400 py-4">Loading…</div>
+          </div>
+        </div>
+
+        <!-- Top Losers -->
+        <div class="bg-gray-800 rounded-lg border border-gray-700 overflow-hidden">
+          <div class="p-4 border-b border-gray-700">
+            <h2 class="text-xl font-bold">📉 Top Losers</h2>
+          </div>
+          <div id="top-losers-container" class="p-4">
+            <div class="text-center text-gray-400 py-4">Loading…</div>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Recent Activity -->
+      <div class="bg-gray-800 rounded-lg border border-gray-700 overflow-hidden">
+        <div class="p-4 border-b border-gray-700">
+          <h2 class="text-xl font-bold">🕐 Recent Activity</h2>
+        </div>
+        <div class="overflow-x-auto">
+          <table class="w-full text-sm">
+            <thead class="bg-gray-700">
+              <tr>
+                <th class="px-4 py-3 text-left text-gray-300">Player</th>
+                <th class="px-4 py-3 text-left text-gray-300">Game</th>
+                <th class="px-4 py-3 text-right text-gray-300">Wager</th>
+                <th class="px-4 py-3 text-right text-gray-300">Payout</th>
+                <th class="px-4 py-3 text-right text-gray-300">Net</th>
+                <th class="px-4 py-3 text-left text-gray-300">Result</th>
+                <th class="px-4 py-3 text-left text-gray-300">Time</th>
+              </tr>
+            </thead>
+            <tbody id="recent-body">
+              <tr><td colspan="7" class="text-center py-6 text-gray-400">Loading…</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Loading state -->
+    <div id="loading-state" class="text-center py-20 hidden">
+      <div class="spinner border-4 border-purple-600 border-t-transparent rounded-full w-16 h-16 mx-auto mb-4"></div>
+      <p class="text-gray-400">Loading casino statistics…</p>
+    </div>
+
+  </div>
+
+  <script src="/js/api.js"></script>
+  <script src="/js/csrf-helper.js"></script>
+  <script src="/js/casino-stats.js"></script>
+</body>
+</html>

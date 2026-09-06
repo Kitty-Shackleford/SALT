@@ -1,0 +1,24 @@
+FROM node:22
+
+WORKDIR /app
+
+# Copy package files
+COPY bot/package*.json ./bot/
+WORKDIR /app/bot
+RUN npm ci --only=production
+
+# Copy bot source
+COPY bot/ .
+
+# Copy shared utilities
+COPY utils/ ../utils/
+# Copy shared business logic imported by bot commands.
+COPY services/ ../services/
+# Copy shared schema initialization so bot-only deployments can start fresh.
+COPY db/ ../db/
+
+# Set environment
+ENV NODE_ENV=production
+ENV NODE_PATH=/app/bot/node_modules
+
+CMD ["node", "index.js"]

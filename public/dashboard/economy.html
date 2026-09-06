@@ -1,0 +1,582 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Economy - DayZ Dashboard</title>
+  <link rel="stylesheet" href="/css/tailwind.css">
+  <style>
+    @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    .spinner { animation: spin 1s linear infinite; }
+
+    /* Toggle switch */
+    .toggle-switch { position: relative; display: inline-block; width: 48px; height: 24px; }
+    .toggle-switch input { opacity: 0; width: 0; height: 0; }
+    .toggle-slider {
+      position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0;
+      background-color: #4b5563; border-radius: 24px; transition: .3s;
+    }
+    .toggle-slider:before {
+      position: absolute; content: ""; height: 18px; width: 18px; left: 3px; bottom: 3px;
+      background-color: white; border-radius: 50%; transition: .3s;
+    }
+    input:checked + .toggle-slider { background-color: #f97316; }
+    input:checked + .toggle-slider:before { transform: translateX(24px); }
+
+    /* Section overlay when disabled */
+    .section-disabled { opacity: 0.4; pointer-events: none; }
+
+    /* Setting row */
+    .setting-row { display: flex; align-items: center; justify-content: space-between; padding: 0.75rem 0; border-bottom: 1px solid #374151; }
+    .setting-row:last-child { border-bottom: none; }
+    .setting-label { flex: 1; }
+    .setting-label p { color: #9ca3af; font-size: 0.8rem; margin-top: 0.15rem; }
+    .setting-control { margin-left: 1rem; min-width: 160px; text-align: right; }
+
+    /* Input styles */
+    .form-input {
+      background: #374151; border: 1px solid #4b5563; border-radius: 0.375rem;
+      color: white; padding: 0.375rem 0.625rem; width: 100%; font-size: 0.875rem;
+    }
+    .form-input:focus { outline: none; border-color: #f97316; }
+    .form-select {
+      background: #374151; border: 1px solid #4b5563; border-radius: 0.375rem;
+      color: white; padding: 0.375rem 0.625rem; width: 100%; font-size: 0.875rem;
+    }
+
+    /* Alert message */
+    .alert { padding: 0.875rem 1rem; border-radius: 0.5rem; margin-bottom: 1rem; display: none; }
+    .alert-success { background: #14532d; border: 1px solid #16a34a; color: #86efac; }
+    .alert-error { background: #7f1d1d; border: 1px solid #dc2626; color: #fca5a5; }
+  </style>
+  <script src="/js/instance-config.js" defer></script>
+</head>
+<body class="bg-gray-900 text-white">
+  <div class="container mx-auto p-6 max-w-7xl">
+
+    <!-- Header -->
+    <div class="flex justify-between items-center mb-6">
+      <h1 class="text-4xl font-bold">💰 Economy Settings</h1>
+      <div class="flex gap-2">
+        <a href="/dashboard" class="bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded">← Dashboard</a>
+        <a href="/logout" class="bg-red-600 hover:bg-red-700 px-4 py-2 rounded">Logout</a>
+      </div>
+    </div>
+
+    <!-- Dashboard Navigation -->
+    <nav class="bg-gray-800 rounded-lg p-3 mb-6 border border-gray-700">
+      <div class="flex gap-2 flex-wrap">
+        <a href="/dashboard" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">🎮 Servers</a>
+        <a href="/dashboard/economy" class="bg-orange-600 px-4 py-2 rounded font-semibold">💰 Economy</a>
+        <a href="/map" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">🗺️ Map</a>
+        <a href="/dashboard/feeds" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">📢 Feeds</a>
+        <a href="/dashboard/automation" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">⚙️ Automation</a>
+        <a href="/dashboard/tasks" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">🕒 Tasks</a>
+        <a href="/dashboard/server-control" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">🎮 Control</a>
+        <a href="/dashboard/backups" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">💾 Backups</a>
+        <a href="/dashboard/rotation" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">🔄 Rotation</a>
+        <a href="/dashboard/ai-assistant" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">🤖 AI</a>
+        <a href="/dashboard/server-stats" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">📊 Stats</a>
+        <a href="/dashboard/activity-log" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">📋 Activity</a>
+        <a href="/dashboard/console" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">🖥️ Console</a>
+        <a href="/dashboard/boost" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">🚀 Boost</a>
+        <a href="/dashboard/support" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">🎫 Support</a>
+        <a href="/dashboard/settings" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">🔧 Settings</a>
+        <a href="/player-portal" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">👤 Player Portal</a>
+        <a href="/dashboard/shop-admin" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">🛒 Shop</a>
+      </div>
+    </nav>
+
+    <!-- Economy Submenu -->
+    <div class="bg-gray-700 rounded-lg p-3 mb-6 border border-gray-600">
+      <div class="flex gap-2 flex-wrap">
+        <a href="/dashboard/economy" class="bg-orange-600 px-4 py-2 rounded font-semibold">📊 Overview</a>
+        <a href="/dashboard/economy-settings" class="bg-gray-600 hover:bg-gray-500 px-4 py-2 rounded">⚙️ Settings</a>
+        <a href="/dashboard/economy-leaderboard" class="bg-gray-600 hover:bg-gray-500 px-4 py-2 rounded">🏆 Leaderboard</a>
+        <a href="/dashboard/economy-transactions" class="bg-gray-600 hover:bg-gray-500 px-4 py-2 rounded">📜 Transactions</a>
+      </div>
+    </div>
+
+    <!-- Guild Selector -->
+    <div class="bg-gray-800 p-6 rounded-lg shadow-lg mb-6">
+      <label class="block text-gray-300 mb-2 font-semibold">Select Guild to Configure</label>
+      <select id="guildSelect" class="form-select max-w-sm">
+        <option value="">-- Loading guilds... --</option>
+      </select>
+    </div>
+
+    <!-- No Guild State -->
+    <div id="noGuildState" class="bg-gray-800 p-8 rounded-lg text-center text-gray-400">
+      <p class="text-2xl mb-2">🏰</p>
+      <p>Select a guild above to configure its economy settings.</p>
+    </div>
+
+    <!-- Loading State -->
+    <div id="loadingState" class="hidden bg-gray-800 p-8 rounded-lg text-center">
+      <div class="spinner border-4 border-orange-600 border-t-transparent rounded-full w-12 h-12 mx-auto mb-4"></div>
+      <p class="text-gray-400">Loading economy configuration...</p>
+    </div>
+
+    <!-- Settings Container -->
+    <div id="settingsContainer" class="hidden">
+
+      <!-- Alert messages -->
+      <div id="alertSuccess" class="alert alert-success">✅ Configuration saved successfully!</div>
+      <div id="alertError" class="alert alert-error"></div>
+
+      <!-- Master Toggle -->
+      <div class="bg-gray-800 p-6 rounded-lg shadow-lg mb-6">
+        <div class="flex items-center justify-between">
+          <div>
+            <h2 class="text-2xl font-semibold">Economy System</h2>
+            <p class="text-gray-400 mt-1">Enable or disable the entire economy system for this guild.</p>
+          </div>
+          <label class="toggle-switch">
+            <input type="checkbox" id="economyEnabled">
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+      </div>
+
+      <!-- Stats Section (shown when economy is enabled) -->
+      <div id="statsSection" class="hidden bg-gray-800 p-6 rounded-lg shadow-lg mb-6">
+        <h2 class="text-xl font-semibold mb-4">📊 Economy Statistics</h2>
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div class="bg-gray-700 p-4 rounded-lg text-center">
+            <p class="text-gray-400 text-sm">Total Money</p>
+            <p class="text-2xl font-bold" id="statTotalMoney">-</p>
+          </div>
+          <div class="bg-gray-700 p-4 rounded-lg text-center">
+            <p class="text-gray-400 text-sm">Players</p>
+            <p class="text-2xl font-bold" id="statPlayers">-</p>
+          </div>
+          <div class="bg-gray-700 p-4 rounded-lg text-center">
+            <p class="text-gray-400 text-sm">Avg Wealth</p>
+            <p class="text-2xl font-bold" id="statAvgWealth">-</p>
+          </div>
+          <div class="bg-gray-700 p-4 rounded-lg text-center">
+            <p class="text-gray-400 text-sm">Transactions (24h)</p>
+            <p class="text-2xl font-bold" id="statTx24h">-</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Main Settings (disabled overlay when economy off) -->
+      <div id="mainSettings">
+
+        <!-- Currency Settings -->
+        <div class="bg-gray-800 p-6 rounded-lg shadow-lg mb-6">
+          <h2 class="text-xl font-semibold mb-4">💵 Currency Settings</h2>
+          <div class="setting-row">
+            <div class="setting-label">
+              <strong>Currency Name</strong>
+              <p>Display name for the currency (e.g. "Dollar").</p>
+            </div>
+            <div class="setting-control">
+              <input type="text" id="currencyName" class="form-input" maxlength="32" placeholder="Dollar">
+            </div>
+          </div>
+          <div class="setting-row">
+            <div class="setting-label">
+              <strong>Currency Symbol</strong>
+              <p>Short symbol shown before amounts (e.g. "$").</p>
+            </div>
+            <div class="setting-control">
+              <input type="text" id="currencySymbol" class="form-input" maxlength="8" placeholder="$">
+            </div>
+          </div>
+          <div class="setting-row">
+            <div class="setting-label">
+              <strong>Starting Cash</strong>
+              <p>Cash on hand given to new players.</p>
+            </div>
+            <div class="setting-control">
+              <input type="number" id="startingCash" class="form-input" min="0" step="1" placeholder="1000">
+            </div>
+          </div>
+          <div class="setting-row">
+            <div class="setting-label">
+              <strong>Starting Bank Balance</strong>
+              <p>Bank balance given to new players.</p>
+            </div>
+            <div class="setting-control">
+              <input type="number" id="startingBank" class="form-input" min="0" step="1" placeholder="0">
+            </div>
+          </div>
+        </div>
+
+        <!-- Monetary System -->
+        <div class="bg-gray-800 p-6 rounded-lg shadow-lg mb-6">
+          <h2 class="text-xl font-semibold mb-4">🏦 Monetary System</h2>
+          <div class="setting-row">
+            <div class="setting-label">
+              <strong>System Type</strong>
+              <p>Fiat: unlimited supply. Fixed: capped total supply.</p>
+            </div>
+            <div class="setting-control">
+              <select id="monetarySystem" class="form-select">
+                <option value="fiat">Fiat (Unlimited)</option>
+                <option value="fixed">Fixed Supply</option>
+              </select>
+            </div>
+          </div>
+          <div class="setting-row" id="totalSupplyRow">
+            <div class="setting-label">
+              <strong>Total Money Supply</strong>
+              <p>Maximum total currency that can exist (Fixed Supply only).</p>
+            </div>
+            <div class="setting-control">
+              <input type="number" id="totalMoneySupply" class="form-input" min="0" step="1" placeholder="Leave blank for no cap">
+            </div>
+          </div>
+
+          <!-- Fixed Supply Enforcement -->
+          <div class="mt-4 pt-4 border-t border-gray-600">
+            <div class="setting-row">
+              <div class="setting-label">
+                <strong>💎 Enable Fixed Supply Enforcement</strong>
+                <p>Track and enforce a hard cap on total money in circulation. Blocks new awards when cap is reached.</p>
+              </div>
+              <div class="setting-control">
+                <label class="toggle-switch">
+                  <input type="checkbox" id="fixedSupplyEnabled">
+                  <span class="toggle-slider"></span>
+                </label>
+              </div>
+            </div>
+            <div id="fixedSupplySettings">
+              <div class="setting-row">
+                <div class="setting-label">
+                  <strong>Max Money Supply</strong>
+                  <p>Hard cap on total currency across all wallets and banks. Leave blank for unlimited.</p>
+                </div>
+                <div class="setting-control">
+                  <input type="number" id="maxMoneySupply" class="form-input" min="0" step="1000" placeholder="No cap">
+                </div>
+              </div>
+              <div class="bg-blue-900 bg-opacity-30 border border-blue-700 p-4 rounded mt-2">
+                <div class="flex justify-between items-center">
+                  <div>
+                    <p class="text-sm">Current Supply: <span id="currentSupplyDisplay" class="font-bold text-blue-300">-</span></p>
+                    <p class="text-sm mt-1">Cap Utilization: <span id="supplyUtilizationDisplay" class="font-bold text-blue-300">-</span></p>
+                  </div>
+                  <button id="recalculateSupplyBtn" class="text-xs bg-blue-700 hover:bg-blue-600 px-3 py-1 rounded">
+                    🔄 Recalculate
+                  </button>
+                </div>
+                <p class="text-xs text-gray-400 mt-2">
+                  <a href="/admin/supply-monitor" class="text-blue-400 hover:text-blue-300">📊 View full supply monitor →</a>
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Earning Modules -->
+        <div class="bg-gray-800 p-6 rounded-lg shadow-lg mb-6">
+          <h2 class="text-xl font-semibold mb-4">🎯 Earning Modules</h2>
+
+          <!-- Kill Rewards -->
+          <div class="setting-row">
+            <div class="setting-label">
+              <strong>Kill Rewards</strong>
+              <p>Reward players for killing other players.</p>
+            </div>
+            <div class="setting-control flex items-center gap-3">
+              <input type="number" id="killReward" class="form-input w-24" min="0" step="1" placeholder="100">
+              <label class="toggle-switch flex-shrink-0">
+                <input type="checkbox" id="killRewardsEnabled">
+                <span class="toggle-slider"></span>
+              </label>
+            </div>
+          </div>
+
+          <!-- Playtime Rewards -->
+          <div class="setting-row">
+            <div class="setting-label">
+              <strong>Playtime Rewards</strong>
+              <p>Reward players per hour of playtime.</p>
+            </div>
+            <div class="setting-control flex items-center gap-3">
+              <input type="number" id="playtimeRewardPerHour" class="form-input w-24" min="0" step="1" placeholder="10">
+              <label class="toggle-switch flex-shrink-0">
+                <input type="checkbox" id="playtimeRewardsEnabled">
+                <span class="toggle-slider"></span>
+              </label>
+            </div>
+          </div>
+
+          <!-- Achievement Rewards -->
+          <div class="setting-row">
+            <div class="setting-label">
+              <strong>Achievement Rewards</strong>
+              <p>Multiplier bonus for completing achievements.</p>
+            </div>
+            <div class="setting-control flex items-center gap-3">
+              <input type="number" id="achievementBonusMultiplier" class="form-input w-24" min="0" step="0.1" placeholder="1.0">
+              <label class="toggle-switch flex-shrink-0">
+                <input type="checkbox" id="achievementRewardsEnabled">
+                <span class="toggle-slider"></span>
+              </label>
+            </div>
+          </div>
+
+          <!-- Territory Rewards -->
+          <div class="setting-row opacity-60">
+            <div class="setting-label">
+              <strong>Territory Rewards</strong>
+              <p>Currently unavailable until authoritative territory ownership is supported.</p>
+            </div>
+            <div class="setting-control flex items-center gap-3">
+              <input type="number" id="territoryRewardPerHour" class="form-input w-24" min="0" step="1" placeholder="5" disabled aria-disabled="true">
+              <label class="toggle-switch flex-shrink-0">
+                <input type="checkbox" id="territoryRewardsEnabled" disabled aria-disabled="true">
+                <span class="toggle-slider"></span>
+              </label>
+            </div>
+          </div>
+        </div>
+
+        <!-- Death Penalties -->
+        <div class="bg-gray-800 p-6 rounded-lg shadow-lg mb-6">
+          <div class="flex items-center justify-between mb-4">
+            <h2 class="text-xl font-semibold">💀 Death Penalties</h2>
+            <label class="toggle-switch">
+              <input type="checkbox" id="deathPenaltyEnabled">
+              <span class="toggle-slider"></span>
+            </label>
+          </div>
+          <div id="deathPenaltySettings">
+            <div class="setting-row">
+              <div class="setting-label">
+                <strong>Penalty Type</strong>
+                <p>Percentage of wallet or fixed flat amount lost on death.</p>
+              </div>
+              <div class="setting-control">
+                <select id="deathPenaltyType" class="form-select">
+                  <option value="percentage">Percentage</option>
+                  <option value="fixed">Fixed Amount</option>
+                </select>
+              </div>
+            </div>
+            <div class="setting-row">
+              <div class="setting-label">
+                <strong>Penalty Amount</strong>
+                <p>Percentage (0-100) or flat amount lost on death.</p>
+              </div>
+              <div class="setting-control">
+                <input type="number" id="deathPenaltyAmount" class="form-input" min="0" step="0.1" placeholder="10">
+              </div>
+            </div>
+            <div class="setting-row">
+              <div class="setting-label">
+                <strong>Max Loss Cap</strong>
+                <p>Maximum amount that can be lost per death. Leave blank for no cap.</p>
+              </div>
+              <div class="setting-control">
+                <input type="number" id="deathPenaltyMaxLoss" class="form-input" min="0" step="1" placeholder="No cap">
+              </div>
+            </div>
+            <div class="setting-row">
+              <div class="setting-label">
+                <strong>Drop Money on Death</strong>
+                <p>Lost money appears on the ground and can be looted.</p>
+              </div>
+              <div class="setting-control">
+                <label class="toggle-switch">
+                  <input type="checkbox" id="deathDropsMoneyOnGround">
+                  <span class="toggle-slider"></span>
+                </label>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Transfer Settings -->
+        <div class="bg-gray-800 p-6 rounded-lg shadow-lg mb-6">
+          <div class="flex items-center justify-between mb-4">
+            <h2 class="text-xl font-semibold">💸 Transfer Settings</h2>
+            <label class="toggle-switch">
+              <input type="checkbox" id="transferEnabled">
+              <span class="toggle-slider"></span>
+            </label>
+          </div>
+          <div id="transferSettings">
+            <div class="setting-row">
+              <div class="setting-label">
+                <strong>Transfer Fee (%)</strong>
+                <p>Percentage fee taken from each transfer.</p>
+              </div>
+              <div class="setting-control">
+                <input type="number" id="transferFeePercentage" class="form-input" min="0" max="100" step="0.1" placeholder="0">
+              </div>
+            </div>
+            <div class="setting-row">
+              <div class="setting-label">
+                <strong>Require Both Online</strong>
+                <p>Both sender and receiver must be online to transfer.</p>
+              </div>
+              <div class="setting-control">
+                <label class="toggle-switch">
+                  <input type="checkbox" id="transferRequireBothOnline">
+                  <span class="toggle-slider"></span>
+                </label>
+              </div>
+            </div>
+            <div class="setting-row">
+              <div class="setting-label">
+                <strong>Offline Transfer Fee (%)</strong>
+                <p>Extra fee when receiver is offline (if offline transfers allowed).</p>
+              </div>
+              <div class="setting-control">
+                <input type="number" id="transferOfflineFeePercentage" class="form-input" min="0" max="100" step="0.1" placeholder="5">
+              </div>
+            </div>
+            <div class="setting-row">
+              <div class="setting-label">
+                <strong>Minimum Transfer Amount</strong>
+                <p>Smallest allowed transfer.</p>
+              </div>
+              <div class="setting-control">
+                <input type="number" id="transferMinAmount" class="form-input" min="0" step="1" placeholder="1">
+              </div>
+            </div>
+            <div class="setting-row">
+              <div class="setting-label">
+                <strong>Maximum Transfer Amount</strong>
+                <p>Largest allowed transfer. Leave blank for no limit.</p>
+              </div>
+              <div class="setting-control">
+                <input type="number" id="transferMaxAmount" class="form-input" min="0" step="1" placeholder="No limit">
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Bank Settings -->
+        <div class="bg-gray-800 p-6 rounded-lg shadow-lg mb-6">
+          <div class="flex items-center justify-between mb-4">
+            <h2 class="text-xl font-semibold">🏛️ Bank Settings</h2>
+            <label class="toggle-switch">
+              <input type="checkbox" id="bankEnabled">
+              <span class="toggle-slider"></span>
+            </label>
+          </div>
+          <div id="bankSettings">
+            <div class="setting-row">
+              <div class="setting-label">
+                <strong>Max Bank Balance</strong>
+                <p>Maximum balance a player can hold in the bank. Leave blank for no limit.</p>
+              </div>
+              <div class="setting-control">
+                <input type="number" id="maxBankBalance" class="form-input" min="0" step="1" placeholder="No limit">
+              </div>
+            </div>
+            <div class="setting-row">
+              <div class="setting-label">
+                <strong>Deposit Fee (%)</strong>
+                <p>Fee taken when depositing money into the bank.</p>
+              </div>
+              <div class="setting-control">
+                <input type="number" id="bankDepositFeePercentage" class="form-input" min="0" max="100" step="0.1" placeholder="0">
+              </div>
+            </div>
+            <div class="setting-row">
+              <div class="setting-label">
+                <strong>Withdrawal Fee (%)</strong>
+                <p>Fee taken when withdrawing money from the bank.</p>
+              </div>
+              <div class="setting-control">
+                <input type="number" id="bankWithdrawFeePercentage" class="form-input" min="0" max="100" step="0.1" placeholder="0">
+              </div>
+            </div>
+            <div class="setting-row">
+              <div class="setting-label">
+                <strong>Daily Fee</strong>
+                <p>Charge a daily maintenance fee on bank balances.</p>
+              </div>
+              <div class="setting-control">
+                <label class="toggle-switch">
+                  <input type="checkbox" id="bankDailyFeeEnabled">
+                  <span class="toggle-slider"></span>
+                </label>
+              </div>
+            </div>
+            <div id="bankDailyFeeSettings">
+              <div class="setting-row">
+                <div class="setting-label">
+                  <strong>Daily Fee Type</strong>
+                  <p>Charge as a percentage of balance or a flat amount per day.</p>
+                </div>
+                <div class="setting-control">
+                  <select id="bankDailyFeeType" class="form-select">
+                    <option value="percentage">Percentage</option>
+                    <option value="flat">Flat Amount</option>
+                  </select>
+                </div>
+              </div>
+              <div class="setting-row">
+                <div class="setting-label">
+                  <strong>Daily Fee Amount</strong>
+                  <p>Percentage (0-100) or flat amount charged per day.</p>
+                </div>
+                <div class="setting-control">
+                  <input type="number" id="bankDailyFeeAmount" class="form-input" min="0" max="100" step="0.01" placeholder="0.1">
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Inactivity Tax -->
+        <div class="bg-gray-800 p-6 rounded-lg shadow-lg mb-6">
+          <div class="flex items-center justify-between mb-4">
+            <h2 class="text-xl font-semibold">⏳ Inactivity Tax</h2>
+            <label class="toggle-switch">
+              <input type="checkbox" id="inactivityTaxEnabled">
+              <span class="toggle-slider"></span>
+            </label>
+          </div>
+          <p class="text-gray-400 text-sm mb-4">Anti-hoarding mechanism for fixed supply economies. Tax inactive players to redistribute wealth.</p>
+          <div id="inactivityTaxSettings">
+            <div class="setting-row">
+              <div class="setting-label">
+                <strong>Inactivity Threshold (days)</strong>
+                <p>Days of inactivity before tax is applied.</p>
+              </div>
+              <div class="setting-control">
+                <input type="number" id="inactivityThresholdDays" class="form-input" min="1" step="1" placeholder="30">
+              </div>
+            </div>
+            <div class="setting-row">
+              <div class="setting-label">
+                <strong>Inactivity Tax Rate (%)</strong>
+                <p>Percentage of wealth taxed per cycle from inactive players.</p>
+              </div>
+              <div class="setting-control">
+                <input type="number" id="inactivityTaxPercentage" class="form-input" min="0" max="100" step="0.1" placeholder="5">
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </div><!-- end #mainSettings -->
+
+      <!-- Save / Reset Buttons -->
+      <div class="flex gap-4 mb-8">
+        <button id="saveBtn" class="bg-green-600 hover:bg-green-700 px-8 py-3 rounded-lg font-semibold text-lg flex-1">
+          💾 Save Configuration
+        </button>
+        <button id="resetBtn" class="bg-gray-600 hover:bg-gray-700 px-8 py-3 rounded-lg font-semibold text-lg">
+          🔄 Reset to Defaults
+        </button>
+      </div>
+
+    </div><!-- end #settingsContainer -->
+
+  </div>
+
+  <script src="/js/api.js"></script>
+  <script src="/js/csrf-helper.js"></script>
+  <script src="/js/admin/economy-settings.js"></script>
+</body>
+</html>

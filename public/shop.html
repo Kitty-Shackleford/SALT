@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Shop - DayZ Dashboard</title>
+  <link rel="stylesheet" href="/css/tailwind.css">
+  <link rel="stylesheet" href="/vendor/leaflet/leaflet.css">
+  <style>
+    @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    .spinner { animation: spin 1s linear infinite; }
+    .form-select {
+      background: #374151; border: 1px solid #4b5563; border-radius: 0.375rem;
+      color: white; padding: 0.375rem 0.625rem; font-size: 0.875rem;
+    }
+    .form-input {
+      background: #374151; border: 1px solid #4b5563; border-radius: 0.375rem;
+      color: white; padding: 0.375rem 0.625rem; font-size: 0.875rem; width: 100%;
+    }
+    .form-input:focus { outline: none; border-color: #3b82f6; }
+    /* Modal overlay */
+    #atc-modal { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.7); z-index:50;
+      align-items:center; justify-content:center; }
+    #atc-modal.open { display:flex; }
+
+    /* Map picker overlay — sits above the ATC modal */
+    #map-picker-modal { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.85);
+      z-index:60; flex-direction:column; }
+    #map-picker-modal.open { display:flex; }
+    #shop-map { flex:1; min-height:0; background:#1a2535; cursor:crosshair; }
+    /* Leaflet marker popup dark theme */
+    .leaflet-popup-content-wrapper { background:#1f2937; color:#f9fafb; border:1px solid #374151; }
+    .leaflet-popup-tip { background:#1f2937; }
+  </style>
+  <script src="/js/instance-config.js" defer></script>
+</head>
+<body class="bg-gray-900 text-white">
+  <div class="container mx-auto p-6 max-w-7xl">
+
+    <!-- Header -->
+    <div class="flex justify-between items-center mb-6">
+      <h1 class="text-4xl font-bold">🛒 Player Shop</h1>
+      <div class="flex gap-2">
+        <a href="/player-portal" class="bg-green-700 hover:bg-green-800 px-4 py-2 rounded">← Portal</a>
+        <a href="/logout" class="bg-red-600 hover:bg-red-700 px-4 py-2 rounded">Logout</a>
+      </div>
+    </div>
+
+    <!-- Selectors + Balance -->
+    <div class="bg-gray-800 rounded-lg p-4 mb-6 border border-gray-700 flex flex-wrap gap-4 items-end">
+      <div>
+        <label class="block text-gray-400 text-sm mb-1">Server</label>
+        <select id="serverSelect" class="form-select min-w-48">
+          <option value="">-- Select a server --</option>
+        </select>
+      </div>
+      <div>
+        <label class="block text-gray-400 text-sm mb-1">My Identity</label>
+        <select id="identitySelect" class="form-select min-w-48">
+          <option value="">-- Select identity --</option>
+        </select>
+      </div>
+      <div id="balance-box" class="ml-auto hidden flex flex-col text-right">
+        <span class="text-gray-400 text-xs mb-1">Balance</span>
+        <span class="text-lg font-bold text-green-400">
+          💰 <span id="bal-wallet">0</span>
+          <span class="text-gray-500 text-sm mx-1">+</span>
+          🏦 <span id="bal-bank">0</span>
+        </span>
+      </div>
+    </div>
+
+    <!-- Tab navigation -->
+    <div class="flex gap-2 mb-4">
+      <button id="tab-btn-shop"    class="tab-btn bg-blue-600 font-semibold px-4 py-2 rounded">🛍️ Shop</button>
+      <button id="tab-btn-cart"    class="tab-btn bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">🛒 Cart <span id="cart-badge" class="hidden bg-green-600 text-xs rounded-full px-1.5 ml-1">0</span></button>
+      <button id="tab-btn-rentals" class="tab-btn bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">📦 Rentals</button>
+      <button id="tab-btn-orders"  class="tab-btn bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">📜 Orders</button>
+    </div>
+
+    <!-- Shop tab -->
+    <div id="tab-shop">
+      <div class="mb-4 rounded-lg border border-purple-700 bg-purple-950/40 p-4 text-sm text-purple-100">
+        <strong>Rental terms:</strong> rental prices are charged per scheduled restart. Only a scheduled restart
+        confirmed by server logs consumes one purchased restart; owner-triggered restarts and crashes do not.
+        Normal refunds are prorated from unused scheduled restarts. Fulfillment or restart evidence that is not
+        available is shown as unknown rather than assumed.
+      </div>
+      <div id="items-grid" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+        <p class="text-gray-400 col-span-full text-center py-12">Select a server to browse items.</p>
+      </div>
+    </div>
+
+    <!-- Cart tab -->
+    <div id="tab-cart" style="display:none;">
+      <div id="cart-empty" class="bg-gray-800 rounded-lg border border-gray-700 p-8 text-center text-gray-400">
+        Your cart is empty.
+      </div>
+      <div id="cart-contents" class="hidden">
+        <div class="bg-gray-800 rounded-lg border border-gray-700 overflow-x-auto">
+          <table class="w-full text-sm">
+            <thead class="bg-gray-700">
+              <tr>
+                <th class="text-left py-2 px-3">Item</th>
+                <th class="text-left py-2 px-3">Type</th>
+                <th class="text-left py-2 px-3">Qty</th>
+                <th class="text-left py-2 px-3">Spawn Location</th>
+                <th class="text-left py-2 px-3">Subtotal</th>
+                <th class="py-2 px-3"></th>
+              </tr>
+            </thead>
+            <tbody id="cart-tbody"></tbody>
+          </table>
+        </div>
+        <div class="flex justify-between items-center mt-4">
+          <div class="text-lg font-semibold">
+            Total: 💰 <span id="cart-total">0</span>
+          </div>
+          <button id="checkoutBtn" class="bg-green-600 hover:bg-green-700 px-6 py-2 rounded font-semibold inline-flex items-center gap-2">
+            <span id="checkout-spinner" class="hidden h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" aria-hidden="true"></span>
+            <span id="checkout-label">Checkout</span>
+          </button>
+        </div>
+        <p id="checkout-status" class="hidden mt-3 text-sm text-gray-300" role="status" aria-live="polite"></p>
+      </div>
+    </div>
+
+    <!-- Active Rentals tab -->
+    <div id="tab-rentals" style="display:none;">
+      <div id="rentals-list" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+        <p class="text-gray-400 col-span-full text-center py-12">Select a server and identity to view active rentals.</p>
+      </div>
+    </div>
+
+    <!-- Orders tab -->
+    <div id="tab-orders" style="display:none;">
+      <div class="bg-gray-800 rounded-lg border border-gray-700 overflow-x-auto">
+        <table class="w-full text-sm">
+          <thead class="bg-gray-700">
+            <tr>
+              <th class="text-left py-2 px-3">Order #</th>
+              <th class="text-left py-2 px-3">Status</th>
+              <th class="text-left py-2 px-3">Total</th>
+              <th class="text-left py-2 px-3">Date</th>
+              <th class="text-left py-2 px-3">Items</th>
+            </tr>
+          </thead>
+          <tbody id="orders-tbody">
+            <tr><td colspan="5" class="text-center py-6 text-gray-400">No orders yet.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Add to Cart modal -->
+  <div id="atc-modal" role="dialog" aria-modal="true" aria-labelledby="atc-title">
+    <div class="bg-gray-800 rounded-xl border border-gray-600 p-6 w-full max-w-md mx-4 shadow-2xl">
+      <h2 id="atc-title" class="text-xl font-bold mb-4">Add to Cart</h2>
+
+      <div class="mb-3 flex items-center gap-3">
+        <div id="atc-img" class="w-16 h-16 bg-gray-700 rounded flex items-center justify-center text-3xl flex-shrink-0">📦</div>
+        <div>
+          <p id="atc-name" class="font-semibold text-lg"></p>
+          <p id="atc-price" class="text-green-400"></p>
+          <p id="atc-type-badge" class="text-xs mt-0.5"></p>
+        </div>
+      </div>
+
+      <div id="atc-qty-section" class="mb-4">
+        <label id="atc-qty-label" class="block text-gray-400 text-sm mb-1">Quantity</label>
+        <div class="flex items-center gap-3">
+          <input id="atc-qty" type="number" min="1" value="1" class="form-input w-24">
+          <span id="atc-rental-price" class="text-green-400 text-sm hidden"></span>
+        </div>
+        <p id="atc-qty-hint" class="text-xs text-gray-500 mt-1 hidden"></p>
+      </div>
+
+      <!-- Spawn location section — shown for supported CE event items -->
+      <div id="atc-location-section">
+        <label class="block text-gray-400 text-sm mb-1">Spawn Location</label>
+
+        <!-- Preset picker (only shown when item has presets) -->
+        <div id="atc-preset-row" class="hidden mb-2">
+          <select id="atc-preset" class="form-select w-full">
+            <option value="">-- Pick a preset location --</option>
+          </select>
+        </div>
+
+        <!-- Coordinate inputs -->
+        <div class="grid grid-cols-3 gap-2">
+          <div>
+            <label class="text-gray-500 text-xs">X</label>
+            <input id="atc-pos-x" type="number" step="0.001" placeholder="X" class="form-input mt-0.5">
+          </div>
+          <div>
+            <label class="text-gray-500 text-xs">Y (elevation; 0 = ground)</label>
+            <input id="atc-pos-y" type="number" step="0.001" placeholder="0" class="form-input mt-0.5">
+          </div>
+          <div>
+            <label class="text-gray-500 text-xs">Z</label>
+            <input id="atc-pos-z" type="number" step="0.001" placeholder="Z" class="form-input mt-0.5">
+          </div>
+        </div>
+        <button id="atc-pick-map-btn" type="button"
+          class="mt-2 w-full bg-blue-700 hover:bg-blue-600 text-sm py-1.5 rounded flex items-center justify-center gap-2">
+          📍 Pick on Map
+        </button>
+        <p id="atc-location-hint" class="text-xs text-gray-500 mt-1"></p>
+      </div>
+
+      <p id="atc-error" class="text-red-400 text-sm mt-3 hidden"></p>
+
+      <div class="flex gap-3 mt-5">
+        <button id="atc-confirm" class="flex-1 bg-green-600 hover:bg-green-700 py-2 rounded font-semibold">
+          Add to Cart
+        </button>
+        <button id="atc-cancel" class="flex-1 bg-gray-700 hover:bg-gray-600 py-2 rounded">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Map picker overlay ──────────────────────────────────────────────── -->
+  <!-- Full-screen map; player clicks to set spawn coordinates for their order item. -->
+  <div id="map-picker-modal" role="dialog" aria-modal="true" aria-label="Pick spawn location on map">
+
+    <!-- Top toolbar -->
+    <div class="flex flex-wrap items-center gap-2 px-3 py-2 bg-gray-900 border-b border-gray-700 flex-shrink-0">
+      <span class="font-semibold text-sm text-white">📍 Pick Spawn Location</span>
+
+      <!-- Map selector populated at runtime from /api/server-maps/:id -->
+      <select id="mp-map-select" class="form-select text-sm">
+        <option value="chernarusplus">Chernarus+</option>
+        <option value="enoch">Livonia</option>
+        <option value="sakhal">Sakhal</option>
+        <option value="namalsk">Namalsk</option>
+      </select>
+
+      <!-- Live coordinate readout while hovering / after click -->
+      <span id="mp-coord-display" class="text-xs text-gray-400 flex-1 min-w-40">
+        Click the map to place a pin
+      </span>
+
+      <!-- Optional elevation override -->
+      <label class="text-xs text-gray-400 flex-shrink-0">Y (elev):</label>
+      <input id="mp-y-input" type="number" step="0.001" value="0" placeholder="0"
+        class="form-input w-20 text-sm flex-shrink-0"
+        title="Elevation — leave 0 to clip placement to the ground">
+
+    </div>
+
+    <!-- Leaflet map fills remaining space -->
+    <div id="shop-map"></div>
+
+    <!-- Keep primary actions in a dedicated footer so they remain visible on phones. -->
+    <div id="map-picker-actions" class="flex gap-3 p-3 bg-gray-900 border-t border-gray-700 flex-shrink-0">
+      <button id="mp-cancel-btn" type="button"
+        class="flex-1 bg-gray-700 hover:bg-gray-600 px-3 py-2 rounded text-sm font-semibold">
+        ← Back to Shop
+      </button>
+      <button id="mp-confirm-btn" type="button" disabled
+        class="flex-1 bg-green-600 hover:bg-green-700 disabled:opacity-40 px-4 py-2 rounded text-sm font-semibold">
+        ✔ Use This Location
+      </button>
+    </div>
+  </div>
+
+  <script src="/js/api.js"></script>
+  <script src="/js/csrf-helper.js"></script>
+  <script src="/vendor/leaflet/leaflet.js"></script>
+  <script src="/js/dayz-map-coordinates.js"></script>
+  <script src="/js/checkout-state.js?v=checkout-idempotency-v1"></script>
+  <script src="/js/shop.js?v=checkout-idempotency-v1"></script>
+</body>
+</html>

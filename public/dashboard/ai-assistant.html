@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>AI Assistant - DayZ Dashboard</title>
+  <link rel="stylesheet" href="/css/tailwind.css">
+  <script src="/js/instance-config.js" defer></script>
+  <script src="/js/ai-assistant.js" defer></script>
+</head>
+<body class="bg-gray-900 text-white">
+  <div class="container mx-auto p-6 max-w-7xl">
+    <div class="flex justify-between items-center mb-6">
+      <h1 class="text-4xl font-bold">🤖 AI Server Assistant</h1>
+      <a href="/dashboard" class="bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded">← Back</a>
+    </div>
+
+    <!-- Dashboard Navigation -->
+    <nav class="bg-gray-800 rounded-lg p-3 mb-6 border border-gray-700">
+      <div class="flex gap-2 flex-wrap">
+        <a href="/dashboard" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">🎮 Servers</a>
+        <a href="/dashboard/economy" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">💰 Economy</a>
+        <a href="/map" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">🗺️ Map</a>
+        <a href="/dashboard/feeds" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">📢 Feeds</a>
+        <a href="/dashboard/automation" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">⚙️ Automation</a>
+        <a href="/dashboard/tasks" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">🕒 Tasks</a>
+        <a href="/dashboard/server-control" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">🎮 Control</a>
+        <a href="/dashboard/backups" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">💾 Backups</a>
+        <a href="/dashboard/rotation" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">🔄 Rotation</a>
+        <a href="/dashboard/ai-assistant" class="bg-blue-600 px-4 py-2 rounded font-semibold">🤖 AI</a>
+        <a href="/dashboard/server-stats" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">📊 Stats</a>
+        <a href="/dashboard/activity-log" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">📋 Activity</a>
+        <a href="/dashboard/console" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">🖥️ Console</a>
+        <a href="/dashboard/boost" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">🚀 Boost</a>
+        <a href="/dashboard/support" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">🎫 Support</a>
+        <a href="/dashboard/settings" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">🔧 Settings</a>
+        <a href="/player-portal" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">👤 Player Portal</a>
+        <a href="/dashboard/shop-admin" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">🛒 Shop</a>
+      </div>
+    </nav>
+
+    <!-- GitHub Connection Banner -->
+    <div id="ghBanner" class="bg-yellow-900 border border-yellow-600 rounded-lg p-4 mb-6 hidden">
+      <div class="flex items-center justify-between">
+        <div>
+          <p class="font-bold text-yellow-300">⚠️ GitHub Not Connected</p>
+          <p class="text-sm text-yellow-200 mt-1">Connect GitHub to link repositories and create pull requests. AI inference is configured separately by the dashboard operator.</p>
+        </div>
+        <button data-action="show-connect" class="bg-yellow-600 hover:bg-yellow-500 px-4 py-2 rounded font-semibold whitespace-nowrap ml-4">Connect GitHub</button>
+      </div>
+    </div>
+
+    <div id="aiProviderBanner" class="bg-red-900 border border-red-600 rounded-lg p-4 mb-6 hidden">
+      <div class="flex items-center justify-between gap-4">
+        <div>
+          <p class="font-bold text-red-300">⚠️ AI Provider Not Connected</p>
+          <p class="text-sm text-red-200 mt-1">Connect your own OpenAI-compatible provider token or use your GitHub Copilot subscription.</p>
+        </div>
+        <button data-action="show-ai-provider" class="bg-red-700 hover:bg-red-600 px-4 py-2 rounded font-semibold whitespace-nowrap">Connect AI</button>
+      </div>
+    </div>
+
+    <div id="aiProviderConnectedBar" class="bg-gray-800 border border-purple-700 rounded-lg p-3 mb-6 hidden">
+      <div class="flex items-center justify-between gap-4">
+        <div>
+          <span class="text-purple-300 font-semibold">✨ AI Connected</span>
+          <span id="aiProviderDisplay" class="text-gray-400 ml-2 text-sm"></span>
+        </div>
+        <div class="flex gap-2">
+          <button data-action="show-ai-provider" class="text-purple-300 hover:text-purple-200 text-sm px-2 py-1 rounded border border-purple-800">Change</button>
+          <button id="aiProviderDisconnectBtn" data-action="disconnect-ai-provider" class="text-red-400 hover:text-red-300 text-sm px-2 py-1 rounded border border-red-800">Disconnect</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Connected status bar -->
+    <div id="ghConnectedBar" class="bg-gray-800 border border-green-700 rounded-lg p-3 mb-6 hidden">
+      <div class="flex items-center justify-between">
+        <div class="flex items-center gap-3">
+          <span class="text-green-400 text-xl">✅</span>
+          <div>
+            <span class="font-semibold text-green-300">GitHub Connected</span>
+            <span id="ghUsernameDisplay" class="text-gray-400 ml-2 text-sm"></span>
+          </div>
+        </div>
+        <div class="flex items-center gap-3">
+          <span id="aiModelDisplay" class="text-sm text-gray-400"></span>
+          <label class="flex items-center gap-2 text-sm cursor-pointer">
+            <input type="checkbox" id="autoCommitToggle"  class="w-4 h-4">
+            <span class="text-gray-300">Auto PR on apply</span>
+          </label>
+          <button data-action="disconnect-github" class="text-red-400 hover:text-red-300 text-sm px-2 py-1 rounded border border-red-800 hover:border-red-600">Disconnect</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Server Selector -->
+    <div class="bg-gray-800 p-4 rounded-lg mb-6 border border-gray-700">
+      <label class="block mb-2 font-semibold">Select Server</label>
+      <select id="serverSelect"  class="bg-gray-700 border border-gray-600 rounded px-3 py-2 w-full max-w-md">
+        <option value="">-- Select a server --</option>
+      </select>
+    </div>
+
+    <!-- Tabs -->
+    <div class="flex gap-2 mb-4 border-b border-gray-700 pb-2" id="tabBar">
+      <button data-action="switch-tab" data-tab="chat"       id="tab-chat"        class="tab-btn active px-4 py-2 rounded-t">💬 Chat</button>
+      <button data-action="switch-tab" data-tab="suggestions" id="tab-suggestions" class="tab-btn px-4 py-2 rounded-t">💡 Suggestions</button>
+      <button data-action="switch-tab" data-tab="repo"        id="tab-repo"        class="tab-btn px-4 py-2 rounded-t">📁 GitHub Repo</button>
+    </div>
+
+    <!-- ── Tab: Chat ──────────────────────────────────────────────────── -->
+    <div id="pane-chat" class="tab-pane">
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+
+        <!-- File loader -->
+        <div class="bg-gray-800 rounded-lg p-4 border border-gray-700">
+          <h3 class="font-bold text-lg mb-3">Load a Config File</h3>
+          <p class="text-sm text-gray-400 mb-3">Load a file from your Nitrado server to chat about it. The AI will have the file content as context.</p>
+          <select id="fileNameSelect" class="bg-gray-700 border border-gray-600 rounded px-3 py-2 w-full mb-3">
+            <option value="types.xml">types.xml</option>
+            <option value="events.xml">events.xml</option>
+            <option value="cfgGameplay.json">cfgGameplay.json</option>
+            <option value="cfgspawnabletypes.xml">cfgspawnabletypes.xml</option>
+            <option value="randompresets.xml">randompresets.xml</option>
+            <option value="mapgrouppos.xml">mapgrouppos.xml</option>
+          </select>
+          <button data-action="load-file" id="loadFileBtn" class="bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded w-full mb-2">Load File from Server</button>
+          <div id="fileStatus" class="text-sm text-gray-400"></div>
+
+          <!-- Server context summary -->
+          <div id="contextSummary" class="mt-4 hidden">
+            <h4 class="font-semibold text-sm mb-2 text-gray-300">📊 What the AI knows about your server:</h4>
+            <div id="contextText" class="text-xs text-gray-400 bg-gray-900 p-2 rounded whitespace-pre-wrap max-h-48 overflow-y-auto"></div>
+          </div>
+        </div>
+
+        <!-- Chat interface -->
+        <div class="lg:col-span-2 bg-gray-800 rounded-lg border border-gray-700 flex flex-col" style="height: 600px;">
+          <div class="p-3 border-b border-gray-700 flex justify-between items-center">
+            <span class="font-semibold" id="chatTitle">Chat — no file loaded</span>
+            <button data-action="clear-history" class="text-xs text-gray-500 hover:text-gray-300">Clear history</button>
+          </div>
+
+          <!-- Messages -->
+          <div id="chatMessages" class="flex-1 overflow-y-auto p-4 space-y-3">
+            <div class="text-center text-gray-500 text-sm mt-8">
+              Select a server, load a file, then start chatting.<br>
+              Try: <em>"Increase the nominal of all military weapons by 20%"</em>
+            </div>
+          </div>
+
+          <!-- Input -->
+          <div class="p-3 border-t border-gray-700">
+            <div class="flex gap-2">
+              <textarea id="chatInput" rows="2" placeholder="Ask the AI to edit or explain your config file..."
+                class="flex-1 bg-gray-700 border border-gray-600 rounded px-3 py-2 text-sm resize-none"
+                ></textarea>
+              <button data-action="send-message" id="sendBtn" class="bg-blue-600 hover:bg-blue-700 px-4 rounded font-semibold">Send</button>
+            </div>
+            <p class="text-xs text-gray-500 mt-1">Ctrl+Enter to send</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Tab: Suggestions ──────────────────────────────────────────── -->
+    <div id="pane-suggestions" class="tab-pane hidden">
+      <div class="flex justify-between items-center mb-4">
+        <h2 class="text-xl font-bold">💡 AI Suggestions</h2>
+        <div class="flex gap-2">
+          <select id="analyzeFileSelect" class="bg-gray-700 border border-gray-600 rounded px-3 py-2 text-sm">
+            <option value="types.xml">types.xml</option>
+            <option value="events.xml">events.xml</option>
+            <option value="cfgGameplay.json">cfgGameplay.json</option>
+          </select>
+          <button data-action="run-analysis" id="analyzeBtn" class="bg-purple-600 hover:bg-purple-700 px-4 py-2 rounded">
+            🔍 Analyze Now
+          </button>
+        </div>
+      </div>
+      <p class="text-sm text-gray-400 mb-4">The AI analyzes your server's kill and loot data to suggest config improvements. Click "Analyze Now" to generate fresh suggestions.</p>
+
+      <div id="suggestionsList" class="space-y-4">
+        <p class="text-gray-500 text-center py-8">No suggestions yet — select a server and click Analyze Now.</p>
+      </div>
+    </div>
+
+    <!-- ── Tab: GitHub Repo ──────────────────────────────────────────── -->
+    <div id="pane-repo" class="tab-pane hidden">
+      <div class="bg-gray-800 rounded-lg p-6 border border-gray-700 max-w-2xl">
+        <h2 class="text-xl font-bold mb-2">📁 GitHub Repo Link</h2>
+        <p class="text-sm text-gray-400 mb-6">Link a GitHub repo to this server so applied suggestions can be committed as Pull Requests, giving you a full change history for your config files.</p>
+
+        <div id="noRepoMsg" class="text-gray-500 mb-4 hidden">No repo linked for this server.</div>
+        <div id="currentRepoDisplay" class="bg-gray-900 rounded p-3 mb-4 hidden">
+          <p class="text-sm"><span class="text-gray-400">Repo:</span> <span id="repoFullName" class="text-white font-mono"></span></p>
+          <p class="text-sm"><span class="text-gray-400">Branch:</span> <span id="repoBranch" class="text-white font-mono"></span></p>
+          <p class="text-sm"><span class="text-gray-400">Base path:</span> <span id="repoBasePath" class="text-white font-mono"></span></p>
+        </div>
+
+        <div id="canonicalIntegrationDisplay" class="bg-gray-900 rounded p-3 mb-4">
+          <div class="flex items-center justify-between gap-3">
+            <span class="font-semibold">DayZ Actions integration</span>
+            <span id="githubIntegrationStatus" class="text-gray-400">Unknown</span>
+          </div>
+          <div id="githubOpsStatus" class="mt-2 text-sm text-gray-400">Canonical integration status has not been loaded.</div>
+          <div id="githubActionsList" class="mt-2 space-y-1 text-sm text-gray-400"></div>
+        </div>
+
+        <div class="bg-gray-900 border border-gray-700 rounded p-4 mb-4 text-sm">
+          <p class="font-semibold text-green-300">User-owned automation</p>
+          <p class="text-gray-400 mt-1">Install the workflows in your own repository. They run directly against Nitrado and continue working without this dashboard or bot.</p>
+          <a href="https://github.com/Kitty-Shackleford/SALT/tree/main/templates/dayz-server-automation"
+             target="_blank" rel="noopener noreferrer" class="text-blue-400 hover:underline mt-2 inline-block">Open installation kit ↗</a>
+        </div>
+
+        <div class="space-y-4">
+          <div>
+            <label class="block text-sm mb-1">Repository</label>
+            <select id="repoSelect" class="bg-gray-700 border border-gray-600 rounded px-3 py-2 w-full" >
+              <option value="">-- Select a repo --</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-sm mb-1">Branch</label>
+            <select id="branchSelect" class="bg-gray-700 border border-gray-600 rounded px-3 py-2 w-full">
+              <option value="main">main</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-sm mb-1">Base path in repo <span class="text-gray-500">(where mission files are stored)</span></label>
+            <input type="text" id="basePathInput" value="/" placeholder="e.g. / or /mpmissions/dayzOffline.chernarusplus/"
+              class="bg-gray-700 border border-gray-600 rounded px-3 py-2 w-full">
+          </div>
+          <div class="flex gap-3">
+            <button data-action="save-repo-link" class="bg-green-600 hover:bg-green-700 px-4 py-2 rounded">Save Repo Link</button>
+            <button data-action="remove-repo-link" class="bg-red-700 hover:bg-red-600 px-4 py-2 rounded">Unlink Repo</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── AI Provider Modal ────────────────────────────────────────────────── -->
+  <div id="aiProviderModal" class="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50 hidden">
+    <div class="bg-gray-800 rounded-lg p-6 w-full max-w-lg border border-gray-600">
+      <h2 class="text-xl font-bold mb-2">✨ Connect AI Provider</h2>
+      <p class="text-sm text-gray-400 mb-4">Credentials are verified server-side, encrypted at rest, and never displayed again.</p>
+      <label class="block text-sm mb-1">Provider</label>
+      <select id="aiProviderType" class="bg-gray-700 border border-gray-600 rounded px-3 py-2 w-full mb-4">
+        <option value="openai-compatible">My OpenAI-compatible provider</option>
+        <option value="copilot">GitHub Copilot</option>
+      </select>
+      <div id="openAiProviderFields">
+        <label class="block text-sm mb-1">Provider URL</label>
+        <input id="aiProviderBaseUrl" type="url" value="https://api.openai.com/v1/" class="bg-gray-700 border border-gray-600 rounded px-3 py-2 w-full mb-3">
+        <label class="block text-sm mb-1">Model</label>
+        <input id="aiProviderModel" type="text" value="gpt-4o-mini" class="bg-gray-700 border border-gray-600 rounded px-3 py-2 w-full mb-3">
+        <label class="block text-sm mb-1">AI provider token</label>
+        <input id="aiProviderToken" type="password" autocomplete="new-password" placeholder="Token is encrypted and never returned" class="bg-gray-700 border border-gray-600 rounded px-3 py-2 w-full mb-4">
+      </div>
+      <div id="copilotProviderFields" class="hidden text-sm text-gray-300 bg-gray-900 rounded p-3 mb-4">
+        Uses the GitHub account connected above and requires an active Copilot subscription. A personal fine-grained token must include the account-level <strong>Copilot Requests</strong> permission; OAuth and GitHub App user tokens are also supported. Classic <code>ghp_</code> tokens are not supported by the Copilot SDK.
+      </div>
+      <div id="aiProviderError" class="text-red-400 text-sm mb-3 hidden"></div>
+      <div class="flex gap-3">
+        <button data-action="connect-ai-provider" id="aiProviderConnectBtn" class="bg-purple-600 hover:bg-purple-500 px-4 py-2 rounded flex-1">Verify & Connect</button>
+        <button data-action="close-ai-provider" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── GitHub Connect Modal ─────────────────────────────────────────────── -->
+  <div id="connectModal" class="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50 hidden">
+    <div class="bg-gray-800 rounded-lg p-6 w-full max-w-md border border-gray-600">
+      <h2 class="text-xl font-bold mb-4">🔗 Connect GitHub Account</h2>
+      <p class="text-sm text-gray-300 mb-4">
+        Create a fine-grained GitHub token restricted to the repositories you will link, with repository metadata and contents access plus pull-request write access when PR creation is enabled.
+      </p>
+      <a href="https://github.com/settings/personal-access-tokens/new"
+         target="_blank"
+         class="block text-center bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded mb-4 text-sm">
+        📝 Create token on GitHub ↗
+      </a>
+      <label class="block text-sm mb-1">Paste token here:</label>
+      <input type="password" id="patInput" autocomplete="new-password" placeholder="github_pat_..." class="bg-gray-700 border border-gray-600 rounded px-3 py-2 w-full mb-4">
+      <div id="connectError" class="text-red-400 text-sm mb-3 hidden"></div>
+      <div class="flex gap-3">
+        <button data-action="connect-pat" id="connectBtn" class="bg-green-600 hover:bg-green-700 px-4 py-2 rounded flex-1">Connect</button>
+        <button data-action="close-connect" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Diff / Apply Modal ───────────────────────────────────────────────── -->
+  <div id="diffModal" class="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50 hidden">
+    <div class="bg-gray-800 rounded-lg p-6 w-full max-w-4xl max-h-screen overflow-y-auto border border-gray-600">
+      <h2 class="text-xl font-bold mb-2" id="diffTitle">Apply Suggestion</h2>
+      <p class="text-sm text-gray-400 mb-4" id="diffExplanation"></p>
+      <div class="bg-gray-900 rounded p-3 mb-4 max-h-96 overflow-y-auto">
+        <pre id="diffContent" class="text-xs text-green-300 whitespace-pre-wrap"></pre>
+      </div>
+      <div class="flex gap-3">
+        <button data-action="apply-suggestion" id="applyBtn" class="bg-green-600 hover:bg-green-700 px-4 py-2 rounded">✅ Finalize / Create PR</button>
+        <button data-action="close-diff" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <style>
+    .tab-btn       { background: #374151; color: #9CA3AF; transition: all .15s; }
+    .tab-btn:hover { background: #4B5563; color: #fff; }
+    .tab-btn.active { background: #2563EB; color: #fff; font-weight: 600; }
+  </style>
+
+</body>
+</html>

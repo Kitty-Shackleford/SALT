@@ -1,0 +1,309 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Player Map - DayZ Dashboard</title>
+  <link rel="stylesheet" href="/css/tailwind.css">
+  <link rel="stylesheet" href="/vendor/leaflet/leaflet.css" />
+  <script src="/vendor/leaflet/leaflet.js"></script>
+  <script src="/vendor/leaflet/leaflet-heat.js"></script>
+  <style>
+    #map {
+      height: calc(100vh - 120px);
+      width: 100%;
+      background: #2d3748;
+    }
+    .leaflet-container {
+      background: #2d3748;
+      cursor: grab;
+    }
+    .leaflet-container:active { cursor: grabbing; }
+
+    .badge {
+      display: inline-block;
+      padding: 4px 8px;
+      border-radius: 4px;
+      font-size: 12px;
+      font-weight: 600;
+    }
+    .badge-blue   { background: #3b82f6; color: white; }
+    .badge-green  { background: #10b981; color: white; }
+    .badge-red    { background: #ef4444; color: white; }
+    .badge-gray   { background: #6b7280; color: white; }
+    .badge-yellow { background: #eab308; color: black; }
+
+    /* Layer control panel */
+    .filter-panel {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      background: rgba(31, 41, 55, 0.98);
+      border-radius: 8px;
+      z-index: 1000;
+      min-width: 220px;
+      box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+    }
+    .filter-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 12px 15px;
+      border-bottom: 1px solid #4b5563;
+      cursor: pointer;
+      user-select: none;
+      background: rgba(55,65,81,0.5);
+      border-radius: 8px 8px 0 0;
+    }
+    .filter-content { padding: 15px; }
+    .filter-section {
+      margin-bottom: 12px;
+      padding-bottom: 12px;
+      border-bottom: 1px solid #374151;
+    }
+    .filter-section:last-child { border-bottom: none; margin-bottom: 0; padding-bottom: 0; }
+    .filter-section h3 {
+      font-size: 12px;
+      font-weight: 600;
+      margin-bottom: 8px;
+      color: #9ca3af;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .layer-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 6px;
+      font-size: 13px;
+      cursor: pointer;
+    }
+    .layer-row input { cursor: pointer; }
+    .color-dot {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      border: 1px solid rgba(255,255,255,0.4);
+      display: inline-block;
+      flex-shrink: 0;
+    }
+    #radar-status {
+      border: 1px solid rgba(34, 211, 238, 0.45);
+      background: rgba(8, 145, 178, 0.14);
+      color: #a5f3fc;
+      border-radius: 6px;
+      padding: 7px 8px;
+      margin-bottom: 8px;
+      font-size: 12px;
+      line-height: 1.35;
+    }
+    #radar-presence-list {
+      color: #d1d5db;
+      font-size: 11px;
+      line-height: 1.45;
+      max-height: 96px;
+      overflow-y: auto;
+    }
+    .radar-contact-marker {
+      filter: drop-shadow(0 0 5px #22d3ee) drop-shadow(0 0 9px #f43f5e);
+    }
+    .radar-contact-pulse {
+      animation: radar-pulse 1.4s ease-out infinite;
+      transform-box: fill-box;
+      transform-origin: center;
+    }
+    @keyframes radar-pulse {
+      0% { opacity: 0.9; transform: scale(0.7); }
+      100% { opacity: 0; transform: scale(1.5); }
+    }
+
+    /* Loading overlay */
+    #loading {
+      position: absolute;
+      inset: 0;
+      background: rgba(17,24,39,0.9);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 50;
+      border-radius: 0.5rem;
+    }
+  </style>
+  <script src="/js/instance-config.js" defer></script>
+</head>
+<body class="bg-gray-900 text-white">
+
+  <!-- Header -->
+  <div class="bg-gray-800 p-4 shadow-lg">
+    <div class="container mx-auto flex justify-between items-center flex-wrap gap-4">
+      <div class="flex-1">
+        <h1 class="text-2xl font-bold">🗺️ Player Map</h1>
+        <div class="flex items-center gap-2 mt-1 flex-wrap">
+          <p class="text-sm text-gray-400" id="map-info">Loading player data…</p>
+          <span id="badge-structures" class="badge badge-blue" style="display:none;"></span>
+          <span id="badge-purchases" class="badge" style="display:none;background:#7c3aed;"></span>
+          <span id="badge-deaths"     class="badge badge-red"  style="display:none;"></span>
+          <span id="badge-trail"      class="badge badge-gray" style="display:none;"></span>
+        </div>
+      </div>
+      <div class="flex gap-3 items-center flex-wrap">
+        <select id="map-select" class="bg-gray-700 px-4 py-2 rounded">
+          <option value="chernarusplus">Chernarus+</option>
+          <option value="enoch">Livonia</option>
+          <option value="sakhal">Sakhal</option>
+        </select>
+        <button id="reload-btn" class="bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded">
+          🔄 Reload
+        </button>
+        <a href="/player-portal" class="bg-gray-600 hover:bg-gray-700 px-4 py-2 rounded">← Portal</a>
+      </div>
+    </div>
+  </div>
+
+  <!-- Map area -->
+  <div class="container mx-auto p-4">
+    <div class="relative">
+
+      <div id="map" class="rounded-lg shadow-lg"></div>
+
+      <!-- Layer toggle panel (sits over the map like the admin map's filter panel) -->
+      <div class="filter-panel">
+        <div class="filter-header" id="panel-header">
+          <span class="font-bold text-sm">🔍 Layers</span>
+          <span id="panel-toggle-icon">▼</span>
+        </div>
+        <div class="filter-content" id="panel-body">
+
+          <div class="filter-section" data-player-map-feature="structures">
+            <h3>Structures</h3>
+            <p class="text-xs text-gray-500 mb-2">Decay health is unavailable from retained logs; markers show observed actions only.</p>
+            <label class="layer-row">
+              <input type="checkbox" id="layer-built" checked>
+              <span class="color-dot" style="background:#3b82f6;"></span>
+              <span>Built</span>
+              <span id="count-built" class="ml-auto text-gray-400 text-xs">0</span>
+            </label>
+            <label class="layer-row">
+              <input type="checkbox" id="layer-placed" checked>
+              <span class="color-dot" style="background:#10b981;"></span>
+              <span>Placed</span>
+              <span id="count-placed" class="ml-auto text-gray-400 text-xs">0</span>
+            </label>
+            <label class="layer-row">
+              <input type="checkbox" id="layer-mounted" checked>
+              <span class="color-dot" style="background:#eab308;"></span>
+              <span>Mounted</span>
+              <span id="count-mounted" class="ml-auto text-gray-400 text-xs">0</span>
+            </label>
+          </div>
+
+          <div class="filter-section">
+            <h3>Player</h3>
+            <label class="layer-row" data-player-map-feature="purchases">
+              <input type="checkbox" id="layer-purchases" checked>
+              <span class="color-dot" style="background:#8b5cf6;"></span>
+              <span>Purchase placements</span>
+              <span id="count-purchases" class="ml-auto text-gray-400 text-xs">0</span>
+            </label>
+            <label class="layer-row" data-player-map-feature="deaths">
+              <input type="checkbox" id="layer-deaths" checked>
+              <span class="color-dot" style="background:#ef4444;"></span>
+              <span>Deaths</span>
+              <span id="count-deaths" class="ml-auto text-gray-400 text-xs">0</span>
+            </label>
+            <label class="layer-row" data-player-map-feature="trail">
+              <input type="checkbox" id="layer-trail" checked>
+              <span class="color-dot" style="background:#60a5fa;"></span>
+              <span>Movement Trail</span>
+              <span id="count-trail" class="ml-auto text-gray-400 text-xs">0</span>
+            </label>
+            <label class="layer-row" data-player-map-feature="lastPosition">
+              <input type="checkbox" id="layer-lastpos" checked>
+              <span class="color-dot" style="background:#a78bfa;"></span>
+              <span>Last Position</span>
+            </label>
+          </div>
+
+          <div class="filter-section" id="radar-layer-section" style="display:none;">
+            <h3>📡 Radar</h3>
+            <div id="radar-status" role="status" aria-live="polite">Checking radar access…</div>
+            <p class="text-xs text-gray-500 mb-2">Log-derived observations update on the next successful log sync; they are not live GPS.</p>
+            <label class="layer-row">
+              <input type="checkbox" id="layer-radar" checked>
+              <span class="color-dot" style="background:#22d3ee;box-shadow:0 0 8px #22d3ee;"></span>
+              <span>Radar contacts</span>
+              <span id="count-radar" class="ml-auto text-gray-400 text-xs">0</span>
+            </label>
+            <label class="layer-row">
+              <input type="checkbox" id="layer-radar-heat" checked>
+              <span class="color-dot" style="background:#f43f5e;box-shadow:0 0 8px #f43f5e;"></span>
+              <span>Contact heat</span>
+            </label>
+            <div id="radar-presence-list" aria-live="polite"></div>
+          </div>
+
+          <div class="filter-section">
+            <h3>Coordinates</h3>
+            <div id="coord-display" class="font-mono text-xs text-gray-300">Hover map…</div>
+          </div>
+
+          <!-- Faction section — shown only when factionId URL param is present -->
+          <div class="filter-section" id="faction-layer-section" style="display:none;">
+            <h3>⚔️ Faction</h3>
+            <label class="layer-row" data-player-map-feature="factionMembers">
+              <input type="checkbox" id="layer-faction-members" checked>
+              <span class="color-dot" style="background:#f97316;"></span>
+              <span>Teammates</span>
+              <span id="count-faction-members" class="ml-auto text-gray-400 text-xs">0</span>
+            </label>
+            <label class="layer-row" data-player-map-feature="factionMarkers">
+              <input type="checkbox" id="layer-faction-markers" checked>
+              <span class="color-dot" style="background:#facc15;"></span>
+              <span>Markers</span>
+              <span id="count-faction-markers" class="ml-auto text-gray-400 text-xs">0</span>
+            </label>
+            <button id="place-marker-btn" data-player-map-feature="factionMarkers"
+              class="mt-2 w-full text-xs bg-yellow-700 hover:bg-yellow-600 px-2 py-1.5 rounded flex items-center justify-center gap-1">
+              📍 Place Marker
+            </button>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- Faction marker placement form — hidden by default, shown in placement mode -->
+      <div id="faction-marker-form" style="display:none; position:absolute; bottom:16px; left:50%; transform:translateX(-50%); z-index:1000; background:#1f2937; border:1px solid #374151; border-radius:8px; padding:16px; min-width:280px; max-width:360px;">
+        <p class="text-sm font-bold mb-3">📍 Click the map to place a marker</p>
+        <div id="faction-marker-inputs" style="display:none;">
+          <input id="marker-title" type="text" placeholder="Title (e.g. Base Camp)" maxlength="60"
+            class="w-full bg-gray-700 rounded px-2 py-1.5 text-sm text-white mb-2">
+          <textarea id="marker-note" placeholder="Note (optional)" maxlength="300" rows="2"
+            class="w-full bg-gray-700 rounded px-2 py-1.5 text-sm text-white mb-2"></textarea>
+          <input id="marker-icon" type="text" placeholder="Icon emoji (e.g. 🏠)" maxlength="4"
+            class="w-full bg-gray-700 rounded px-2 py-1.5 text-sm text-white mb-3" value="📍">
+          <div class="flex gap-2">
+            <button id="marker-save-btn" class="flex-1 bg-yellow-700 hover:bg-yellow-600 px-3 py-1.5 rounded text-sm">Save</button>
+            <button id="marker-cancel-btn" class="flex-1 bg-gray-600 hover:bg-gray-500 px-3 py-1.5 rounded text-sm">Cancel</button>
+          </div>
+        </div>
+        <button id="marker-dismiss-btn" class="mt-2 text-xs text-gray-400 hover:text-white w-full text-center">✕ Cancel placement</button>
+      </div>
+
+      <!-- Loading overlay -->
+      <div id="loading">
+        <div class="text-center">
+          <div class="animate-spin rounded-full h-14 w-14 border-t-2 border-b-2 border-blue-500 mx-auto mb-4"></div>
+          <p class="text-lg">Initialising map…</p>
+          <p id="loading-status" class="text-sm text-gray-400 mt-1"></p>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <script src="/js/api.js"></script>
+  <script src="/js/csrf-helper.js"></script>
+  <script src="/js/dayz-map-coordinates.js"></script>
+  <script src="/js/dayz-map-tiles.js"></script>
+  <script src="/js/player-map-standalone.js"></script>
+</body>
+</html>

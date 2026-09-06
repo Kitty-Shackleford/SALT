@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Nitrado Settings - DayZ Dashboard</title>
+  <link rel="stylesheet" href="/css/tailwind.css">
+  <script src="/js/instance-config.js" defer></script>
+</head>
+<body class="bg-gray-900 text-white">
+  <div class="container mx-auto p-6 max-w-7xl">
+    <div class="flex justify-between items-center mb-6">
+      <h1 class="text-4xl font-bold">⚙️ Nitrado Server Settings</h1>
+      <a href="/dashboard" class="bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded">← Back</a>
+    </div>
+
+    <!-- Dashboard Navigation -->
+    <nav class="bg-gray-800 rounded-lg p-3 mb-6 border border-gray-700">
+      <div class="flex gap-2 flex-wrap">
+        <a href="/dashboard" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">🎮 Servers</a>
+        <a href="/dashboard/economy" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">💰 Economy</a>
+        <a href="/map" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">🗺️ Map</a>
+        <a href="/dashboard/feeds" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">📢 Feeds</a>
+        <a href="/dashboard/automation" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">⚙️ Automation</a>
+        <a href="/dashboard/tasks" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">🕒 Tasks</a>
+        <a href="/dashboard/server-control" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">🎮 Control</a>
+        <a href="/dashboard/backups" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">💾 Backups</a>
+        <a href="/dashboard/rotation" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">🔄 Rotation</a>
+        <a href="/dashboard/ai-assistant" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">🤖 AI</a>
+        <a href="/dashboard/server-stats" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">📊 Stats</a>
+        <a href="/dashboard/activity-log" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">📋 Activity</a>
+        <a href="/dashboard/console" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">🖥️ Console</a>
+        <a href="/dashboard/boost" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">🚀 Boost</a>
+        <a href="/dashboard/support" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">🎫 Support</a>
+        <a href="/dashboard/settings" class="bg-blue-600 px-4 py-2 rounded font-semibold">🔧 Settings</a>
+        <a href="/player-portal" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">👤 Player Portal</a>
+        <a href="/dashboard/shop-admin" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">🛒 Shop</a>
+      </div>
+    </nav>
+
+    <!-- Server Selection -->
+    <div class="bg-gray-800 p-6 rounded-lg shadow-lg mb-6">
+      <label class="block mb-2 font-semibold">Select Server:</label>
+      <select id="serverSelect" class="bg-gray-700 p-3 rounded w-full text-lg">
+        <option value="">-- Choose a server --</option>
+      </select>
+    </div>
+
+    <!-- Loading Indicator -->
+    <div id="loadingIndicator" class="text-center py-12 hidden">
+      <div class="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-white"></div>
+      <p class="mt-4 text-gray-400">Loading settings...</p>
+    </div>
+
+    <!-- Settings Container -->
+    <div id="settingsContainer" class="hidden">
+      <div id="linkSettingsCard" class="hidden bg-gray-800 p-6 rounded-lg shadow-lg mb-6">
+        <h2 class="text-2xl mb-2 font-bold">🔗 Gamertag Linking Verification</h2>
+        <p class="text-sm text-gray-400 mb-4">Controls how new Discord users may claim a gamertag on this exact DayZ server.</p>
+        <label for="linkVerificationMode" class="block mb-2 font-semibold">Verification level</label>
+        <select id="linkVerificationMode" class="bg-gray-700 p-3 rounded w-full mb-3">
+          <option value="admin_approval">Admin/moderator approval — highest assurance</option>
+          <option value="emote">Emote verification — player proves control in game</option>
+          <option value="open">Open self-link — one Discord owner per game identity</option>
+        </select>
+        <p id="linkVerificationHelp" class="text-sm text-yellow-300 mb-4"></p>
+        <button id="saveLinkVerificationBtn" class="bg-green-600 hover:bg-green-700 px-5 py-2 rounded font-semibold">
+          Save Link Verification
+        </button>
+      </div>
+
+      <div id="playerMapSettingsCard" class="hidden bg-gray-800 p-6 rounded-lg shadow-lg mb-6">
+        <h2 class="text-2xl mb-2 font-bold">🗺️ Player Map Features</h2>
+        <p class="text-sm text-gray-400 mb-4">Choose which exact-server layers players may receive. Purchase, structure, death, trail, and position data always remain scoped to the signed-in player's linked identity; teammate locations are controlled separately.</p>
+        <div id="playerMapFeatureOptions" class="grid gap-3 sm:grid-cols-2 mb-4">
+          <label class="flex gap-2"><input type="checkbox" value="structures"> Own structure actions</label>
+          <label class="flex gap-2"><input type="checkbox" value="purchases"> Own purchase placements</label>
+          <label class="flex gap-2"><input type="checkbox" value="deaths"> Own deaths</label>
+          <label class="flex gap-2"><input type="checkbox" value="trail"> Own movement trail</label>
+          <label class="flex gap-2"><input type="checkbox" value="lastPosition"> Own last position</label>
+          <label class="flex gap-2"><input type="checkbox" value="factionMembers"> Faction teammate positions</label>
+          <label class="flex gap-2"><input type="checkbox" value="factionMarkers"> Faction markers and placement</label>
+        </div>
+        <button id="savePlayerMapSettingsBtn" class="bg-green-600 hover:bg-green-700 px-5 py-2 rounded font-semibold">
+          Save Player Map Features
+        </button>
+      </div>
+
+      <div class="bg-gray-800 p-6 rounded-lg shadow-lg mb-6">
+        <h2 class="text-2xl mb-4 font-bold">🏷️ Server Identity</h2>
+        <div class="space-y-6">
+          <div>
+            <label for="serverDisplayName" class="block mb-2 font-semibold text-gray-300">Dashboard &amp; bot display name</label>
+            <input id="serverDisplayName" type="text" maxlength="200"
+              class="bg-gray-700 p-3 rounded w-full"
+              placeholder="Easy-to-recognize server name">
+            <p class="text-sm text-gray-400 mt-2">This safe name identifies the server throughout the dashboard, shop, and Discord bot. It does not change the Nitrado service ID or the real game-server name.</p>
+            <button id="saveDisplayNameBtn" class="mt-3 bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded font-semibold">Save display name</button>
+          </div>
+
+          <div id="hostnameControls" class="border-t border-gray-700 pt-6">
+            <label for="nitradoHostname" class="block mb-2 font-semibold text-gray-300">Actual Nitrado hostname</label>
+            <input id="nitradoHostname" type="text" maxlength="80"
+              class="bg-gray-700 p-3 rounded w-full"
+              placeholder="Name shown by the game server browser">
+            <label class="flex items-start gap-3 mt-4 cursor-pointer">
+              <input id="invisibleHostname" type="checkbox" class="mt-1 h-5 w-5">
+              <span>
+                <span class="font-semibold">Use 80 control characters for server-list sorting</span>
+                <span class="block text-sm text-gray-400">All console platforms (Xbox, PlayStation, and Switch 2) can use the same 80-character value observed on the Xbox server. The dashboard, shop, and Discord bot continue using the safe display name above.</span>
+              </span>
+            </label>
+            <p id="hostnameStatus" class="text-sm text-gray-400 mt-3"></p>
+            <button id="saveHostnameBtn" class="mt-3 bg-yellow-600 hover:bg-yellow-700 px-4 py-2 rounded font-semibold">Save Nitrado hostname</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="bg-gray-800 p-6 rounded-lg shadow-lg mb-6 border border-gray-700">
+        <h2 class="text-2xl mb-2 font-bold">⚡ GitHub Actions Integration</h2>
+        <p class="text-sm text-gray-400 mb-4">Install decentralized DayZ automation in a repository you own. GitHub runs it directly against Nitrado, so monitoring, validation, backups, and static reports continue when this dashboard or bot is offline.</p>
+        <div class="flex flex-wrap gap-3">
+          <a href="/dashboard/ai-assistant#repo" class="bg-green-700 hover:bg-green-600 px-4 py-2 rounded font-semibold">Connect repository</a>
+          <a href="https://github.com/Kitty-Shackleford/SALT/tree/main/templates/dayz-server-automation"
+             target="_blank" rel="noopener noreferrer" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">Installation kit ↗</a>
+        </div>
+      </div>
+
+      <!-- General Settings -->
+      <div class="bg-gray-800 p-6 rounded-lg shadow-lg mb-6">
+        <h2 class="text-2xl mb-4 font-bold">🔧 General Settings</h2>
+        <div id="generalSettings" class="space-y-4"></div>
+      </div>
+
+      <!-- Config Settings -->
+      <div class="bg-gray-800 p-6 rounded-lg shadow-lg mb-6">
+        <h2 class="text-2xl mb-4 font-bold">📋 Config Settings</h2>
+        <div id="configSettings" class="space-y-4"></div>
+      </div>
+
+      <!-- Savegame Settings -->
+      <div class="bg-gray-800 p-6 rounded-lg shadow-lg mb-6">
+        <h2 class="text-2xl mb-4 font-bold">💾 Savegame Settings</h2>
+        <div id="savegameSettings" class="space-y-4"></div>
+      </div>
+
+      <!-- Save Button -->
+      <div class="flex justify-end gap-4">
+        <button id="resetBtn" class="bg-gray-600 hover:bg-gray-700 px-6 py-3 rounded-lg text-lg">
+          Reset Changes
+        </button>
+        <button id="saveBtn" class="bg-green-600 hover:bg-green-700 px-6 py-3 rounded-lg text-lg font-semibold">
+          💾 Save All Changes
+        </button>
+      </div>
+    </div>
+
+    <!-- No Server Selected Message -->
+    <div id="noServerMessage" class="text-center py-12 text-gray-400">
+      <p class="text-xl">Please select a server to view and edit settings</p>
+    </div>
+
+  </div>
+
+  <script src="/js/api.js"></script>
+  <script src="/js/csrf-helper.js"></script>
+  <script src="/js/nitrado-settings.js"></script>
+</body>
+</html>

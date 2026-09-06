@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>All Servers - Admin Panel</title>
+  <link rel="stylesheet" href="/css/tailwind.css">
+  <style>
+    @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    .spinner { animation: spin 1s linear infinite; }
+  </style>
+  <script src="/js/instance-config.js" defer></script>
+</head>
+<body class="bg-gray-900 text-white">
+  <div class="container mx-auto p-6 max-w-7xl">
+    <!-- Header -->
+    <div class="flex justify-between items-center mb-6">
+      <h1 class="text-4xl font-bold">🖥️ All Servers</h1>
+      <div class="flex gap-2">
+        <a href="/admin" class="bg-orange-600 hover:bg-orange-700 px-4 py-2 rounded">← Admin Dashboard</a>
+        <a href="/logout" class="bg-red-600 hover:bg-red-700 px-4 py-2 rounded">Logout</a>
+      </div>
+    </div>
+
+    <!-- Admin Navigation -->
+    <nav class="bg-gray-800 rounded-lg p-4 mb-6">
+      <div class="flex gap-2 flex-wrap">
+        <a href="/admin" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">Dashboard</a>
+        <a href="/admin/guilds" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">Discord Communities</a>
+        <a href="/admin/guilds-approval" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">Guild Approval</a>
+        <a href="/admin/servers" class="bg-orange-600 px-4 py-2 rounded font-semibold">All Servers</a>
+        <a href="/admin/users" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">Users</a>
+        <a href="/admin/audit" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">Audit Log</a>
+      </div>
+    </nav>
+
+    <!-- Filters -->
+    <div class="bg-gray-800 p-6 rounded-lg shadow-lg mb-6">
+      <div class="flex gap-4 items-center flex-wrap">
+        <div class="flex-1 min-w-[200px]">
+          <label class="block text-sm text-gray-400 mb-2">Filter by Guild</label>
+          <select id="guildFilter" class="bg-gray-700 p-3 rounded w-full focus:ring-2 focus:ring-orange-500 outline-none">
+            <option value="">All Guilds</option>
+          </select>
+        </div>
+        <div class="flex-1 min-w-[200px]">
+          <label class="block text-sm text-gray-400 mb-2">Search Server Name</label>
+          <input type="text" id="searchInput" placeholder="Search..." class="bg-gray-700 p-3 rounded w-full focus:ring-2 focus:ring-orange-500 outline-none" />
+        </div>
+        <div class="min-w-[180px]">
+          <label class="block text-sm text-gray-400 mb-2">Health</label>
+          <select id="healthFilter" class="bg-gray-700 p-3 rounded w-full">
+            <option value="">All</option>
+            <option value="healthy">Healthy</option>
+            <option value="degraded">Degraded</option>
+            <option value="offline">Offline</option>
+            <option value="unknown">Unknown / Stale</option>
+          </select>
+        </div>
+        <div class="pt-7">
+          <button id="loadServersBtn" class="bg-orange-600 hover:bg-orange-700 px-6 py-3 rounded font-semibold">
+            🔍 Filter
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Servers Table -->
+    <div class="bg-gray-800 p-6 rounded-lg shadow-lg">
+      <h2 class="text-2xl mb-4 font-semibold">Servers Across All Communities</h2>
+      <div id="servers-container">
+        <div class="text-center py-8">
+          <div class="spinner border-4 border-orange-600 border-t-transparent rounded-full w-12 h-12 mx-auto mb-4"></div>
+          <p class="text-gray-400">Loading servers...</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Delete Confirmation Modal -->
+  <div id="deleteModal" class="hidden fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50">
+    <div class="bg-gray-800 p-8 rounded-lg shadow-xl max-w-md w-full">
+      <h2 class="text-2xl font-bold mb-4">⚠️ Confirm Deletion</h2>
+
+      <p class="text-gray-300 mb-4">Are you sure you want to delete <strong id="deleteServerName"></strong>?</p>
+
+      <p class="text-yellow-400 text-sm mb-4">This action cannot be undone. All associated data will be removed.</p>
+
+      <div class="flex gap-2">
+        <button id="confirmDeleteBtn" class="bg-red-600 hover:bg-red-700 px-6 py-3 rounded font-semibold flex-1">
+          Delete
+        </button>
+        <button id="closeDeleteModalBtn" class="bg-gray-600 hover:bg-gray-700 px-6 py-3 rounded font-semibold">
+          Cancel
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <script src="/js/api.js"></script>
+  <script src="/js/csrf-helper.js"></script>
+  <script src="/js/admin-servers.js"></script>
+</body>
+</html>

@@ -1,0 +1,75 @@
+# Node.js / npm
+node_modules/
+npm-debug.log
+yarn-error.log
+
+# Environment / Secrets
+.env
+.env.local
+.env.development
+.env.test
+.env.production
+*.env.*
+!.env.example
+!.env.local.example
+credentials.json
+config/secrets.*
+
+# Database files and exports (never commit real data!)
+db/database.sqlite
+db/*.sqlite
+db/*.sqlite-journal
+db/*.db
+db/*.sql.dump
+
+# Session database
+data/
+data/*.db
+data/sessions.db
+
+# Downloads
+downloads/
+
+# Private/internal release material
+.hermes/
+reports/
+agents/
+
+# Map tile binaries are intentionally distributed separately.
+public/maps/**
+!public/maps/README.md
+
+#bin
+bin/
+
+# Docker / build artifacts
+Dockerfile.*
+!Dockerfile.bot
+docker-compose.override.yml
+*.dockerignore
+!.dockerignore
+.docker/
+build/
+dist/
+
+# Logs and temp files
+*.log
+logs/
+tmp/
+temp/
+
+# Editor / OS files
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.swp
+*~
+
+# Testing / coverage
+coverage/
+.nyc_output/
+
+# Misc
+.AppleDouble
+.LSOverride

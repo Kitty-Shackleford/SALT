@@ -1,0 +1,18 @@
+node_modules
+.env
+.env*
+*.env
+*.env.*
+.git
+downloads
+data
+# bin/ contains large DayZ mission files (700MB+) — mounted as a volume at runtime
+bin
+build
+dist
+*.log
+logs
+tmp
+temp
+coverage
+.nyc_output

@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Automation - DayZ Dashboard</title>
+  <link rel="stylesheet" href="/css/tailwind.css">
+  <script src="/js/instance-config.js" defer></script>
+</head>
+<body class="bg-gray-900 text-white">
+  <div class="container mx-auto p-6 max-w-7xl">
+    <div class="flex justify-between items-center mb-6">
+      <h1 class="text-4xl font-bold">⚙️ Automation Settings</h1>
+      <a href="/dashboard" class="bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded">← Back</a>
+    </div>
+
+    <!-- Auto Log Sync -->
+    <div class="bg-gray-800 p-6 rounded-lg shadow-lg mb-6">
+      <div class="flex justify-between items-start mb-4">
+        <div>
+          <h2 class="text-2xl mb-2">📥 Auto Log Sync</h2>
+          <p class="text-gray-400 text-sm">Automatically download and scan new log files from your servers</p>
+        </div>
+        <label class="relative inline-flex items-center cursor-pointer">
+          <input type="checkbox" id="autoLogSyncToggle" class="sr-only peer">
+          <div class="w-14 h-7 bg-gray-700 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-800 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[4px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-6 after:w-6 after:transition-all peer-checked:bg-blue-600"></div>
+        </label>
+      </div>
+
+      <div id="autoLogSyncSettings" style="display: none;">
+        <div class="bg-gray-700 p-4 rounded-lg space-y-4">
+          <div>
+            <label class="block mb-2 font-semibold">Select Servers to Monitor:</label>
+            <div id="serverCheckboxes" class="space-y-2">
+              <p class="text-gray-400">Loading servers...</p>
+            </div>
+          </div>
+
+          <div>
+            <label class="block mb-2 font-semibold">Sync Interval:</label>
+            <select id="syncInterval" class="bg-gray-600 p-2 rounded w-full">
+              <option value="0.5">Every 30 seconds ⚡</option>
+              <option value="1">Every 1 minute ⚡</option>
+              <option value="1.5">Every 90 seconds ⚡</option>
+              <option value="2">Every 2 minutes</option>
+              <option value="3">Every 3 minutes</option>
+              <option value="5">Every 5 minutes</option>
+              <option value="15" selected>Every 15 minutes</option>
+              <option value="30">Every 30 minutes</option>
+              <option value="60">Every hour</option>
+            </select>
+            <p class="text-xs text-gray-400 mt-2">
+              ⚡ = Fast intervals for real-time feeds (uses more API calls)
+            </p>
+          </div>
+
+          <div>
+            <label class="flex items-center gap-2">
+              <input type="checkbox" id="autoScanAfterSync" checked class="w-4 h-4">
+              <span>Automatically scan logs after sync</span>
+            </label>
+          </div>
+
+          <div class="mt-4 pt-4 border-t border-gray-600">
+            <div class="flex justify-between items-center mb-2">
+              <span class="text-sm text-gray-400">Status:</span>
+              <span id="syncStatus" class="text-sm">Idle</span>
+            </div>
+            <div class="flex justify-between items-center">
+              <span class="text-sm text-gray-400">Last Sync:</span>
+              <span id="lastSync" class="text-sm">Never</span>
+            </div>
+          </div>
+
+          <button id="runSyncNowBtn" class="bg-green-600 hover:bg-green-700 px-4 py-2 rounded w-full mt-4">
+            🔄 Run Sync Now
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Auto Player Tracking -->
+    <div class="bg-gray-800 p-6 rounded-lg shadow-lg mb-6">
+      <div class="flex justify-between items-start mb-4">
+        <div>
+          <h2 class="text-2xl mb-2">👥 Auto Player Tracking</h2>
+          <p class="text-gray-400 text-sm">Automatically scan all logs periodically to update player database</p>
+        </div>
+        <label class="relative inline-flex items-center cursor-pointer">
+          <input type="checkbox" id="autoTrackingToggle" class="sr-only peer">
+          <div class="w-14 h-7 bg-gray-700 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-800 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[4px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-6 after:w-6 after:transition-all peer-checked:bg-blue-600"></div>
+        </label>
+      </div>
+
+      <div id="autoTrackingSettings" style="display: none;">
+        <div class="bg-gray-700 p-4 rounded-lg space-y-4">
+          <div>
+            <label class="block mb-2 font-semibold">Scan Interval:</label>
+            <select id="trackingInterval" class="bg-gray-600 p-2 rounded w-full">
+              <option value="30">Every 30 minutes</option>
+              <option value="60" selected>Every 1 hour</option>
+              <option value="180">Every 3 hours</option>
+              <option value="360">Every 6 hours</option>
+              <option value="720">Every 12 hours</option>
+              <option value="1440">Daily</option>
+            </select>
+          </div>
+
+          <div class="mt-4 pt-4 border-t border-gray-600">
+            <div class="flex justify-between items-center mb-2">
+              <span class="text-sm text-gray-400">Status:</span>
+              <span id="trackingStatus" class="text-sm">Idle</span>
+            </div>
+            <div class="flex justify-between items-center">
+              <span class="text-sm text-gray-400">Last Scan:</span>
+              <span id="lastTracking" class="text-sm">Never</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Activity Log -->
+    <div class="bg-gray-800 p-6 rounded-lg shadow-lg">
+      <h2 class="text-2xl mb-4">📜 Activity Log</h2>
+      <div id="activityLog" class="bg-gray-700 p-4 rounded-lg max-h-96 overflow-y-auto">
+        <p class="text-gray-400 text-sm">No activity yet</p>
+      </div>
+    </div>
+  </div>
+
+  <script src="/js/api.js"></script>
+  <script src="/js/csrf-helper.js"></script>
+  <script src="/js/automation.js"></script>
+</body>
+</html>
