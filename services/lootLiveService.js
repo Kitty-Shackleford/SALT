@@ -9,9 +9,14 @@
  * Log file location: bin/dayzxb/config/*.RPT
  */
 
-const path = require('path');
 const fs = require('fs');
 const { getGuildDownloadPath } = require('./logSyncService');
+const {
+  listContainedDirectorySync,
+  openContainedFileSync,
+  resolveExistingContainedPath,
+  statContainedFileSync,
+} = require('../utils/safePath');
 
 // Regex patterns for RPT log parsing
 const RE_RESPAWN_CANDIDATE = /\[CE\]\[LootRespawner\].*RESPAWN CANDIDATE\]\s+(\S+)\s+missing:(\d+)\s+\[cnt:(\d+),\s*nom:(\d+),\s*min:(\d+)\]/;
@@ -23,7 +28,13 @@ const RE_TIMESTAMP         = /^(\d+:\d+:\d+\.\d+)/;
 const liveCache = {};
 
 function getLogDir(guildDiscordId, serverId) {
-  return path.join(getGuildDownloadPath(guildDiscordId, serverId), 'config');
+  const serverRoot = getGuildDownloadPath(guildDiscordId, serverId);
+  try {
+    return resolveExistingContainedPath(serverRoot, 'config');
+  } catch (error) {
+    if (error.code === 'ENOENT') return null;
+    throw error;
+  }
 }
 
 // ─── RPT File Discovery ───────────────────────────────────────────────────────
@@ -32,11 +43,10 @@ function getLogDir(guildDiscordId, serverId) {
  * List all RPT files in the log directory, sorted newest first.
  */
 function listRptFiles(logDir) {
-  if (!fs.existsSync(logDir)) return [];
-  return fs
-    .readdirSync(logDir)
-    .filter(f => f.endsWith('.RPT'))
-    .map(f => ({ name: f, fullPath: path.join(logDir, f) }))
+  if (!logDir) return [];
+  return listContainedDirectorySync(logDir)
+    .filter(entry => entry.isFile() && entry.name.endsWith('.RPT'))
+    .map(entry => ({ name: entry.name }))
     .sort((a, b) => {
       // Sort by filename (which contains timestamp) descending
       return b.name.localeCompare(a.name);
@@ -49,19 +59,23 @@ function listRptFiles(logDir) {
  *
  * Returns the map name (e.g. "chernarusplus") or null if not found.
  */
-function detectMapFromRpt(filePath) {
+function detectMapFromRpt(logDir, fileName) {
+  let fd;
   try {
-    // Read first 200 lines to find the storage path
-    const fd = fs.openSync(filePath, 'r');
+    // Read first 200 lines to find the storage path.
+    ({ fd } = openContainedFileSync(logDir, fileName));
     const buffer = Buffer.alloc(16384); // 16KB should cover the header
     const bytesRead = fs.readSync(fd, buffer, 0, buffer.length, 0);
-    fs.closeSync(fd);
 
     const header = buffer.slice(0, bytesRead).toString('utf8');
     const match = RE_MAP_STORAGE.exec(header);
     return match ? match[1] : null;
   } catch {
     return null;
+  } finally {
+    if (fd !== undefined) {
+      try { fs.closeSync(fd); } catch { /* ignore */ }
+    }
   }
 }
 
@@ -71,12 +85,12 @@ function detectMapFromRpt(filePath) {
  */
 function findLatestRptForMap(mapName, logDir) {
   const files = listRptFiles(logDir);
-  for (const { fullPath } of files) {
-    const detectedMap = detectMapFromRpt(fullPath);
-    if (detectedMap === mapName) return fullPath;
+  for (const { name } of files) {
+    const detectedMap = detectMapFromRpt(logDir, name);
+    if (detectedMap === mapName) return name;
   }
   // Fallback: return the latest RPT file if map detection fails
-  return files.length > 0 ? files[0].fullPath : null;
+  return files.length > 0 ? files[0].name : null;
 }
 
 // ─── RPT Parsing ─────────────────────────────────────────────────────────────
@@ -89,7 +103,7 @@ function findLatestRptForMap(mapName, logDir) {
  *
  * This reads the file in chunks to avoid loading 13MB+ files entirely into memory.
  */
-function parseRptFile(filePath, maxAdds = 1000) {
+function parseRptFile(logDir, fileName, maxAdds = 1000) {
   const candidates = {};
   const allAdds = [];
   let lastCandidate = null;
@@ -102,7 +116,7 @@ function parseRptFile(filePath, maxAdds = 1000) {
   let fd;
 
   try {
-    fd = fs.openSync(filePath, 'r');
+    ({ fd } = openContainedFileSync(logDir, fileName));
     const stat = fs.fstatSync(fd);
     const fileSize = stat.size;
 
@@ -233,9 +247,9 @@ function computeEconomyHealth(parsedData) {
  */
 async function getLiveSpawns(mapName, guildDiscordId, serverId) {
   const logDir = getLogDir(guildDiscordId, serverId);
-  const rptPath = findLatestRptForMap(mapName, logDir);
+  const rptFile = findLatestRptForMap(mapName, logDir);
 
-  if (!rptPath) {
+  if (!rptFile) {
     return {
       candidates: [],
       recentAdds: [],
@@ -248,16 +262,16 @@ async function getLiveSpawns(mapName, guildDiscordId, serverId) {
 
   // Cache invalidation by mtime
   let currentMtime = 0;
-  try { currentMtime = fs.statSync(rptPath).mtimeMs; } catch { /* ignore */ }
+  try { currentMtime = statContainedFileSync(logDir, rptFile).mtimeMs; } catch { /* ignore */ }
 
   const cacheKey = `${guildDiscordId}:${serverId}:${mapName}`;
   const cached = liveCache[cacheKey];
-  if (cached && cached.rptPath === rptPath && cached.mtime === currentMtime) {
+  if (cached && cached.rptFile === rptFile && cached.mtime === currentMtime) {
     return cached.data;
   }
 
   // Parse the RPT file
-  const parsed = parseRptFile(rptPath);
+  const parsed = parseRptFile(logDir, rptFile);
   const economyHealth = computeEconomyHealth(parsed);
 
   const result = {
@@ -265,11 +279,11 @@ async function getLiveSpawns(mapName, guildDiscordId, serverId) {
     recentAdds:    parsed.recentAdds,
     economyHealth,
     lastUpdated:   new Date().toISOString(),
-    rptFile:       path.basename(rptPath),
+    rptFile,
     error:         parsed.error || null,
   };
 
-  liveCache[cacheKey] = { rptPath, mtime: currentMtime, data: result };
+  liveCache[cacheKey] = { rptFile, mtime: currentMtime, data: result };
   return result;
 }
 
@@ -278,11 +292,12 @@ async function getLiveSpawns(mapName, guildDiscordId, serverId) {
  * Useful for the admin UI to know what data is available.
  */
 function listAvailableLogs(guildDiscordId, serverId) {
-  return listRptFiles(getLogDir(guildDiscordId, serverId)).slice(0, 20).map(({ name, fullPath }) => ({
+  const logDir = getLogDir(guildDiscordId, serverId);
+  return listRptFiles(logDir).slice(0, 20).map(({ name }) => ({
     file: name,
-    map:  detectMapFromRpt(fullPath),
-    size: (() => { try { return fs.statSync(fullPath).size; } catch { return 0; } })(),
-    mtime: (() => { try { return fs.statSync(fullPath).mtime; } catch { return null; } })(),
+    map:  detectMapFromRpt(logDir, name),
+    size: (() => { try { return statContainedFileSync(logDir, name).size; } catch { return 0; } })(),
+    mtime: (() => { try { return statContainedFileSync(logDir, name).mtime; } catch { return null; } })(),
   }));
 }
 

@@ -247,9 +247,10 @@ async function loadFile() {
     await loadContextSummary();
 
     // Reset chat with file pre-loaded
-    document.getElementById('chatMessages').innerHTML = `
+    const chatMessages = document.getElementById('chatMessages');
+    chatMessages.innerHTML = `
       <div class="bg-gray-700 rounded p-3 text-sm">
-        <span class="text-green-400 font-semibold">✅ ${filename} loaded</span>
+        <span class="text-green-400 font-semibold" data-loaded-file-name></span>
         <p class="text-gray-300 mt-1">File is ready. What would you like to do? Try asking:</p>
         <ul class="text-gray-400 mt-2 space-y-1 list-disc list-inside text-xs">
           <li>Increase the nominal of all assault rifles by 20%</li>
@@ -258,6 +259,8 @@ async function loadFile() {
         </ul>
       </div>
     `;
+    const loadedFileName = chatMessages.querySelector('[data-loaded-file-name]');
+    loadedFileName.textContent = `${filename} loaded`;
   } finally {
     btn.textContent = 'Load File from Server';
     btn.disabled = false;

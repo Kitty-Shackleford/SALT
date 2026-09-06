@@ -188,6 +188,7 @@ function registerMiddleware(app, db, csrfProtection) {
   });
 
   app.use(express.json());
+  app.use(express.urlencoded({ extended: false }));
   // HTML documents are served only by the canonical route handlers, where
   // authentication and authorization are enforced. Static delivery is assets-only.
   app.use((req, res, next) => {
@@ -201,17 +202,9 @@ function registerMiddleware(app, db, csrfProtection) {
     redirect: false,
   }));
 
-  // Apply CSRF protection to all state-changing requests and to GET requests
-  // that render HTML pages (so they receive the token in the page).
-  app.use((req, res, next) => {
-    if (['POST', 'PUT', 'DELETE', 'PATCH'].includes(req.method)) {
-      return csrfProtection(req, res, next);
-    }
-    if (req.method === 'GET' && !req.path.startsWith('/api/')) {
-      return csrfProtection(req, res, next);
-    }
-    next();
-  });
+  // Apply session-backed CSRF protection globally. csurf validates unsafe
+  // methods and exposes req.csrfToken() on safe requests used to render pages.
+  app.use(csrfProtection);
 
   // Make CSRF token available to all route handlers via res.locals
   app.use((req, res, next) => {

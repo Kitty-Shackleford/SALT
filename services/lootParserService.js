@@ -17,6 +17,12 @@ const path = require('path');
 const fs = require('fs');
 const xml2js = require('xml2js');
 const { MISSION_SUBDIRS } = require('../utils/dayzPlatform');
+const {
+  normalizeStorageIdentifier,
+  readContainedFileSync,
+  resolveExistingContainedPath,
+  statContainedFileSync,
+} = require('../utils/safePath');
 
 // Folder suffix for each supported map
 const MAP_FOLDER_SUFFIX = {
@@ -37,10 +43,10 @@ const xmlParser = new xml2js.Parser({ explicitArray: true, mergeAttrs: false });
 /**
  * Parse an XML file and return the JS object, or null if the file doesn't exist.
  */
-async function parseXmlFile(filePath) {
-  if (!fs.existsSync(filePath)) return null;
-  const content = fs.readFileSync(filePath, 'utf8');
+async function parseXmlFile(mapDir, filePath) {
   try {
+    const relativePath = path.relative(mapDir, filePath);
+    const content = readContainedFileSync(mapDir, relativePath, 'utf8');
     return await xmlParser.parseStringPromise(content);
   } catch {
     return null;
@@ -50,9 +56,9 @@ async function parseXmlFile(filePath) {
 /**
  * Get the last-modified time of a file (ms), or 0 if not found.
  */
-function mtime(filePath) {
+function mtime(mapDir, filePath) {
   try {
-    return fs.statSync(filePath).mtimeMs;
+    return statContainedFileSync(mapDir, path.relative(mapDir, filePath)).mtimeMs;
   } catch {
     return 0;
   }
@@ -67,12 +73,25 @@ function resolveMapDir(guildDiscordId, serverId, mapName) {
   const folderSuffix = MAP_FOLDER_SUFFIX[mapName];
   if (!folderSuffix) return null;
 
-  const serverRoot = path.join(DOWNLOADS_DIR, String(guildDiscordId), `server_${serverId}`);
-  const searchRoots = [serverRoot, ...MISSION_SUBDIRS.map(d => path.join(serverRoot, d))];
+  const guildId = normalizeStorageIdentifier(guildDiscordId, 'guild storage identifier');
+  const platformServerId = normalizeStorageIdentifier(serverId, 'server storage identifier');
+  const serverRelativePath = path.join(guildId, `server_${platformServerId}`);
 
-  for (const root of searchRoots) {
-    const candidate = path.join(root, folderSuffix);
-    if (fs.existsSync(candidate)) return candidate;
+  let serverRoot;
+  try {
+    serverRoot = resolveExistingContainedPath(DOWNLOADS_DIR, serverRelativePath);
+  } catch {
+    return null;
+  }
+
+  const candidates = [folderSuffix, ...MISSION_SUBDIRS.map(dir => path.join(dir, folderSuffix))];
+  for (const relativePath of candidates) {
+    try {
+      const candidate = resolveExistingContainedPath(serverRoot, relativePath);
+      if (fs.lstatSync(candidate).isDirectory()) return candidate;
+    } catch {
+      // Try the next known mission directory.
+    }
   }
   return null;
 }
@@ -83,8 +102,8 @@ function resolveMapDir(guildDiscordId, serverId, mapName) {
  * Parse a single types.xml file and return a map of itemName → item object.
  * Custom files may only define a subset of fields; missing fields stay undefined.
  */
-async function parseTypesFile(filePath) {
-  const parsed = await parseXmlFile(filePath);
+async function parseTypesFile(mapDir, filePath) {
+  const parsed = await parseXmlFile(mapDir, filePath);
   if (!parsed || !parsed.types || !parsed.types.type) return {};
 
   const items = {};
@@ -151,8 +170,8 @@ function mergeTypes(base, custom) {
  * Parse mapgroupproto.xml and return a map of groupName → Set<usageName>.
  * A group may have multiple <usage> elements defining what loot zones it accepts.
  */
-async function parseMapgroupproto(filePath) {
-  const parsed = await parseXmlFile(filePath);
+async function parseMapgroupproto(mapDir, filePath) {
+  const parsed = await parseXmlFile(mapDir, filePath);
   if (!parsed?.prototype?.group) return {};
 
   const groups = {};
@@ -172,8 +191,8 @@ async function parseMapgroupproto(filePath) {
  * pos attribute format: "x y z" (x=east, y=elevation, z=north)
  * We drop elevation (y) since it's not needed for map display.
  */
-async function parseMapgrouppos(filePath) {
-  const parsed = await parseXmlFile(filePath);
+async function parseMapgrouppos(mapDir, filePath) {
+  const parsed = await parseXmlFile(mapDir, filePath);
   if (!parsed?.map?.group) return {};
 
   const positions = {};
@@ -203,8 +222,8 @@ async function parseMapgrouppos(filePath) {
  *
  * @returns {Object} { groupName: [{type, relX, relZ}] }
  */
-async function parseEventGroupsFile(filePath) {
-  const parsed = await parseXmlFile(filePath);
+async function parseEventGroupsFile(mapDir, filePath) {
+  const parsed = await parseXmlFile(mapDir, filePath);
   if (!parsed?.eventgroupdef?.group) return {};
 
   const groups = {};
@@ -234,8 +253,8 @@ async function parseEventGroupsFile(filePath) {
  *
  * @returns {Object} { eventName: [{x, z, groupName}] }
  */
-async function parseEventSpawnsFile(filePath) {
-  const parsed = await parseXmlFile(filePath);
+async function parseEventSpawnsFile(mapDir, filePath) {
+  const parsed = await parseXmlFile(mapDir, filePath);
   if (!parsed?.eventposdef?.event) return {};
 
   const spawns = {};
@@ -267,8 +286,8 @@ async function parseEventSpawnsFile(filePath) {
  *
  * @returns {Object} { eventName: [containerType, ...] }
  */
-async function parseEventsFile(filePath) {
-  const parsed = await parseXmlFile(filePath);
+async function parseEventsFile(mapDir, filePath) {
+  const parsed = await parseXmlFile(mapDir, filePath);
   if (!parsed?.events?.event) return {};
 
   const events = {};
@@ -375,9 +394,32 @@ function buildUsageIndex(groupProtos, groupPositions) {
  * Parse cfgeconomycore.xml to discover all custom types files loaded by the server.
  * Returns an array of absolute paths to custom types.xml files.
  */
+function resolveDeclaredMissionFile(mapDir, folder, fileName) {
+  for (const [label, value] of [['folder', folder], ['file name', fileName]]) {
+    if (typeof value !== 'string' || !value || value.includes('\\') || value.includes('\0') || path.posix.isAbsolute(value)) {
+      throw new Error(`Invalid mission ${label}`);
+    }
+    const segments = value.split('/');
+    if (segments.some(segment => !segment || segment === '.' || segment === '..')) {
+      throw new Error(`Invalid mission ${label}`);
+    }
+  }
+  if (path.posix.basename(fileName) !== fileName) throw new Error('Invalid mission file name');
+  return resolveExistingContainedPath(mapDir, path.posix.join(folder, fileName));
+}
+
+function resolveOptionalMissionFile(mapDir, relativePath) {
+  try {
+    return resolveExistingContainedPath(mapDir, relativePath);
+  } catch (error) {
+    if (error.code === 'ENOENT') return null;
+    throw error;
+  }
+}
+
 async function discoverCustomTypesFiles(mapDir) {
   const corePath = path.join(mapDir, 'cfgeconomycore.xml');
-  const parsed = await parseXmlFile(corePath);
+  const parsed = await parseXmlFile(mapDir, corePath);
   if (!parsed?.economycore?.ce) return [];
 
   const customFiles = [];
@@ -386,8 +428,11 @@ async function discoverCustomTypesFiles(mapDir) {
     if (!folder || !ce.file) continue;
     for (const file of ce.file) {
       if (file.$.type === 'types' && file.$.name) {
-        const filePath = path.join(mapDir, folder, file.$.name);
-        if (fs.existsSync(filePath)) customFiles.push(filePath);
+        try {
+          customFiles.push(resolveDeclaredMissionFile(mapDir, folder, file.$.name));
+        } catch (error) {
+          if (error.code !== 'ENOENT') throw error;
+        }
       }
     }
   }
@@ -435,7 +480,7 @@ async function buildLootData(mapName, guildDiscordId, serverId) {
 
   // Check mtimes for cache invalidation
   const tracked = getTrackedFiles(mapDir);
-  const currentMtimes = tracked.map(f => mtime(f));
+  const currentMtimes = tracked.map(filePath => mtime(mapDir, filePath));
   const cached = cache[cacheKey];
   if (cached && JSON.stringify(cached.mtimes) === JSON.stringify(currentMtimes)) {
     return cached.data;
@@ -443,38 +488,38 @@ async function buildLootData(mapName, guildDiscordId, serverId) {
 
   // ── 1. Parse types.xml (base + custom overrides) ──
   const baseTypesPath = path.join(mapDir, 'db', 'types.xml');
-  const baseTypes = await parseTypesFile(baseTypesPath);
+  const baseTypes = await parseTypesFile(mapDir, baseTypesPath);
 
   // Discover additional custom types files from cfgeconomycore
   const customTypesPaths = await discoverCustomTypesFiles(mapDir);
 
   // Also always include the main custom/types.xml if it exists
-  const defaultCustomPath = path.join(mapDir, 'custom', 'types.xml');
-  if (!customTypesPaths.includes(defaultCustomPath) && fs.existsSync(defaultCustomPath)) {
+  const defaultCustomPath = resolveOptionalMissionFile(mapDir, path.join('custom', 'types.xml'));
+  if (defaultCustomPath && !customTypesPaths.includes(defaultCustomPath)) {
     customTypesPaths.unshift(defaultCustomPath);
   }
 
   // Merge all custom files in order (each overrides the previous)
   let mergedTypes = baseTypes;
   for (const customPath of customTypesPaths) {
-    const customTypes = await parseTypesFile(customPath);
+    const customTypes = await parseTypesFile(mapDir, customPath);
     mergedTypes = mergeTypes(mergedTypes, customTypes);
   }
 
   // ── 2. Parse mapgroupproto.xml ──
   const protoPath = path.join(mapDir, 'mapgroupproto.xml');
-  let groupProtos = await parseMapgroupproto(protoPath);
+  let groupProtos = await parseMapgroupproto(mapDir, protoPath);
 
   // Also check for custom mapgroupproto
-  const customProtoPath = path.join(mapDir, 'custom', 'mapgroupproto.xml');
-  if (fs.existsSync(customProtoPath)) {
-    const customProtos = await parseMapgroupproto(customProtoPath);
+  const customProtoPath = resolveOptionalMissionFile(mapDir, path.join('custom', 'mapgroupproto.xml'));
+  if (customProtoPath) {
+    const customProtos = await parseMapgroupproto(mapDir, customProtoPath);
     groupProtos = { ...groupProtos, ...customProtos };
   }
 
   // ── 3. Parse mapgrouppos.xml ──
   const posPath = path.join(mapDir, 'mapgrouppos.xml');
-  const groupPositions = await parseMapgrouppos(posPath);
+  const groupPositions = await parseMapgrouppos(mapDir, posPath);
 
   // ── 4. Build usage → buildings index ──
   const usageIndex = buildUsageIndex(groupProtos, groupPositions);
@@ -488,9 +533,9 @@ async function buildLootData(mapName, guildDiscordId, serverId) {
   const eventsFilePath   = path.join(mapDir, 'db', 'events.xml');
 
   const [eventGroups, eventSpawns, eventsFile] = await Promise.all([
-    parseEventGroupsFile(eventGroupsPath),
-    parseEventSpawnsFile(eventSpawnsPath),
-    parseEventsFile(eventsFilePath),
+    parseEventGroupsFile(mapDir, eventGroupsPath),
+    parseEventSpawnsFile(mapDir, eventSpawnsPath),
+    parseEventsFile(mapDir, eventsFilePath),
   ]);
 
   // Index: usageName → [{x, z}] for all dynamic event container positions.

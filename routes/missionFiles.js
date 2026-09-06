@@ -9,10 +9,14 @@ const path = require('path');
 const { ensureAuthenticated } = require('../middleware/auth');
 const {
   ensureContainedDirectorySync,
+  listContainedDirectorySync,
+  normalizeStorageIdentifier,
+  openContainedDirectorySync,
   readContainedFileSync,
   resolveContainedPath,
   resolveExistingContainedPath,
   resolveWritableContainedPath,
+  statContainedFileSync,
   writeContainedFileAtomicSync,
   writeContainedFileSync,
 } = require('../utils/safePath');
@@ -22,6 +26,14 @@ const {
   authorizePlatformServer,
   authorizePlatformServerMutation,
 } = require('../services/authorizationService');
+
+const DOWNLOAD_ROOT = path.join(__dirname, '..', 'downloads');
+const DATA_ROOT = path.join(__dirname, '..', 'data');
+const BACKUP_ROOT = path.join(DATA_ROOT, 'backups');
+
+if (!fsSync.existsSync(DOWNLOAD_ROOT)) fsSync.mkdirSync(DOWNLOAD_ROOT, { recursive: true });
+if (!fsSync.existsSync(DATA_ROOT)) fsSync.mkdirSync(DATA_ROOT, { recursive: true });
+ensureContainedDirectorySync(DATA_ROOT, 'backups');
 
 // Helper to decrypt token
 function decrypt(encryptedText) {
@@ -63,18 +75,26 @@ async function getGuildTokenForServer(db, accessContext) {
 }
 
 function getLegacyServerRoots(user, serverId) {
-  const userDiscordId = String(user?.discord_id || '');
-  const internalUserId = String(user?.id || '');
-  const roots = [];
+  const canonicalServerId = normalizeStorageIdentifier(serverId, 'server storage identifier');
+  const candidateUserIds = [user?.discord_id, user?.id]
+    .filter(value => value !== undefined && value !== null && String(value) !== '')
+    .map(value => normalizeStorageIdentifier(value, 'user storage identifier'));
 
-  if (userDiscordId) {
-    roots.push(path.join(__dirname, '..', 'downloads', userDiscordId, `server_${serverId}`));
-  }
-  if (internalUserId) {
-    roots.push(path.join(__dirname, '..', 'downloads', internalUserId, `server_${serverId}`));
-  }
+  return Array.from(new Set(candidateUserIds.map(userId =>
+    resolveContainedPath(DOWNLOAD_ROOT, path.join(userId, `server_${canonicalServerId}`))
+  )));
+}
 
-  return Array.from(new Set(roots));
+function resolveBackupDirectory(user, serverId, create = false) {
+  const userId = normalizeStorageIdentifier(
+    user?.discord_id || user?.id,
+    'user storage identifier'
+  );
+  const canonicalServerId = normalizeStorageIdentifier(serverId, 'server storage identifier');
+  const relativePath = path.join(userId, `server_${canonicalServerId}`);
+  return create
+    ? ensureContainedDirectorySync(BACKUP_ROOT, relativePath)
+    : resolveContainedPath(BACKUP_ROOT, relativePath);
 }
 
 async function getServerAccessContext(
@@ -110,13 +130,38 @@ async function requireServerFileAccess(req, res, platformServerId) {
 
 async function resolveServerDownloadRoot(db, user, serverId) {
   const context = await getServerAccessContext(db, user, serverId);
-  const guildDiscordId = context?.guildDiscordId || null;
-  const canonicalRoot = guildDiscordId
-    ? path.join(__dirname, '..', 'downloads', String(guildDiscordId), `server_${serverId}`)
-    : null;
+  if (!context) return { serverRoot: null, triedRoots: [] };
 
-  const triedRoots = [canonicalRoot, ...getLegacyServerRoots(user, serverId)].filter(Boolean);
-  const existingRoot = triedRoots.find((root) => fsSync.existsSync(root));
+  const canonicalServerId = normalizeStorageIdentifier(
+    context.platformServerId,
+    'server storage identifier'
+  );
+  const canonicalGuildId = normalizeStorageIdentifier(
+    context.guildDiscordId,
+    'guild storage identifier'
+  );
+  const canonicalRoot = resolveContainedPath(
+    DOWNLOAD_ROOT,
+    path.join(canonicalGuildId, `server_${canonicalServerId}`)
+  );
+
+  const triedRoots = Array.from(new Set([
+    canonicalRoot,
+    ...getLegacyServerRoots(user, canonicalServerId),
+  ]));
+  let existingRoot = null;
+  for (const root of triedRoots) {
+    let opened;
+    try {
+      opened = openContainedDirectorySync(DOWNLOAD_ROOT, path.relative(DOWNLOAD_ROOT, root));
+      existingRoot = root;
+      break;
+    } catch (error) {
+      if (error.code !== 'ENOENT') throw error;
+    } finally {
+      if (opened) fsSync.closeSync(opened.fd);
+    }
+  }
 
   return {
     serverRoot: existingRoot || canonicalRoot || null,
@@ -132,16 +177,18 @@ async function resolveMissionFilePath(db, user, serverId, fileName) {
 
   const candidatePaths = triedRoots.map((root) => resolveContainedPath(root, fileName));
   let existingPath = null;
+  let matchedRoot = null;
   for (let index = 0; index < candidatePaths.length; index += 1) {
     if (fsSync.existsSync(candidatePaths[index])) {
       existingPath = resolveExistingContainedPath(triedRoots[index], candidatePaths[index]);
+      matchedRoot = triedRoots[index];
       break;
     }
   }
 
   return {
     filePath: existingPath || resolveWritableContainedPath(serverRoot, fileName),
-    serverRoot,
+    serverRoot: matchedRoot || serverRoot,
     triedPaths: candidatePaths
   };
 }
@@ -175,8 +222,6 @@ router.get('/mission-files/list/:serverId?', ensureAuthenticated, async (req, re
   console.log('   User:', req.user.username);
 
   try {
-    const fs = require('fs').promises;
-
     // If no server ID, list all available servers
     if (!serverId) {
       console.log('   📂 No server ID provided, listing available servers...');
@@ -227,9 +272,7 @@ router.get('/mission-files/list/:serverId?', ensureAuthenticated, async (req, re
 
     console.log('   📂 Scanning local path:', downloadPath);
 
-    // Check if directory exists
     if (!downloadPath) {
-      console.log('   ❌ Could not resolve server download directory');
       return res.json({
         success: false,
         error: 'No files downloaded yet. Please use the "Sync Files" button on the dashboard first.',
@@ -237,58 +280,56 @@ router.get('/mission-files/list/:serverId?', ensureAuthenticated, async (req, re
       });
     }
 
-    try {
-      await fs.access(downloadPath);
-    } catch (err) {
-      console.log('   ❌ Download directory not found');
-      return res.json({
-        success: false,
-        error: 'No files downloaded yet. Please use the "Sync Files" button on the dashboard first.',
-        debug: { serverId, triedRoots }
-      });
-    }
-
-    // Recursively scan for XML/JSON files
+    // Recursively scan for XML/JSON files. Every directory and file is
+    // reopened through descriptor-anchored helpers to reject symlink swaps.
     const editableFiles = {};
 
-    const scanDirectory = async (dirPath, prefix = '') => {
-      const entries = await fs.readdir(dirPath, { withFileTypes: true });
+    const scanDirectory = (relativeDir = '.', prefix = '') => {
+      const entries = listContainedDirectorySync(downloadPath, relativeDir);
 
       for (const entry of entries) {
-        const fullPath = path.join(dirPath, entry.name);
         const relativePath = prefix ? `${prefix}/${entry.name}` : entry.name;
+        const containedPath = relativeDir === '.'
+          ? entry.name
+          : path.join(relativeDir, entry.name);
 
         if (entry.isDirectory()) {
-          // Skip excluded directories
           const dirName = entry.name.toLowerCase();
           if (['custom', 'db', 'env', 'pra', '.git', 'node_modules'].includes(dirName)) {
             continue;
           }
-
-          // Recursively scan subdirectories
-          await scanDirectory(fullPath, relativePath);
+          scanDirectory(containedPath, relativePath);
         } else if (entry.isFile()) {
           const fileName = entry.name.toLowerCase();
           const isXml = fileName.endsWith('.xml');
           const isJson = fileName.endsWith('.json');
 
-          if (fileName.startsWith('.')) continue;
-
-          if (isXml || isJson) {
-            const stats = await fs.stat(fullPath);
-            editableFiles[relativePath] = {
-              description: `Mission file: ${relativePath}`,
-              type: isXml ? 'xml' : 'json',
-              path: fullPath,
-              relativePath: relativePath,
-              size: stats.size
-            };
-          }
+          if (fileName.startsWith('.') || (!isXml && !isJson)) continue;
+          const stats = statContainedFileSync(downloadPath, containedPath);
+          editableFiles[relativePath] = {
+            description: `Mission file: ${relativePath}`,
+            type: isXml ? 'xml' : 'json',
+            path: relativePath,
+            relativePath,
+            size: stats.size
+          };
         }
       }
-    }
+    };
 
-    await scanDirectory(downloadPath);
+    try {
+      scanDirectory();
+    } catch (err) {
+      if (err.code === 'ENOENT') {
+        console.log('   ❌ Download directory not found');
+        return res.json({
+          success: false,
+          error: 'No files downloaded yet. Please use the "Sync Files" button on the dashboard first.',
+          debug: { serverId, triedRoots }
+        });
+      }
+      throw err;
+    }
 
     console.log(`   ✅ Found ${Object.keys(editableFiles).length} editable files`);
 
@@ -338,14 +379,17 @@ router.post('/mission-files/:serverId/:fileName(*)/check-conflict', ensureAuthen
   try {
     if (!await requireServerFileAccess(req, res, serverId)) return;
 
-    const fs = require('fs').promises;
-    const { filePath } = await resolveMissionFilePath(req.app.locals.db, req.user, serverId, fileName);
+    const { filePath, serverRoot } = await resolveMissionFilePath(req.app.locals.db, req.user, serverId, fileName);
     if (!filePath) {
       return res.status(404).json({ success: false, error: 'Server download path not found. Sync files first.' });
     }
 
-    // Read current file
-    const currentContent = await fs.readFile(filePath, 'utf8');
+    // Read current file through a descriptor anchored to the authorized root.
+    const currentContent = readContainedFileSync(
+      serverRoot,
+      path.relative(serverRoot, filePath),
+      'utf8'
+    );
     const currentHash = crypto.createHash('sha256').update(currentContent).digest('hex');
 
     const hasConflict = expectedHash !== currentHash;
@@ -376,16 +420,17 @@ router.get('/mission-files/:serverId/:fileName(*)/backups', ensureAuthenticated,
   console.log('📂 Listing backups for:', fileName);
 
   try {
-    if (!await requireServerFileAccess(req, res, serverId)) return;
+    const accessContext = await requireServerFileAccess(req, res, serverId);
+    if (!accessContext) return;
 
-    const userId = req.user.discord_id || req.user.id;
-    const fs = require('fs').promises;
-    const backupDir = path.join(__dirname, '..', 'data', 'backups', userId.toString(), `server_${serverId}`);
-
-    const sanitizedFileName = fileName.replace(/\//g, '_');
+    const backupDir = resolveBackupDirectory(req.user, accessContext.platformServerId);
+    const backupRelativeDir = path.relative(BACKUP_ROOT, backupDir);
+    const sanitizedFileName = fileName.replace(/[\\/]/g, '_');
 
     try {
-      const files = await fs.readdir(backupDir);
+      const files = listContainedDirectorySync(BACKUP_ROOT, backupRelativeDir)
+        .filter(entry => entry.isFile())
+        .map(entry => entry.name);
 
       const backups = files
         .filter(file => file.startsWith(sanitizedFileName))
@@ -426,11 +471,11 @@ router.post('/mission-files/:serverId/:fileName(*)/restore', ensureAuthenticated
   }
 
   try {
-    if (!await requireServerFileAccess(req, res, serverId)) return;
+    const accessContext = await requireServerFileAccess(req, res, serverId);
+    if (!accessContext) return;
 
-    const userId = req.user.discord_id || req.user.id;
-    const backupDir = path.join(__dirname, '..', 'data', 'backups', userId.toString(), `server_${serverId}`);
-    const sanitizedFileName = fileName.replace(/\//g, '_');
+    const backupDir = resolveBackupDirectory(req.user, accessContext.platformServerId);
+    const sanitizedFileName = fileName.replace(/[\\/]/g, '_');
     const resolvedBackupPath = resolveExistingContainedPath(backupDir, backupPath);
     const backupFileName = path.basename(resolvedBackupPath);
     if (!backupFileName.startsWith(`${sanitizedFileName}.`) || !/\.\d+\.backup$/.test(backupFileName)) {
@@ -588,16 +633,16 @@ router.put('/mission-files/:serverId/:fileName(*)', ensureAuthenticated, async (
         const localPreimage = readContainedFileSync(serverRoot, relativeLocalPath, 'utf8');
         if (createBackup) {
           const timestamp = Date.now();
-          const userId = req.user.discord_id || req.user.id;
-          const backupRoot = path.join(__dirname, '..', 'data', 'backups');
-          if (!fsSync.existsSync(backupRoot)) fsSync.mkdirSync(backupRoot, { recursive: true });
-          const backupDir = path.join(backupRoot, userId.toString(), `server_${serverId}`);
-          ensureContainedDirectorySync(backupRoot, path.relative(backupRoot, backupDir));
-          const backupFileName = `${fileName.replace(/\//g, '_')}.${timestamp}.backup`;
+          const backupDir = resolveBackupDirectory(
+            req.user,
+            accessContext.platformServerId,
+            true
+          );
+          const backupFileName = `${fileName.replace(/[\\/]/g, '_')}.${timestamp}.backup`;
           backupPath = path.join(backupDir, backupFileName);
           writeContainedFileSync(
-            backupRoot,
-            path.relative(backupRoot, backupPath),
+            BACKUP_ROOT,
+            path.relative(BACKUP_ROOT, backupPath),
             previousContent,
             'utf8'
           );
@@ -650,15 +695,18 @@ router.get('/mission-files/:serverId/:fileName(*)', ensureAuthenticated, async (
   try {
     if (!await requireServerFileAccess(req, res, serverId)) return;
 
-    const fs = require('fs').promises;
-    const { filePath } = await resolveMissionFilePath(req.app.locals.db, req.user, serverId, fileName);
+    const { filePath, serverRoot } = await resolveMissionFilePath(req.app.locals.db, req.user, serverId, fileName);
     if (!filePath) {
-      return res.status(404).json({ success: false, error: 'Server download path not found. Sync files first.' });
+      return res.status(404).json({ success: false, error: 'File not found. Please sync files first.' });
     }
 
     console.log('   📂 Local path:', filePath);
 
-    const content = await fs.readFile(filePath, 'utf8');
+    const content = readContainedFileSync(
+      serverRoot,
+      path.relative(serverRoot, filePath),
+      'utf8'
+    );
 
     // Calculate hash
     const hash = crypto.createHash('sha256').update(content).digest('hex');

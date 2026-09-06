@@ -3,6 +3,7 @@
 const assert = require('assert');
 const http = require('http');
 const express = require('express');
+const rateLimit = require('express-rate-limit');
 const roleRoutes = require('../routes/roleManagement');
 const accessRoutes = require('../routes/access');
 const healthRoutes = require('../routes/health');
@@ -67,7 +68,13 @@ function appFor(router, user, db, options = {}) {
     }
     next();
   });
-  app.use('/api', ensureAuthenticated, router);
+  const testLimiter = rateLimit({
+    windowMs: 60 * 1000,
+    max: 10000,
+    standardHeaders: false,
+    legacyHeaders: false,
+  });
+  app.use('/api', testLimiter, ensureAuthenticated, router);
   return app;
 }
 

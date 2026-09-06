@@ -448,7 +448,7 @@ class ValidationService {
     const lines = content.split('\n');
     const trailingWhitespaceLines = lines
       .map((line, index) => ({ line: line, number: index + 1 }))
-      .filter(item => /\s+$/.test(item.line));
+      .filter(item => item.line.length !== item.line.trimEnd().length);
 
     if (trailingWhitespaceLines.length > 0) {
       warnings.push({
@@ -597,7 +597,7 @@ class ValidationService {
 
       // Remove trailing whitespace
       const originalLines = fixed.split('\n');
-      const trimmedLines = originalLines.map(line => line.replace(/\s+$/, ''));
+      const trimmedLines = originalLines.map(line => line.trimEnd());
       if (originalLines.join('\n') !== trimmedLines.join('\n')) {
         fixed = trimmedLines.join('\n');
         fixes.push({

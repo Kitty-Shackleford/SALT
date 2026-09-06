@@ -43,7 +43,37 @@ function sourceLabel(key) {
 }
 
 function destroyChart(instance) {
-  if (instance) { try { instance.destroy(); } catch (e) {} }
+  if (instance) {
+    try {
+      instance.destroy();
+    } catch (error) {
+      console.warn('Unable to destroy analytics chart:', error);
+    }
+  }
+}
+
+function renderRankingList(container, players, amountKey, amountPrefix, amountClass, emptyMessage) {
+  container.replaceChildren();
+  if (!Array.isArray(players) || players.length === 0) {
+    const empty = document.createElement('p');
+    empty.className = 'text-gray-500 text-sm';
+    empty.textContent = emptyMessage;
+    container.appendChild(empty);
+    return;
+  }
+
+  players.forEach((player, index) => {
+    const row = document.createElement('div');
+    row.className = 'flex justify-between items-center bg-gray-700 px-3 py-2 rounded';
+    const name = document.createElement('span');
+    name.className = 'text-sm';
+    name.textContent = `#${index + 1} ${player.gamertag || 'Unknown player'}`;
+    const amount = document.createElement('span');
+    amount.className = `${amountClass} font-semibold text-sm`;
+    amount.textContent = `${amountPrefix}$${fmt(player[amountKey])}`;
+    row.append(name, amount);
+    container.appendChild(row);
+  });
 }
 
 async function loadGuilds() {
@@ -223,30 +253,24 @@ async function loadAnalytics() {
     }
 
     // Top earners
-    const earnersList = document.getElementById('topEarnersList');
-    if (a.topEarners && a.topEarners.length > 0) {
-      earnersList.innerHTML = a.topEarners.map((p, i) => `
-        <div class="flex justify-between items-center bg-gray-700 px-3 py-2 rounded">
-          <span class="text-sm">#${i + 1} ${p.gamertag}</span>
-          <span class="text-green-400 font-semibold text-sm">+$${fmt(p.totalEarned)}</span>
-        </div>
-      `).join('');
-    } else {
-      earnersList.innerHTML = '<p class="text-gray-500 text-sm">No earner data for this period.</p>';
-    }
+    renderRankingList(
+      document.getElementById('topEarnersList'),
+      a.topEarners,
+      'totalEarned',
+      '+',
+      'text-green-400',
+      'No earner data for this period.'
+    );
 
     // Top spenders
-    const spendersList = document.getElementById('topSpendersList');
-    if (a.topSpenders && a.topSpenders.length > 0) {
-      spendersList.innerHTML = a.topSpenders.map((p, i) => `
-        <div class="flex justify-between items-center bg-gray-700 px-3 py-2 rounded">
-          <span class="text-sm">#${i + 1} ${p.gamertag}</span>
-          <span class="text-red-400 font-semibold text-sm">-$${fmt(p.totalSpent)}</span>
-        </div>
-      `).join('');
-    } else {
-      spendersList.innerHTML = '<p class="text-gray-500 text-sm">No spender data for this period.</p>';
-    }
+    renderRankingList(
+      document.getElementById('topSpendersList'),
+      a.topSpenders,
+      'totalSpent',
+      '-',
+      'text-red-400',
+      'No spender data for this period.'
+    );
 
     document.getElementById('loadingState').classList.add('hidden');
     document.getElementById('mainDashboard').classList.remove('hidden');
@@ -278,7 +302,9 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   document.getElementById('exportBtn').addEventListener('click', () => {
     if (!currentServerId) return;
-    const days = document.getElementById('dateRange').value || 30;
-    window.location.href = `/api/economy/admin/${currentServerId}/export?days=${days}`;
+    const selectedDays = document.getElementById('dateRange').value;
+    const days = ['7', '30', '90'].includes(selectedDays) ? selectedDays : '30';
+    const serverId = encodeURIComponent(currentServerId);
+    window.location.assign(`/api/economy/admin/${serverId}/export?days=${days}`);
   });
 });

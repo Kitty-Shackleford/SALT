@@ -54,9 +54,14 @@ function gameToLeaflet(east, north, mapName) {
 
 // Helper function for event colors - DYNAMIC with localStorage
 function getEventColor(eventName) {
-  const savedColors = JSON.parse(localStorage.getItem('eventColors') || '{}');
+  let savedColors = {};
+  try {
+    savedColors = JSON.parse(localStorage.getItem('eventColors') || '{}');
+  } catch {
+    savedColors = {};
+  }
 
-  if (savedColors[eventName]) {
+  if (/^#[0-9a-f]{6}$/i.test(savedColors[eventName] || '')) {
     return savedColors[eventName];
   }
 
@@ -984,12 +989,17 @@ function onMapClick(e) {
     grouped[event.name]++;
   });
 
-  let resultText = '✅ Found ' + eventsInRadius.length + ' events:<br>';
+  const results = document.getElementById('radius-results');
+  const summary = document.createElement('span');
+  summary.textContent = `✅ Found ${eventsInRadius.length} events:`;
+  results.replaceChildren(summary);
+  results.appendChild(document.createElement('br'));
   Object.entries(grouped).forEach(function([name, count]) {
-    resultText += '<span style="color: ' + getEventColor(name) + ';">●</span> ' + escapeHtml(name) + ' (' + count + ')<br>';
+    const marker = document.createElement('span');
+    marker.style.color = getEventColor(name);
+    marker.textContent = '●';
+    results.append(marker, document.createTextNode(` ${name} (${count})`), document.createElement('br'));
   });
-
-  document.getElementById('radius-results').innerHTML = resultText;
 
   radiusSearchMode = false;
   document.getElementById('radius-btn').style.display = 'inline-block';

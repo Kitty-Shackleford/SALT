@@ -465,9 +465,11 @@ async function testOnboardingRateLimitIsolation() {
   assert.equal(typeof onboardingLimiter, 'function', 'onboarding endpoints need a dedicated limiter');
 
   const routeRegistration = read('src/app/registerRoutes.js');
-  assert(routeRegistration.includes("app.use('/admin/*', ensureAuthenticated, ensureAdmin, apiLimiter)"),
-    'read-only admin HTML pages must use the general read limiter after authorization');
-  assert(!routeRegistration.includes("app.use('/admin/*', ensureAuthenticated, ensureAdmin, strictLimiter)"),
+  assert(routeRegistration.includes("app.use('/admin/*', apiLimiter, ensureAuthenticated, ensureAdmin)"),
+    'read-only descendant admin HTML pages must apply the general read limiter before authorization');
+  assert(routeRegistration.includes("app.get('/admin', apiLimiter, ensureAuthenticated, ensureAdmin"),
+    'the exact admin root must apply the general read limiter before authorization');
+  assert(!routeRegistration.includes("app.use('/admin/*', strictLimiter"),
     'admin HTML navigation must not exhaust the sensitive-operation limiter');
   assert.equal((routeRegistration.match(/app\.get\('\/api\/config', onboardingLimiter/g) || []).length, 1,
     'public config must use the dedicated onboarding limiter exactly once');

@@ -43,8 +43,8 @@
         );
       }
 
-      console.log('\nIDENTITIES_FOUND_FOR_KEYS:', JSON.stringify(rows, null, 2));
-      console.log('\nGAMERTAGS_FOUND:', JSON.stringify(gamertags, null, 2));
+      console.log('\nIDENTITIES_FOUND_COUNT:', rows.length);
+      console.log('\nGAMERTAGS_FOUND_COUNT:', gamertags.length);
 
     } finally {
       await closeDatabase();

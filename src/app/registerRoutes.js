@@ -153,7 +153,7 @@ function registerRoutes(app, csrfProtection) {
   // Browsers request this legacy path automatically when pages do not declare
   // an icon. Serve the SVG explicitly so every page gets a favicon without
   // duplicating a <link> element across the static HTML files.
-  app.get('/favicon.ico', (req, res) => {
+  app.get('/favicon.ico', apiLimiter, (req, res) => {
     res.type('image/svg+xml').sendFile(path.join(__dirname, '..', '..', 'public', 'favicon.svg'));
   });
 
@@ -245,7 +245,7 @@ function registerRoutes(app, csrfProtection) {
     const telemetry = require('../../utils/telemetry');
     // Restrict metrics to authenticated admins only
     const { ensureAuthenticated, ensureAdmin } = require('../../middleware/auth');
-    app.get('/metrics', ensureAuthenticated, ensureAdmin, (req, res) => {
+    app.get('/metrics', apiLimiter, ensureAuthenticated, ensureAdmin, (req, res) => {
       res.set('Content-Type', 'text/plain; version=0.0.4');
       res.send(telemetry.getPrometheusMetrics());
     });
@@ -849,35 +849,43 @@ function registerRoutes(app, csrfProtection) {
     }
   );
 
-  app.get('/logout', (req, res) => {
-    req.logout(() => res.redirect('/'));
+  const pub = (...parts) => path.join(__dirname, '..', '..', 'public', ...parts);
+
+  app.get('/logout', apiLimiter, ensureAuthenticated, (req, res) => {
+    renderWithCsrf(pub('logout-confirm.html'), req, res);
+  });
+
+  app.post('/logout', apiLimiter, ensureAuthenticated, (req, res, next) => {
+    req.logout((error) => {
+      if (error) return next(error);
+      return res.redirect('/');
+    });
   });
 
   // -------------------------------------------------------------------------
   // HTML page routes
   // -------------------------------------------------------------------------
-  const pub = (...parts) => path.join(__dirname, '..', '..', 'public', ...parts);
 
   // Player portal
-  app.get('/player', ensureAuthenticated, (req, res) => {
+  app.get('/player', apiLimiter, ensureAuthenticated, (req, res) => {
     console.log('🎮 Player portal accessed');
     console.log('   isPlayerPortal:', req.isPlayerPortal);
     res.set('Cache-Control', 'no-store');
     renderWithCsrf(pub('player-portal.html'), req, res);
   });
 
-  app.get('/player-portal', ensureAuthenticated, apiLimiter, (req, res) => {
+  app.get('/player-portal', apiLimiter, ensureAuthenticated, (req, res) => {
     res.set('Cache-Control', 'no-store');
     renderWithCsrf(pub('player-portal.html'), req, res);
   });
 
   // Standalone player map — same auth requirement as player portal
-  app.get('/player-map', ensureAuthenticated, (req, res) => {
+  app.get('/player-map', apiLimiter, ensureAuthenticated, (req, res) => {
     renderWithCsrf(pub('player-map.html'), req, res);
   });
 
   // Dashboard
-  app.get('/dashboard', ensureAuthenticated, async (req, res) => {
+  app.get('/dashboard', apiLimiter, ensureAuthenticated, async (req, res) => {
     if (req.isPlayerPortal) return res.redirect('/player');
     const db = req.app.locals.db;
 
@@ -1029,42 +1037,42 @@ function registerRoutes(app, csrfProtection) {
   });
 
   // Server tools
-  app.get('/map', ensureAuthenticated, apiLimiter, ensureHasServers, (req, res) => {
+  app.get('/map', apiLimiter, ensureAuthenticated, ensureHasServers, (req, res) => {
     console.log('🗺️  Map page accessed by:', req.user?.username);
     renderWithCsrf(pub('map.html'), req, res);
   });
 
-  app.get('/loot-finder', ensureAuthenticated, apiLimiter, (req, res) => {
+  app.get('/loot-finder', apiLimiter, ensureAuthenticated, (req, res) => {
     console.log('🔍 Loot finder accessed by:', req.user?.username);
     renderWithCsrf(pub('loot-finder.html'), req, res);
   });
 
-  app.get('/mission-editor', ensureAuthenticated, apiLimiter, ensureHasServers, (req, res) => {
+  app.get('/mission-editor', apiLimiter, ensureAuthenticated, ensureHasServers, (req, res) => {
     console.log('📝 Mission editor accessed by:', req.user?.username);
     renderWithCsrf(pub('mission-editor.html'), req, res);
   });
 
-  app.get('/logs', ensureAuthenticated, apiLimiter, ensureHasOperableServers, (req, res) => {
+  app.get('/logs', apiLimiter, ensureAuthenticated, ensureHasOperableServers, (req, res) => {
     console.log('📋 Logs page accessed by:', req.user?.username);
     renderWithCsrf(pub('logs.html'), req, res);
   });
 
-  app.get('/server-players', ensureAuthenticated, apiLimiter, (req, res) => {
+  app.get('/server-players', apiLimiter, ensureAuthenticated, (req, res) => {
     console.log('👥 Server players page accessed by:', req.user?.username);
     renderWithCsrf(pub('server-players.html'), req, res);
   });
 
-  app.get('/server-lists', ensureAuthenticated, apiLimiter, (req, res) => {
+  app.get('/server-lists', apiLimiter, ensureAuthenticated, (req, res) => {
     console.log('📋 Server lists page accessed by:', req.user?.username);
     renderWithCsrf(pub('server-lists.html'), req, res);
   });
 
   // Redirects
-  app.get('/automation', ensureAuthenticated, apiLimiter, ensureHasServers, (req, res) => {
+  app.get('/automation', apiLimiter, ensureAuthenticated, ensureHasServers, (req, res) => {
     res.redirect('/dashboard/automation');
   });
 
-  app.get('/nitrado-settings', ensureAuthenticated, apiLimiter, ensureHasServers, (req, res) => {
+  app.get('/nitrado-settings', apiLimiter, ensureAuthenticated, ensureHasServers, (req, res) => {
     res.redirect('/dashboard/settings');
   });
 
@@ -1083,9 +1091,9 @@ function registerRoutes(app, csrfProtection) {
   // Admin HTML pages are authenticated read traffic. Keep sensitive API
   // mutations on their route-specific strict limiters so ordinary navigation
   // cannot exhaust the sensitive-operation bucket.
-  app.use('/admin/*', ensureAuthenticated, ensureAdmin, apiLimiter);
+  app.use('/admin/*', apiLimiter, ensureAuthenticated, ensureAdmin);
 
-  app.get('/admin', ensureAuthenticated, ensureAdmin, (req, res) => {
+  app.get('/admin', apiLimiter, ensureAuthenticated, ensureAdmin, (req, res) => {
     console.log('⚡ Admin dashboard accessed by:', req.user?.username);
     renderWithCsrf(pub('admin', 'index.html'), req, res);
   });
@@ -1114,7 +1122,7 @@ function registerRoutes(app, csrfProtection) {
     renderWithCsrf(pub('admin', 'users.html'), req, res);
   });
 
-  app.get('/dashboard/roles', ensureAuthenticated, (req, res) => {
+  app.get('/dashboard/roles', apiLimiter, ensureAuthenticated, (req, res) => {
     renderWithCsrf(pub('admin', 'users.html'), req, res);
   });
 
@@ -1128,7 +1136,7 @@ function registerRoutes(app, csrfProtection) {
     renderWithCsrf(pub('admin', 'database.html'), req, res);
   });
 
-  app.get('/admin/reports', ensureAuthenticated, ensureAdmin, (req, res) => {
+  app.get('/admin/reports', (req, res) => {
     console.log('📋 Admin reports accessed by:', req.user?.username);
     renderWithCsrf(pub('admin', 'reports.html'), req, res);
   });
@@ -1137,12 +1145,12 @@ function registerRoutes(app, csrfProtection) {
     res.redirect('/dashboard/feeds');
   });
 
-  app.get('/admin/supply-monitor', apiLimiter, ensureAdmin, (req, res) => {
+  app.get('/admin/supply-monitor', (req, res) => {
     console.log('💎 Admin supply monitor accessed by:', req.user?.username);
     renderWithCsrf(pub('admin', 'supply-monitor.html'), req, res);
   });
 
-  app.get('/admin/economy-analytics', apiLimiter, ensureAdmin, (req, res) => {
+  app.get('/admin/economy-analytics', (req, res) => {
     console.log('📊 Admin economy analytics accessed by:', req.user?.username);
     renderWithCsrf(pub('admin', 'economy-analytics.html'), req, res);
   });

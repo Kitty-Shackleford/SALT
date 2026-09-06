@@ -9,11 +9,33 @@ const MIN_DELAY_MS = 350; // Minimum 350ms between messages to same channel
 const DEFAULT_DISCORD_TIMEOUT_MS = 15000;
 const MAX_RETRY_AFTER_MS = 15000;
 
+function normalizeDiscordWebhookUrl(value) {
+  let parsed;
+  try {
+    parsed = new URL(value);
+  } catch {
+    throw new Error('Invalid Discord webhook URL');
+  }
+  const match = parsed.pathname.match(/^\/api(?:\/v\d+)?\/webhooks\/(\d+)\/([^/]+)$/);
+  if (parsed.protocol !== 'https:' || parsed.hostname !== 'discord.com' || parsed.port ||
+      parsed.username || parsed.password || !match) {
+    throw new Error('Invalid Discord webhook URL');
+  }
+  const normalized = new URL(`https://discord.com/api/webhooks/${match[1]}/${match[2]}`);
+  if (parsed.searchParams.get('wait') === 'true') normalized.searchParams.set('wait', 'true');
+  if (parsed.searchParams.has('thread_id')) {
+    const threadId = parsed.searchParams.get('thread_id');
+    if (!/^\d+$/.test(threadId)) throw new Error('Invalid Discord webhook URL');
+    normalized.searchParams.set('thread_id', threadId);
+  }
+  return normalized.toString();
+}
+
 async function fetchDiscord(url, options = {}, timeoutMs = DEFAULT_DISCORD_TIMEOUT_MS) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(new Error('Discord request timed out')), timeoutMs);
   try {
-    return await fetch(url, { ...options, signal: controller.signal });
+    return await fetch(url, { ...options, redirect: 'error', signal: controller.signal });
   } finally {
     clearTimeout(timer);
   }
@@ -61,17 +83,13 @@ async function validateDiscordDestination(discordGuildId, channelId, webhookUrl)
   }
 
   if (webhookUrl) {
-    let parsed;
+    let normalizedWebhookUrl;
     try {
-      parsed = new URL(webhookUrl);
+      normalizedWebhookUrl = normalizeDiscordWebhookUrl(webhookUrl);
     } catch {
       return false;
     }
-    if (parsed.protocol !== 'https:' || parsed.hostname !== 'discord.com' ||
-        !/^\/api(?:\/v\d+)?\/webhooks\/\d+\/[^/]+$/.test(parsed.pathname)) {
-      return false;
-    }
-    const response = await fetchDiscord(parsed.toString());
+    const response = await fetchDiscord(normalizedWebhookUrl);
     if (!response.ok) return false;
     const webhook = await response.json();
     if (String(webhook.guild_id || '') !== expectedGuildId) return false;
@@ -85,9 +103,10 @@ async function validateDiscordDestination(discordGuildId, channelId, webhookUrl)
  */
 async function postViaWebhook(webhookUrl, content, isEmbed = false, timeoutMs = DEFAULT_DISCORD_TIMEOUT_MS) {
   try {
+    const normalizedWebhookUrl = normalizeDiscordWebhookUrl(webhookUrl);
     const payload = isEmbed ? content : { content };
 
-    const response = await fetchDiscord(webhookUrl, {
+    const response = await fetchDiscord(normalizedWebhookUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload)
@@ -108,7 +127,7 @@ async function postViaWebhook(webhookUrl, content, isEmbed = false, timeoutMs = 
           await sleep(retryAfter);
 
           // Retry once
-          const retryResponse = await fetchDiscord(webhookUrl, {
+          const retryResponse = await fetchDiscord(normalizedWebhookUrl, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(payload)

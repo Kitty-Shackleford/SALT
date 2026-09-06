@@ -162,7 +162,8 @@ async function loadBoostHistory(page) {
     if (data.status !== 'success') throw new Error(data.message || 'API error');
     renderBoostHistory(data.data);
   } catch (err) {
-    wrap.innerHTML = `<p class="text-red-400 text-sm">❌ ${err.message}</p>`;
+    wrap.textContent = `❌ ${err.message}`;
+    wrap.className = 'text-red-400 text-sm';
   }
 }
 

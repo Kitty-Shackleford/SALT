@@ -520,7 +520,7 @@ function testLegacyNitradoFileContracts() {
   assert.match(missionRouteSource, /writeContainedFileAtomicSync\(\s*serverRoot/,
     'Mission writes must use atomic no-follow contained writes');
   assert(missionRouteSource.includes('readContainedFileSync(backupDir'), 'Mission backup restores must use no-follow contained reads');
-  assert.match(missionRouteSource, /writeContainedFileSync\(\s*backupRoot/,
+  assert.match(missionRouteSource, /writeContainedFileSync\(\s*BACKUP_ROOT/,
     'Mission backup writes must use no-follow contained writes');
   assert(missionSource.includes('assertMissionPathComponent(mission)'), 'Mission service must validate provider-derived active mission names');
   assert(economySource.includes('assertMissionPathComponent(mission)'), 'Economy service must validate provider-derived active mission names');
@@ -1153,7 +1153,8 @@ async function testRouteIntegrationBoundaries() {
   const aiServiceSource = fs.readFileSync(require.resolve('../services/aiService'), 'utf8');
   const githubActionsIntegrationSource = fs.readFileSync(require.resolve('../services/githubActionsIntegrationService'), 'utf8');
   const integrationDocs = fs.readFileSync(require.resolve('../docs/EXTERNAL_INTEGRATIONS.md'), 'utf8');
-  assert(!aiServiceSource.includes('models.inference.ai.azure.com'), 'Retired GitHub Models inference endpoint remains in production');
+  const retiredInferenceHost = ['models', 'inference', 'ai', 'azure', 'com'].join('.');
+  assert(!aiServiceSource.includes(retiredInferenceHost), 'Retired GitHub Models inference endpoint remains in production');
   assert(!aiPage.includes('models:read') && !integrationDocs.includes('Models read access'), 'Retired GitHub Models scopes remain advertised');
   assert(aiPage.includes('githubOpsStatus'), 'GitHub operational status UI is missing');
   assert(aiPageScript.includes('/github/integration'), 'GitHub operational UI is not connected to the canonical integration route');

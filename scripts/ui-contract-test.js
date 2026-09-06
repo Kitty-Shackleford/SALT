@@ -141,7 +141,7 @@ function registerRoutes(app) {
   assert.strictEqual(serializeManifest(manifest), serializeManifest(buildManifest(fixtureRoot)));
 
   const repositoryManifest = buildManifest(root);
-  assert.strictEqual(repositoryManifest.pages.length, 49, 'every current HTML document must remain inventoried');
+  assert.strictEqual(repositoryManifest.pages.length, 50, 'every current HTML document must remain inventoried');
   assert.deepStrictEqual(
     repositoryManifest.pages.filter(page => page.routes.length === 0).map(page => page.file),
     [

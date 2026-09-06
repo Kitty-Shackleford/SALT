@@ -4,6 +4,16 @@ const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 
+function normalizeStorageIdentifier(value, label = 'storage identifier') {
+  const normalized = typeof value === 'string' || typeof value === 'number'
+    ? String(value)
+    : '';
+  if (!/^[A-Za-z0-9_-]{1,128}$/.test(normalized)) {
+    throw new Error(`Invalid ${label}`);
+  }
+  return normalized;
+}
+
 function isContained(root, candidate) {
   const relative = path.relative(root, candidate);
   return relative === '' || (!relative.startsWith(`..${path.sep}`) && relative !== '..' && !path.isAbsolute(relative));
@@ -144,6 +154,7 @@ function writeContainedFileAtomicSync(root, untrustedPath, data, options = undef
   const tempName = `.${path.basename(candidate)}.${process.pid}.${crypto.randomBytes(8).toString('hex')}.tmp`;
   const tempPath = `${descriptorPath(parentFd)}/${tempName}`;
   let tempFd;
+  let cleanupError;
   try {
     try {
       const destinationStat = fs.lstatSync(destinationPath);
@@ -167,10 +178,15 @@ function writeContainedFileAtomicSync(root, untrustedPath, data, options = undef
     try {
       fs.unlinkSync(tempPath);
     } catch (error) {
-      if (error.code !== 'ENOENT') throw error;
+      if (error.code !== 'ENOENT') cleanupError = error;
     }
-    fs.closeSync(parentFd);
+    try {
+      fs.closeSync(parentFd);
+    } catch (error) {
+      if (!cleanupError) cleanupError = error;
+    }
   }
+  if (cleanupError) throw cleanupError;
 }
 
 function openContainedFileSync(root, untrustedPath) {
@@ -196,6 +212,24 @@ function openContainedFileSync(root, untrustedPath) {
   }
 }
 
+function listContainedDirectorySync(root, untrustedPath = '.') {
+  const { fd } = openContainedDirectorySync(root, untrustedPath);
+  try {
+    return fs.readdirSync(descriptorPath(fd), { withFileTypes: true });
+  } finally {
+    fs.closeSync(fd);
+  }
+}
+
+function statContainedFileSync(root, untrustedPath) {
+  const { fd, stat } = openContainedFileSync(root, untrustedPath);
+  try {
+    return stat;
+  } finally {
+    fs.closeSync(fd);
+  }
+}
+
 function readContainedFileSync(root, untrustedPath, options = undefined) {
   const { fd: fileFd } = openContainedFileSync(root, untrustedPath);
   try {
@@ -207,11 +241,15 @@ function readContainedFileSync(root, untrustedPath, options = undefined) {
 
 module.exports = {
   ensureContainedDirectorySync,
+  listContainedDirectorySync,
+  normalizeStorageIdentifier,
+  openContainedDirectorySync,
   openContainedFileSync,
   readContainedFileSync,
   resolveContainedPath,
   resolveExistingContainedPath,
   resolveWritableContainedPath,
+  statContainedFileSync,
   writeContainedFileAtomicSync,
   writeContainedFileSync,
 };

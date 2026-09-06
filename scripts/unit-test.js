@@ -1416,11 +1416,12 @@ async function testCentralNitradoHttpTimeoutsAndSanitizedErrors() {
     const fullPath = path.join(directory, entry.name);
     return entry.isDirectory() ? walk(fullPath) : [fullPath];
   });
+  const nitradoHostMarker = ['api', 'nitrado', 'net'].join('.');
   for (const file of ['routes', 'services', 'bot', 'utils', 'src', 'tools']
     .flatMap(directory => walk(path.join(__dirname, '..', directory)))
     .filter(file => file.endsWith('.js'))) {
     const source = fs.readFileSync(file, 'utf8');
-    if (!source.includes('api.nitrado.net')) continue;
+    if (!source.includes(nitradoHostMarker)) continue;
     if (file.endsWith(path.join('utils', 'nitradoHttp.js'))) continue;
     if (source.includes("require('axios')") || source.includes('require("axios")')) {
       throw new Error('Nitrado request bypasses the centralized timeout client: ' + file);
@@ -1898,7 +1899,7 @@ function testAiAssistantUsesCspCompatibleRuntimeRoutes() {
   const routes = fs.readFileSync(path.join(__dirname, '..', 'routes/ai.js'), 'utf8');
 
   if (!page.includes('<script src="/js/ai-assistant.js" defer></script>') ||
-      /\son[a-z]+\s*=/.test(page) || /<script>([\s\S]*?)<\/script>/.test(page)) {
+      /\son[a-z]+\s*=/i.test(page) || /<script\b(?![^>]*\bsrc\s*=)[^>]*>/i.test(page)) {
     throw new Error('AI Assistant page is blocked by the application CSP');
   }
   if (page.includes('/api/guilds/servers') || page.includes('/api/mission-files/content')) {

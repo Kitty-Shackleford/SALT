@@ -8,7 +8,12 @@ const fs = require('fs');
 const path = require('path');
 const { decryptToken } = require('../utils/encryption');
 const { getNitradoBinaryBody, getNitradoFileEntries, getNitradoTransferToken } = require('../utils/nitradoHttp');
-const { ensureContainedDirectorySync, openContainedFileSync, writeContainedFileAtomicSync } = require('../utils/safePath');
+const {
+  ensureContainedDirectorySync,
+  normalizeStorageIdentifier,
+  openContainedFileSync,
+  writeContainedFileAtomicSync,
+} = require('../utils/safePath');
 const { inspectNitradoRootEntries } = require('../utils/dayzPlatform');
 const { compareLogFileEntries, isSupportedRptFilename } = require('../utils/logFileChronology');
 const { createNitradoService } = require('./nitradoService');
@@ -61,8 +66,14 @@ function classifyLogEntry(configPath, entry) {
 
 function getGuildDownloadPath(guildDiscordId, serverId) {
   const basePath = DOWNLOAD_ROOT;
-  const guildPath = path.join(basePath, sanitizeFilename(String(guildDiscordId)));
-  const serverPath = path.join(guildPath, `server_${serverId}`);
+  const guildPath = path.join(
+    basePath,
+    normalizeStorageIdentifier(guildDiscordId, 'guild storage identifier')
+  );
+  const serverPath = path.join(
+    guildPath,
+    `server_${normalizeStorageIdentifier(serverId, 'server storage identifier')}`
+  );
 
   ensureContainedDirectorySync(basePath, path.relative(basePath, serverPath));
 

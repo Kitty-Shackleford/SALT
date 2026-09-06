@@ -90,7 +90,9 @@ function validateAbsoluteProviderPath(value) {
       value.includes('\\') || value.includes('\0')) {
     throw invalidPathMetadata();
   }
-  const trimmed = value.replace(/\/+$/, '');
+  let end = value.length;
+  while (end > 1 && value[end - 1] === '/') end -= 1;
+  const trimmed = value.slice(0, end);
   if (!trimmed || path.posix.normalize(trimmed) !== trimmed ||
       !/^\/games\/[^/]+\/(?:noftp|ftproot)(?:\/|$)/.test(trimmed)) {
     throw invalidPathMetadata();

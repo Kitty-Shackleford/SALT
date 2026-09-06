@@ -419,8 +419,10 @@ function testMapsPreserveCoordinateStableTilesAndExposeEvidenceBackedData() {
     'event health must use the guild captured with the same server request context');
   assert.match(adminClient, /escapeHtml\(eventName\)/,
     'admin event-spawn popup names must escape provider/XML-derived markup');
-  assert.match(adminClient, /escapeHtml\(name\)/,
-    'radius-search event names must escape provider/XML-derived markup');
+  assert.ok(adminClient.includes('document.createTextNode(` ${name} (${count})`)'),
+    'radius-search event names must be rendered as text nodes');
+  assert.match(adminClient, /results\.replaceChildren\(summary\)/,
+    'radius-search results must replace prior markup with DOM nodes');
   assert.match(adminClient, /escapeHtml\(it\.item_class\)/,
     'loot item classes must escape log-derived markup');
   assert.match(adminClient, /contextGeneration/,

@@ -23,6 +23,7 @@
       ],
       "redirectTargets": [],
       "declaredMiddleware": [
+        "apiLimiter",
         "ensureAuthenticated",
         "ensureAdmin"
       ],
@@ -38,9 +39,9 @@
       "redirectTargets": [],
       "declaredMiddleware": [],
       "inheritedMiddleware": [
+        "apiLimiter",
         "ensureAuthenticated",
-        "ensureAdmin",
-        "apiLimiter"
+        "ensureAdmin"
       ]
     },
     {
@@ -53,9 +54,9 @@
       "redirectTargets": [],
       "declaredMiddleware": [],
       "inheritedMiddleware": [
+        "apiLimiter",
         "ensureAuthenticated",
-        "ensureAdmin",
-        "apiLimiter"
+        "ensureAdmin"
       ]
     },
     {
@@ -66,14 +67,11 @@
         "public/admin/economy-analytics.html"
       ],
       "redirectTargets": [],
-      "declaredMiddleware": [
-        "apiLimiter",
-        "ensureAdmin"
-      ],
+      "declaredMiddleware": [],
       "inheritedMiddleware": [
+        "apiLimiter",
         "ensureAuthenticated",
-        "ensureAdmin",
-        "apiLimiter"
+        "ensureAdmin"
       ]
     },
     {
@@ -86,9 +84,9 @@
       ],
       "declaredMiddleware": [],
       "inheritedMiddleware": [
+        "apiLimiter",
         "ensureAuthenticated",
-        "ensureAdmin",
-        "apiLimiter"
+        "ensureAdmin"
       ]
     },
     {
@@ -101,9 +99,9 @@
       "redirectTargets": [],
       "declaredMiddleware": [],
       "inheritedMiddleware": [
+        "apiLimiter",
         "ensureAuthenticated",
-        "ensureAdmin",
-        "apiLimiter"
+        "ensureAdmin"
       ]
     },
     {
@@ -116,9 +114,9 @@
       "redirectTargets": [],
       "declaredMiddleware": [],
       "inheritedMiddleware": [
+        "apiLimiter",
         "ensureAuthenticated",
-        "ensureAdmin",
-        "apiLimiter"
+        "ensureAdmin"
       ]
     },
     {
@@ -129,14 +127,11 @@
         "public/admin/reports.html"
       ],
       "redirectTargets": [],
-      "declaredMiddleware": [
+      "declaredMiddleware": [],
+      "inheritedMiddleware": [
+        "apiLimiter",
         "ensureAuthenticated",
         "ensureAdmin"
-      ],
-      "inheritedMiddleware": [
-        "ensureAuthenticated",
-        "ensureAdmin",
-        "apiLimiter"
       ]
     },
     {
@@ -149,9 +144,9 @@
       "redirectTargets": [],
       "declaredMiddleware": [],
       "inheritedMiddleware": [
+        "apiLimiter",
         "ensureAuthenticated",
-        "ensureAdmin",
-        "apiLimiter"
+        "ensureAdmin"
       ]
     },
     {
@@ -164,9 +159,9 @@
       "redirectTargets": [],
       "declaredMiddleware": [],
       "inheritedMiddleware": [
+        "apiLimiter",
         "ensureAuthenticated",
-        "ensureAdmin",
-        "apiLimiter"
+        "ensureAdmin"
       ]
     },
     {
@@ -177,14 +172,11 @@
         "public/admin/supply-monitor.html"
       ],
       "redirectTargets": [],
-      "declaredMiddleware": [
-        "apiLimiter",
-        "ensureAdmin"
-      ],
+      "declaredMiddleware": [],
       "inheritedMiddleware": [
+        "apiLimiter",
         "ensureAuthenticated",
-        "ensureAdmin",
-        "apiLimiter"
+        "ensureAdmin"
       ]
     },
     {
@@ -197,9 +189,9 @@
       "redirectTargets": [],
       "declaredMiddleware": [],
       "inheritedMiddleware": [
+        "apiLimiter",
         "ensureAuthenticated",
-        "ensureAdmin",
-        "apiLimiter"
+        "ensureAdmin"
       ]
     },
     {
@@ -235,8 +227,8 @@
         "/dashboard/automation"
       ],
       "declaredMiddleware": [
-        "ensureAuthenticated",
         "apiLimiter",
+        "ensureAuthenticated",
         "ensureHasServers"
       ],
       "inheritedMiddleware": []
@@ -253,6 +245,7 @@
         "/player"
       ],
       "declaredMiddleware": [
+        "apiLimiter",
         "ensureAuthenticated"
       ],
       "inheritedMiddleware": []
@@ -441,6 +434,7 @@
       ],
       "redirectTargets": [],
       "declaredMiddleware": [
+        "apiLimiter",
         "ensureAuthenticated"
       ],
       "inheritedMiddleware": []
@@ -609,12 +603,15 @@
     {
       "method": "GET",
       "path": "/logout",
-      "kind": "redirect",
-      "pageTargets": [],
-      "redirectTargets": [
-        "/"
+      "kind": "page",
+      "pageTargets": [
+        "public/logout-confirm.html"
       ],
-      "declaredMiddleware": [],
+      "redirectTargets": [],
+      "declaredMiddleware": [
+        "apiLimiter",
+        "ensureAuthenticated"
+      ],
       "inheritedMiddleware": []
     },
     {
@@ -626,8 +623,8 @@
       ],
       "redirectTargets": [],
       "declaredMiddleware": [
-        "ensureAuthenticated",
         "apiLimiter",
+        "ensureAuthenticated",
         "ensureHasOperableServers"
       ],
       "inheritedMiddleware": []
@@ -641,8 +638,8 @@
       ],
       "redirectTargets": [],
       "declaredMiddleware": [
-        "ensureAuthenticated",
-        "apiLimiter"
+        "apiLimiter",
+        "ensureAuthenticated"
       ],
       "inheritedMiddleware": []
     },
@@ -655,8 +652,8 @@
       ],
       "redirectTargets": [],
       "declaredMiddleware": [
-        "ensureAuthenticated",
         "apiLimiter",
+        "ensureAuthenticated",
         "ensureHasServers"
       ],
       "inheritedMiddleware": []
@@ -670,8 +667,8 @@
       ],
       "redirectTargets": [],
       "declaredMiddleware": [
-        "ensureAuthenticated",
         "apiLimiter",
+        "ensureAuthenticated",
         "ensureHasServers"
       ],
       "inheritedMiddleware": []
@@ -685,8 +682,8 @@
         "/dashboard/settings"
       ],
       "declaredMiddleware": [
-        "ensureAuthenticated",
         "apiLimiter",
+        "ensureAuthenticated",
         "ensureHasServers"
       ],
       "inheritedMiddleware": []
@@ -700,6 +697,7 @@
       ],
       "redirectTargets": [],
       "declaredMiddleware": [
+        "apiLimiter",
         "ensureAuthenticated"
       ],
       "inheritedMiddleware": []
@@ -713,6 +711,7 @@
       ],
       "redirectTargets": [],
       "declaredMiddleware": [
+        "apiLimiter",
         "ensureAuthenticated"
       ],
       "inheritedMiddleware": []
@@ -726,8 +725,8 @@
       ],
       "redirectTargets": [],
       "declaredMiddleware": [
-        "ensureAuthenticated",
-        "apiLimiter"
+        "apiLimiter",
+        "ensureAuthenticated"
       ],
       "inheritedMiddleware": []
     },
@@ -740,8 +739,8 @@
       ],
       "redirectTargets": [],
       "declaredMiddleware": [
-        "ensureAuthenticated",
-        "apiLimiter"
+        "apiLimiter",
+        "ensureAuthenticated"
       ],
       "inheritedMiddleware": []
     },
@@ -754,8 +753,8 @@
       ],
       "redirectTargets": [],
       "declaredMiddleware": [
-        "ensureAuthenticated",
-        "apiLimiter"
+        "apiLimiter",
+        "ensureAuthenticated"
       ],
       "inheritedMiddleware": []
     },
@@ -1180,6 +1179,15 @@
       "routes": [],
       "scripts": [
         "/js/instance-config.js"
+      ]
+    },
+    {
+      "file": "public/logout-confirm.html",
+      "routes": [
+        "/logout"
+      ],
+      "scripts": [
+        "/js/logout-confirm.js"
       ]
     },
     {
