@@ -259,6 +259,35 @@ async function testDiscordWebhookHostIsValidatedAtTheRequestSink() {
   }
 }
 
+async function testDiscordChannelIdsAreValidatedAtTheRequestSink() {
+  const originalFetch = global.fetch;
+  const originalBotToken = process.env.DISCORD_BOT_TOKEN;
+  const calls = [];
+  global.fetch = async (url, options = {}) => {
+    calls.push({ url: String(url), redirect: options.redirect });
+    return { ok: true };
+  };
+  process.env.DISCORD_BOT_TOKEN = 'non-secret-test-token';
+
+  try {
+    const { postViaBot } = require('../utils/discordPoster');
+    const rejected = await postViaBot('123/../../webhooks/456/token', 'test message');
+    assert.strictEqual(rejected, false, 'a malformed Discord channel ID must be rejected');
+    assert.deepStrictEqual(calls, [], 'an invalid channel ID must not reach fetch');
+
+    const accepted = await postViaBot('900000000000000099', 'test message');
+    assert.strictEqual(accepted, true, 'a canonical Discord channel ID should be accepted');
+    assert.deepStrictEqual(calls, [{
+      url: 'https://discord.com/api/v10/channels/900000000000000099/messages',
+      redirect: 'error',
+    }]);
+  } finally {
+    global.fetch = originalFetch;
+    if (originalBotToken === undefined) delete process.env.DISCORD_BOT_TOKEN;
+    else process.env.DISCORD_BOT_TOKEN = originalBotToken;
+  }
+}
+
 async function main() {
   testStorageIdentifiersCannotEscapeAuthorizedRoots();
   testBrowserRenderingKeepsUntrustedTextOutOfHtmlSinks();
@@ -267,6 +296,7 @@ async function main() {
   await testLootParserRejectsDeclaredPathTraversal();
   await testMissionFileReadsStayAnchoredToTheMatchedLegacyRoot();
   await testDiscordWebhookHostIsValidatedAtTheRequestSink();
+  await testDiscordChannelIdsAreValidatedAtTheRequestSink();
   console.log('Code-scanning regression tests passed');
 }
 

@@ -31,6 +31,10 @@ function normalizeDiscordWebhookUrl(value) {
   return normalized.toString();
 }
 
+function isValidDiscordChannelId(value) {
+  return typeof value === 'string' && /^\d{1,20}$/.test(value);
+}
+
 async function fetchDiscord(url, options = {}, timeoutMs = DEFAULT_DISCORD_TIMEOUT_MS) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(new Error('Discord request timed out')), timeoutMs);
@@ -72,6 +76,7 @@ async function validateDiscordDestination(discordGuildId, channelId, webhookUrl)
   if (!expectedGuildId || (!channelId && !webhookUrl)) return false;
 
   if (channelId) {
+    if (!isValidDiscordChannelId(channelId)) return false;
     const botToken = process.env.DISCORD_BOT_TOKEN;
     if (!botToken) return false;
     const response = await fetchDiscord(`https://discord.com/api/v10/channels/${channelId}`, {
@@ -159,6 +164,11 @@ async function postViaWebhook(webhookUrl, content, isEmbed = false, timeoutMs = 
  */
 async function postViaBot(channelId, content, isEmbed = false) {
   try {
+    if (!isValidDiscordChannelId(channelId)) {
+      console.error('❌ Refusing to post: invalid Discord channel ID');
+      return false;
+    }
+
     const botToken = process.env.DISCORD_BOT_TOKEN;
 
     if (!botToken) {
