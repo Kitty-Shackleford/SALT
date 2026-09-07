@@ -9,9 +9,15 @@ const { execFileSync, spawnSync } = require('child_process');
 const root = path.resolve(__dirname, '..');
 const merrySource = path.join(root, 'scripts', 'merry-changelog.js');
 const dopeySource = path.join(root, 'scripts', 'dopey-smoke.js');
+const merryWorkflow = path.join(root, '.github', 'workflows', 'merry.yml');
 
 assert.ok(fs.existsSync(merrySource), 'Merry workflow helper must exist');
 assert.ok(fs.existsSync(dopeySource), 'Dopey workflow helper must exist');
+const merryWorkflowText = fs.readFileSync(merryWorkflow, 'utf8');
+assert.match(merryWorkflowText, /contents:\s*read/, 'public Merry workflow must be read-only');
+assert.match(merryWorkflowText, /actions\/upload-artifact@v4/, 'public Merry workflow must publish its generated changelog as an artifact');
+assert.ok(!merryWorkflowText.includes('git-auto-commit-action'),
+  'public Merry workflow must not create unsigned commits on protected main');
 
 for (const script of [merrySource, dopeySource]) {
   execFileSync(process.execPath, ['--check', script], { stdio: 'pipe' });
