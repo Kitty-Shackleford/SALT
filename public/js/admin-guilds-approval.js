@@ -3,6 +3,8 @@
 let currentTab = 'pending';
 let guilds = [];
 let pendingAction = null;
+let guildLoadGeneration = 0;
+let guildActionGeneration = 0;
 
 function esc(value) {
   return String(value ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;')
@@ -64,26 +66,29 @@ function switchTab(tab) {
   loadGuilds();
 }
 
-function loadGuilds() {
-  const endpoint = currentTab === 'pending' ? '/api/admin/guilds/pending' : '/api/admin/guilds';
+async function loadGuilds() {
+  const tab = currentTab;
+  const generation = ++guildLoadGeneration;
+  const endpoint = tab === 'pending' ? '/api/admin/guilds/pending' : '/api/admin/guilds';
 
-  fetch(endpoint)
-    .then(res => res.json())
-    .then(data => {
-      if (data.success) {
-        guilds = data.guilds.filter(g => {
-          if (currentTab === 'pending') return true;
-          if (currentTab === 'approved') return g.status === 'approved';
-          if (currentTab === 'disabled') return g.status === 'disabled';
-        });
-        displayGuilds();
-      }
-    })
-    .catch(err => {
-      console.error('Error loading guilds:', err);
-      document.getElementById('guilds-container').innerHTML =
-        '<p class="text-red-400 text-center py-4">Failed to load guilds</p>';
+  try {
+    const response = await fetch(endpoint);
+    if (generation !== guildLoadGeneration || tab !== currentTab) return;
+    const data = await response.json();
+    if (generation !== guildLoadGeneration || tab !== currentTab) return;
+    if (!data.success) throw new Error(data.error || 'Failed to load guilds');
+    guilds = data.guilds.filter(guild => {
+      if (tab === 'pending') return true;
+      if (tab === 'approved') return guild.status === 'approved';
+      return guild.status === 'disabled';
     });
+    displayGuilds();
+  } catch (error) {
+    if (generation !== guildLoadGeneration || tab !== currentTab) return;
+    console.error('Error loading guilds:', error);
+    document.getElementById('guilds-container').innerHTML =
+      '<p class="text-red-400 text-center py-4">Failed to load guilds</p>';
+  }
 }
 
 function displayGuilds() {
@@ -110,7 +115,7 @@ function renderGuildCard(guild) {
   const guildId = esc(guild.guild_id);
   const guildName = esc(guild.guildName || 'Unknown Guild');
   const statusBadge = {
-    pending: '<span class="bg-yellow-600 px-3 py-1 rounded text-sm">⏳ Pending</span>',
+    pending: '<span class="bg-yellow-600 px-3 py-1 rounded text-sm">⚠️ Setup incomplete</span>',
     approved: '<span class="bg-green-600 px-3 py-1 rounded text-sm">✅ Approved</span>',
     disabled: '<span class="bg-red-600 px-3 py-1 rounded text-sm">🚫 Disabled</span>'
   }[guild.status];
@@ -118,10 +123,7 @@ function renderGuildCard(guild) {
   let actions = '';
   if (guild.status === 'pending') {
     actions = `
-      <button data-action="approve" data-guild-id="${guildId}"
-              class="bg-green-600 hover:bg-green-700 px-4 py-2 rounded">
-        ✅ Approve
-      </button>
+      <span class="text-sm text-yellow-300 self-center">Awaiting /register-token</span>
       <button data-action="deny" data-guild-id="${guildId}"
               class="bg-red-600 hover:bg-red-700 px-4 py-2 rounded">
         ❌ Deny
@@ -194,13 +196,6 @@ function showConfirmModal(action, guild) {
 
   const guildName = esc(guild.guildName || 'Unknown Guild');
   const configs = {
-    approve: {
-      title: 'Approve Guild',
-      message: `Approve <strong>${guildName}</strong>? They will be able to use all features.`,
-      showReason: false,
-      btnClass: 'bg-green-600 hover:bg-green-700',
-      btnText: '✅ Approve'
-    },
     deny: {
       title: 'Deny Guild Request',
       message: `Deny <strong>${guildName}</strong>? This will remove their registration.`,
@@ -233,10 +228,12 @@ function showConfirmModal(action, guild) {
   confirmBtn.textContent = config.btnText;
 
   pendingAction = { action, guildId: guild.guild_id };
+  guildActionGeneration++;
   modal.classList.remove('hidden');
 }
 
 function closeModal() {
+  guildActionGeneration++;
   document.getElementById('confirmModal').classList.add('hidden');
   document.getElementById('actionReason').value = '';
   pendingAction = null;
@@ -245,7 +242,10 @@ function closeModal() {
 async function executeAction() {
   if (!pendingAction) return;
 
+  const generation = guildActionGeneration;
   const { action, guildId } = pendingAction;
+  const isCurrent = () => generation === guildActionGeneration &&
+    pendingAction?.action === action && String(pendingAction?.guildId) === String(guildId);
   const reason = document.getElementById('actionReason').value;
 
   const endpoint = `/api/admin/guilds/${guildId}/${action}`;
@@ -255,8 +255,10 @@ async function executeAction() {
       method: 'POST',
       body: JSON.stringify({ reason })
     });
+    if (!isCurrent()) return;
 
     const data = await response.json();
+    if (!isCurrent()) return;
 
     if (data.success) {
       closeModal();
@@ -271,6 +273,7 @@ async function executeAction() {
       alert('❌ Error: ' + (data.error || 'Unknown error'));
     }
   } catch (err) {
+    if (!isCurrent()) return;
     console.error('Error executing action:', err);
     alert('❌ Failed to execute action');
   }

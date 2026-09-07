@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const { ensureAdmin } = require('../middleware/auth');
-const { validateGuildId } = require('../middleware/validators');
+const { validateGuildId, validateGuildIdParam } = require('../middleware/validators');
 
 const { logAction } = require('../utils/audit');
 
@@ -202,7 +202,7 @@ router.post('/guilds', validateGuildId, ensureAdmin, async (req, res) => {
  * DELETE /api/admin/guilds/:guildId
  * Remove a Discord guild from the approved list
  */
-router.delete('/guilds/:guildId', validateGuildId, ensureAdmin, async (req, res) => {
+router.delete('/guilds/:guildId', validateGuildIdParam, ensureAdmin, async (req, res) => {
   const { guildId } = req.params;
   const db = req.app.locals.db;
 
@@ -231,6 +231,11 @@ router.delete('/guilds/:guildId', validateGuildId, ensureAdmin, async (req, res)
         "UPDATE servers SET status = 'inactive' WHERE guild_id = ? AND status = 'active'",
         [guild.id]
       );
+      await logAction(transactionDb, req.user.id, 'REMOVE_GUILD', 'guild', guild.id, {
+        guildName: guild.name,
+        discordGuildId: guildId,
+        serversAffected: serverCount
+      });
       return true;
     });
     if (!deactivated) {
@@ -238,10 +243,6 @@ router.delete('/guilds/:guildId', validateGuildId, ensureAdmin, async (req, res)
     }
 
     console.log(`✅ Guild ${guildId} (${guild.name}) deactivated by ${req.user.username}`);
-    await logAction(db, req.user.id, 'REMOVE_GUILD', 'guild', guildId, {
-      guildName: guild.name,
-      serversAffected: serverCount
-    });
 
     res.json({
       success: true,
@@ -542,37 +543,12 @@ router.get('/guilds/pending', ensureAdmin, async (req, res) => {
 
 /**
  * POST /api/admin/guilds/:guildId/approve
- * Approve a pending guild
+ * Manual approval is unsafe: verified /register-token setup activates the guild atomically.
  */
-router.post('/guilds/:guildId/approve', ensureAdmin, async (req, res) => {
-  const { guildId } = req.params;
-  const db = req.app.locals.db;
-  const adminId = req.user.id;
-
-  try {
-    const guild = await db.get('SELECT * FROM guilds WHERE discord_guild_id = ?', [guildId]);
-    if (!guild) return res.status(404).json({ error: 'Guild not found' });
-    if (guild.status === 'approved') return res.status(400).json({ error: 'Guild is already approved' });
-    if (guild.status === 'disabled') return res.status(400).json({ error: 'Guild is disabled. Re-enable it first.' });
-
-    const updateResult = await db.run(
-      `UPDATE guilds
-       SET status = 'approved',
-           approved_at = CURRENT_TIMESTAMP,
-           approved_by = ?
-       WHERE discord_guild_id = ? AND status = 'pending'`,
-      [adminId, guildId]
-    );
-    if (!updateResult.changes) return res.status(409).json({ error: 'Guild status changed; refresh and try again' });
-
-    console.log(`✅ Guild ${guild.name} approved by admin ${req.user.username}`);
-    await logAction(db, adminId, 'APPROVE_GUILD', 'guild', guildId, { guildName: guild.name });
-
-    res.json({ success: true, message: 'Guild approved successfully' });
-  } catch (err) {
-    console.error('❌ Database error:', err);
-    res.status(500).json({ error: 'Database error' });
-  }
+router.post('/guilds/:guildId/approve', ensureAdmin, async (_req, res) => {
+  return res.status(410).json({
+    error: 'Manual approval is disabled. The Discord guild owner or an Administrator must complete /register-token.'
+  });
 });
 
 /**
@@ -594,7 +570,9 @@ router.post('/guilds/:guildId/disable', ensureAdmin, async (req, res) => {
         'SELECT * FROM guilds WHERE discord_guild_id = ? FOR UPDATE', [guildId]
       );
       if (!guild) return { status: 404, error: 'Guild not found' };
-      if (guild.status === 'disabled') return { status: 400, error: 'Guild is already disabled' };
+      if (guild.status !== 'approved') {
+        return { status: 400, error: 'Only approved guilds can be disabled; deny incomplete setup instead' };
+      }
 
       const activeBounty = await transactionDb.get(
         `SELECT b.id FROM bounties b
@@ -622,8 +600,10 @@ router.post('/guilds/:guildId/disable', ensureAdmin, async (req, res) => {
         [adminId, reason || 'No reason provided', guildId]
       );
       if (!updateResult.changes) return { status: 409, error: 'Guild status changed; refresh and try again' };
-      await logAction(transactionDb, adminId, 'DISABLE_GUILD', 'guild', guildId, {
-        guildName: guild.name, reason: reason || 'No reason provided'
+      await logAction(transactionDb, adminId, 'DISABLE_GUILD', 'guild', guild.id, {
+        guildName: guild.name,
+        discordGuildId: guildId,
+        reason: reason || 'No reason provided'
       });
       return { guild };
     });
@@ -652,6 +632,11 @@ router.post('/guilds/:guildId/enable', ensureAdmin, async (req, res) => {
     const guild = await db.get('SELECT * FROM guilds WHERE discord_guild_id = ?', [guildId]);
     if (!guild) return res.status(404).json({ error: 'Guild not found' });
     if (guild.status !== 'disabled') return res.status(400).json({ error: 'Guild is not disabled' });
+    if (!guild.approved_at) {
+      return res.status(409).json({
+        error: 'This guild never completed verified activation. Run /register-token instead.'
+      });
+    }
 
     const updateResult = await db.run(
       `UPDATE guilds
@@ -661,13 +646,16 @@ router.post('/guilds/:guildId/enable', ensureAdmin, async (req, res) => {
            disabled_at = NULL,
            disabled_by = NULL,
            disabled_reason = NULL
-       WHERE discord_guild_id = ? AND status = 'disabled'`,
+       WHERE discord_guild_id = ? AND status = 'disabled' AND approved_at IS NOT NULL`,
       [adminId, guildId]
     );
     if (!updateResult.changes) return res.status(409).json({ error: 'Guild status changed; refresh and try again' });
 
     console.log(`✅ Guild ${guild.name} re-enabled by admin ${req.user.username}`);
-    await logAction(db, adminId, 'ENABLE_GUILD', 'guild', guildId, { guildName: guild.name });
+    await logAction(db, adminId, 'ENABLE_GUILD', 'guild', guild.id, {
+      guildName: guild.name,
+      discordGuildId: guildId
+    });
 
     res.json({ success: true, message: 'Guild enabled successfully' });
   } catch (err) {
@@ -703,8 +691,9 @@ router.post('/guilds/:guildId/deny', ensureAdmin, async (req, res) => {
 
     console.log(`❌ Guild ${guild.name} denied by admin ${req.user.username}`);
     console.log(`   Reason: ${reason || 'No reason provided'}`);
-    await logAction(db, req.user.id, 'DENY_GUILD', 'guild', guildId, {
+    await logAction(db, req.user.id, 'DENY_GUILD', 'guild', guild.id, {
       guildName: guild.name,
+      discordGuildId: guildId,
       reason: reason || 'No reason provided'
     });
 

@@ -22,6 +22,17 @@ const validateGuildId = [
   handleValidationErrors
 ];
 
+// URL guild IDs must be validated independently of body/query values.
+// Do not trim or coerce the identifier before the route uses it.
+const validateGuildIdParam = [
+  param('guildId')
+    .isLength({ min: 17, max: 19 })
+    .withMessage('Invalid guild ID')
+    .not().matches(/[^0-9]/)
+    .withMessage('Invalid guild ID'),
+  handleValidationErrors
+];
+
 // Server ID validation
 const validateServerId = [
   param('serverId')
@@ -82,6 +93,7 @@ const validateSort = [
 
 module.exports = {
   validateGuildId,
+  validateGuildIdParam,
   validateServerId,
   validateGameAccountId,
   validateToken,

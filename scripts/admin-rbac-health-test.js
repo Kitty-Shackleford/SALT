@@ -334,7 +334,8 @@ function testRequiredSecurityContractsExist() {
   'role mutations must lock/re-check platform, guild, and server authority at operation time');
   assert((roleRoute.match(/lockScope: true/g) || []).length >= 3 &&
     roleRoute.includes('FOR UPDATE OF s, g') &&
-    roleRoute.includes("status IN ('pending', 'approved')${lockClause}"),
+    roleRoute.includes("status = 'approved'${lockClause}") &&
+    !roleRoute.includes("status IN ('pending', 'approved')"),
   'role mutations must lock/re-check exact guild/server lifecycle state at operation time');
 
   for (const fragment of [
@@ -442,7 +443,8 @@ function testAdminFrontendContracts() {
   assert(users.includes('availableGrants'), 'Admin users page does not filter role choices server-side');
   assert(users.includes('Remove Role'), 'Admin users page lacks role-removal UX');
   assert(users.includes('transfer-owner'), 'Admin users page lacks explicit guild ownership transfer UX');
-  assert(users.includes('targetUserId: selectedUser.id'), 'ownership transfer UI payload does not match the API');
+  assert(users.includes('targetUserId: userId') && users.includes('selectionIsCurrent(generation, userId)'),
+    'ownership transfer UI must use captured target identity and suppress stale continuations');
   assert(users.includes("roleContext.actor?.platformRole === 'dashboard_owner'") && users.includes('kick-user-btn'),
     'Admin users page must expose account removal only to the Dashboard Owner');
   assert(users.includes("method: 'DELETE'") && users.includes('/api/roles/users/'),

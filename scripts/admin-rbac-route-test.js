@@ -8,6 +8,7 @@ const roleRoutes = require('../routes/roleManagement');
 const accessRoutes = require('../routes/access');
 const healthRoutes = require('../routes/health');
 const { ensureAuthenticated } = require('../middleware/auth');
+const { resolveActorAuthority } = require('../services/roleManagementService');
 
 function request(app, method, path, body) {
   return new Promise((resolve, reject) => {
@@ -632,11 +633,166 @@ async function testHealthIdor() {
   assert.equal(refresh.status, 404, 'unauthorized server health refresh must not reveal resource existence');
 }
 
+async function testUserListingClassification() {
+  const calls = [];
+  const db = {
+    async query(sql, params) {
+      calls.push({ sql, params });
+      return [];
+    },
+  };
+  const user = { id: 1, platform_role: 'dashboard_owner', is_admin: 1 };
+  const authorized = await request(appFor(roleRoutes, user, db), 'GET', '/api/users');
+  assert.equal(authorized.status, 200);
+  assert.equal(calls[0].params[3], 'authorized', 'authorized accounts must be the server-side default');
+  assert.match(calls[0].sql, /JOIN guilds own_g[^]*own_g\.status = 'approved'/,
+    'guild roles count as access only while their guild is approved');
+  assert.match(calls[0].sql, /JOIN servers own_s[^]*own_s\.status = 'active'/,
+    'server assignments count as access only while their server is active');
+  assert.match(calls[0].sql, /JOIN guilds actor_g[^]*actor_g\.status = 'approved'/,
+    'scoped guild actors must belong to an approved guild');
+  assert.match(calls[0].sql, /JOIN servers actor_s[^]*actor_s\.status = 'active'/,
+    'scoped server actors must administer an active server');
+
+  const invalid = await request(appFor(roleRoutes, user, db), 'GET', '/api/users?status=unknown');
+  assert.equal(invalid.status, 400);
+  assert.equal(calls.length, 1, 'invalid filters must not query the database');
+
+  const scopedDb = {
+    async query(sql) {
+      assert.match(sql, /JOIN guilds actor_g[^]*actor_g\.status = 'approved'/,
+        'guild-scoped discovery must require an approved actor guild');
+      assert.match(sql, /server_role_assignments target_sra[^]*JOIN servers target_s[^]*target_s\.status = 'active'/,
+        'guild-scoped discovery must include targets with active server roles');
+      assert.match(sql, /server_player_memberships target_spm[^]*JOIN servers target_ps[^]*target_ps\.status = 'active'/,
+        'guild-scoped discovery must include targets with active player memberships');
+      return [{ id: 2, username: 'Server-only member', hasAccess: true }];
+    },
+  };
+  const scoped = await request(
+    appFor(roleRoutes, { id: 1, platform_role: null, is_admin: 0 }, scopedDb),
+    'GET', '/api/users?status=authorized'
+  );
+  assert.equal(scoped.status, 200);
+  assert.equal(scoped.body.users[0].username, 'Server-only member',
+    'guild operators must discover users authorized only through active server membership');
+}
+
+async function testUserDetailLifecycleGuards() {
+  let sharedScopeChecked = false;
+  const inactiveDb = {
+    async get(sql) {
+      if (sql.startsWith('SELECT id, discord_id')) {
+        return { id: 2, discord_id: '900000000000000002', username: 'target' };
+      }
+      sharedScopeChecked = true;
+      assert.match(sql, /JOIN guilds actor_g[^]*actor_g\.status = 'approved'/,
+        'direct detail visibility must reject guild actors from inactive tenants');
+      assert.match(sql, /JOIN servers actor_s[^]*actor_s\.status = 'active'/,
+        'direct detail visibility must reject server actors from inactive servers');
+      assert.match(sql, /JOIN guilds actor_sg[^]*actor_sg\.status = 'approved'/,
+        'direct detail visibility must reject server actors from inactive tenants');
+      assert.match(sql, /JOIN servers target_s[^]*target_s\.status = 'active'/,
+        'direct detail visibility must reject targets related only through inactive server roles');
+      assert.match(sql, /JOIN servers target_ps[^]*target_ps\.status = 'active'/,
+        'direct detail visibility must reject targets related only through inactive player memberships');
+      return null;
+    },
+    async query() {
+      throw new Error('assignments must not load after lifecycle authority denial');
+    },
+  };
+  const scopedUser = { id: 1, platform_role: null, is_admin: 0 };
+  const denied = await request(appFor(roleRoutes, scopedUser, inactiveDb), 'GET', '/api/users/2');
+  assert.equal(denied.status, 404, 'inactive scoped authority must not access user details directly');
+  assert.equal(sharedScopeChecked, true);
+
+  const globalDb = {
+    async get() {
+      return { id: 2, discord_id: '900000000000000002', username: 'target' };
+    },
+    async query(sql) {
+      assert.match(sql, /JOIN guilds g ON g\.id = gr\.guild_id AND g\.status = 'approved'/,
+        'guild assignments must be limited to approved guilds');
+      assert.match(sql, /JOIN servers s ON[^]*s\.status = 'active'/,
+        'server and player assignments must be limited to active servers');
+      assert.match(sql, /JOIN guilds g ON g\.id = (?:sra|spm)\.guild_id AND g\.status = 'approved'/,
+        'server-backed assignments must be limited to approved guilds');
+      return [];
+    },
+  };
+  const globalUser = { id: 1, platform_role: 'dashboard_owner', is_admin: 1 };
+  const allowed = await request(appFor(roleRoutes, globalUser, globalDb), 'GET', '/api/users/2');
+  assert.equal(allowed.status, 200);
+}
+
+async function testPendingGuildCannotAuthorizeRoleManagement() {
+  let mutated = false;
+  let scopeQueryChecked = false;
+  const db = {
+    async query(sql) {
+      scopeQueryChecked = true;
+      assert.match(sql, /WHERE g\.status = 'approved'/,
+        'role context must not advertise pending guilds');
+      return [];
+    },
+    async transaction(callback) {
+      return callback({
+        async get(sql, params) {
+          if (sql.includes('pg_advisory_xact_lock')) return {};
+          if (sql.includes('FROM guilds')) {
+            assert.match(sql, /status = 'approved'/,
+              'role mutation scope must not resolve pending guilds');
+            return null;
+          }
+          if (sql.includes('FROM users') && sql.includes('FOR UPDATE')) {
+            return { id: Number(params[0]), platform_role: 'dashboard_owner', is_admin: 1 };
+          }
+          return null;
+        },
+        async run() {
+          mutated = true;
+          return { changes: 1 };
+        },
+      });
+    },
+  };
+  const actor = { id: 1, platform_role: 'dashboard_owner', is_admin: 1 };
+  const context = await request(appFor(roleRoutes, actor, db), 'GET', '/api/context');
+  assert.equal(context.status, 200);
+  assert.equal(scopeQueryChecked, true);
+  assert.deepStrictEqual(context.body.scopes, []);
+
+  const grant = await request(
+    appFor(roleRoutes, actor, db), 'POST', '/api/users/2', { role: 'guild_admin', guildId: 20 }
+  );
+  assert.equal(grant.status, 404, 'pending guild scope must fail closed before role mutation');
+  assert.equal(mutated, false, 'pending guild must not authorize role writes');
+
+  const serviceCalls = [];
+  const authority = await resolveActorAuthority({
+    async get(sql, params) {
+      serviceCalls.push(sql);
+      if (sql.includes('FROM guilds g')) {
+        assert.match(sql, /g\.status = 'approved'/,
+          'authority resolution must not load pending guild roles');
+        return null;
+      }
+      return { id: Number(params[0]), platform_role: null, is_admin: 0 };
+    },
+  }, { id: 1, platform_role: null, is_admin: 0 }, { guildId: 20 });
+  assert.equal(authority.guildId, undefined);
+  assert.equal(serviceCalls.length, 1, 'pending guild authority must stop before loading guild role evidence');
+}
+
 async function main() {
   await testRoleIdorAndEscalation();
   await testDashboardOwnerUserKick();
   await testAccessRoleMutationRechecksAuthority();
   await testHealthIdor();
+  await testUserListingClassification();
+  await testUserDetailLifecycleGuards();
+  await testPendingGuildCannotAuthorizeRoleManagement();
   console.log('✅ Admin role and health route IDOR tests passed');
 }
 

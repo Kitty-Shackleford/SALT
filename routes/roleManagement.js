@@ -34,7 +34,7 @@ async function resolveScope(db, body, options = {}) {
     const server = await db.get(
       `SELECT s.id, s.guild_id, s.name, g.discord_guild_id, g.name AS guild_name
          FROM servers s JOIN guilds g ON g.id = s.guild_id
-        WHERE s.id = ? AND s.status = 'active' AND g.status IN ('pending', 'approved')${lockClause ? ' FOR UPDATE OF s, g' : ''}`,
+        WHERE s.id = ? AND s.status = 'active' AND g.status = 'approved'${lockClause ? ' FOR UPDATE OF s, g' : ''}`,
       [serverId]
     );
     if (!server) return null;
@@ -46,7 +46,7 @@ async function resolveScope(db, body, options = {}) {
   const guild = await db.get(
     `SELECT id, discord_guild_id, name FROM guilds
       WHERE (CAST(id AS TEXT) = ? OR discord_guild_id = ?)
-        AND status IN ('pending', 'approved')${lockClause}`,
+        AND status = 'approved'${lockClause}`,
     [requestedGuildId, requestedGuildId]
   );
   return guild ? { guildId: guild.id, guild } : null;
@@ -129,7 +129,7 @@ router.get('/context', async (req, res) => {
          LEFT JOIN server_role_assignments sra
            ON sra.server_id = s.id AND sra.guild_id = g.id
           AND sra.user_id = ? AND sra.status = 'active'
-        WHERE g.status IN ('pending', 'approved')
+        WHERE g.status = 'approved'
           AND (? = 1 OR gr.role IN ('owner', 'admin') OR sra.role = 'admin')
         ORDER BY g.name, s.name`,
       [req.user.id, req.user.id, global ? 1 : 0]
@@ -161,22 +161,67 @@ router.get('/context', async (req, res) => {
 router.get('/users', async (req, res) => {
   const db = req.app.locals.db;
   const search = String(req.query.search || '').trim().toLowerCase();
+  const status = String(req.query.status || 'authorized').toLowerCase();
+  if (!['authorized', 'unassigned', 'all'].includes(status)) {
+    return res.status(400).json({ error: 'Invalid user status filter' });
+  }
   const global = Boolean(req.user.platform_role || req.user.is_admin);
   try {
     const users = await db.query(
-      `SELECT DISTINCT u.id, u.discord_id, u.username, u.avatar, u.platform_role, u.is_admin
-         FROM users u
+      `WITH classified_users AS (
+         SELECT u.id, u.discord_id, u.username, u.avatar, u.platform_role, u.is_admin,
+                (u.platform_role IS NOT NULL OR u.is_admin = 1
+                 OR EXISTS (SELECT 1 FROM guild_roles own_gr
+                             JOIN guilds own_g ON own_g.id = own_gr.guild_id
+                            WHERE own_gr.user_id = u.id AND own_g.status = 'approved')
+                 OR EXISTS (SELECT 1 FROM server_role_assignments own_sra
+                             JOIN servers own_s ON own_s.id = own_sra.server_id
+                                                       AND own_s.guild_id = own_sra.guild_id
+                             JOIN guilds own_sg ON own_sg.id = own_sra.guild_id
+                            WHERE own_sra.user_id = u.id AND own_sra.status = 'active'
+                              AND own_s.status = 'active' AND own_sg.status = 'approved')
+                 OR EXISTS (SELECT 1 FROM server_player_memberships own_spm
+                             JOIN servers own_ps ON own_ps.id = own_spm.server_id
+                                                        AND own_ps.guild_id = own_spm.guild_id
+                             JOIN guilds own_pg ON own_pg.id = own_spm.guild_id
+                            WHERE own_spm.user_id = u.id AND own_spm.status = 'active'
+                              AND own_ps.status = 'active' AND own_pg.status = 'approved')) AS has_access
+           FROM users u
+       )
+       SELECT DISTINCT u.id, u.discord_id, u.username, u.avatar, u.platform_role, u.is_admin,
+              u.has_access AS "hasAccess"
+         FROM classified_users u
         WHERE ($1 = '' OR LOWER(COALESCE(u.username, '')) LIKE '%' || $1 || '%' OR u.discord_id = $1)
+          AND ($4 = 'all' OR ($4 = 'authorized' AND u.has_access) OR ($4 = 'unassigned' AND NOT u.has_access))
           AND (
             $3 = 1
             OR EXISTS (
               SELECT 1 FROM guild_roles actor_gr
-              JOIN guild_roles target_gr ON target_gr.guild_id = actor_gr.guild_id
+              JOIN guilds actor_g ON actor_g.id = actor_gr.guild_id AND actor_g.status = 'approved'
               WHERE actor_gr.user_id = $2 AND actor_gr.role IN ('owner', 'admin')
-                AND target_gr.user_id = u.id
+                AND (
+                  EXISTS (SELECT 1 FROM guild_roles target_gr
+                           WHERE target_gr.guild_id = actor_gr.guild_id AND target_gr.user_id = u.id)
+                  OR EXISTS (SELECT 1 FROM server_role_assignments target_sra
+                             JOIN servers target_s ON target_s.id = target_sra.server_id
+                                                        AND target_s.guild_id = target_sra.guild_id
+                                                        AND target_s.status = 'active'
+                            WHERE target_sra.guild_id = actor_gr.guild_id
+                              AND target_sra.user_id = u.id AND target_sra.status = 'active')
+                  OR EXISTS (SELECT 1 FROM server_player_memberships target_spm
+                             JOIN servers target_ps ON target_ps.id = target_spm.server_id
+                                                         AND target_ps.guild_id = target_spm.guild_id
+                                                         AND target_ps.status = 'active'
+                            WHERE target_spm.guild_id = actor_gr.guild_id
+                              AND target_spm.user_id = u.id AND target_spm.status = 'active')
+                )
             )
             OR EXISTS (
               SELECT 1 FROM server_role_assignments actor_sra
+              JOIN servers actor_s ON actor_s.id = actor_sra.server_id
+                                          AND actor_s.guild_id = actor_sra.guild_id
+                                          AND actor_s.status = 'active'
+              JOIN guilds actor_sg ON actor_sg.id = actor_sra.guild_id AND actor_sg.status = 'approved'
               WHERE actor_sra.user_id = $2 AND actor_sra.role = 'admin' AND actor_sra.status = 'active'
                 AND (
                   EXISTS (SELECT 1 FROM server_role_assignments target_sra
@@ -188,7 +233,7 @@ router.get('/users', async (req, res) => {
           )
         ORDER BY u.username ASC
         LIMIT 100`,
-      [search, req.user.id, global ? 1 : 0]
+      [search, req.user.id, global ? 1 : 0, status]
     );
     return res.json({ users });
   } catch (error) {
@@ -211,15 +256,24 @@ router.get('/users/:userId', async (req, res) => {
         WHERE target.id = ? AND (
           EXISTS (
             SELECT 1 FROM guild_roles actor_gr
+            JOIN guilds actor_g ON actor_g.id = actor_gr.guild_id AND actor_g.status = 'approved'
             WHERE actor_gr.user_id = ? AND actor_gr.role IN ('owner', 'admin')
               AND (
                 EXISTS (SELECT 1 FROM guild_roles target_gr WHERE target_gr.guild_id = actor_gr.guild_id AND target_gr.user_id = target.id)
-                OR EXISTS (SELECT 1 FROM server_role_assignments target_sra WHERE target_sra.guild_id = actor_gr.guild_id AND target_sra.user_id = target.id AND target_sra.status = 'active')
-                OR EXISTS (SELECT 1 FROM server_player_memberships target_spm WHERE target_spm.guild_id = actor_gr.guild_id AND target_spm.user_id = target.id AND target_spm.status = 'active')
+                OR EXISTS (SELECT 1 FROM server_role_assignments target_sra
+                           JOIN servers target_s ON target_s.id = target_sra.server_id AND target_s.guild_id = target_sra.guild_id AND target_s.status = 'active'
+                           JOIN guilds target_sg ON target_sg.id = target_sra.guild_id AND target_sg.status = 'approved'
+                          WHERE target_sra.guild_id = actor_gr.guild_id AND target_sra.user_id = target.id AND target_sra.status = 'active')
+                OR EXISTS (SELECT 1 FROM server_player_memberships target_spm
+                           JOIN servers target_ps ON target_ps.id = target_spm.server_id AND target_ps.guild_id = target_spm.guild_id AND target_ps.status = 'active'
+                           JOIN guilds target_pg ON target_pg.id = target_spm.guild_id AND target_pg.status = 'approved'
+                          WHERE target_spm.guild_id = actor_gr.guild_id AND target_spm.user_id = target.id AND target_spm.status = 'active')
               )
           )
           OR EXISTS (
             SELECT 1 FROM server_role_assignments actor_sra
+            JOIN servers actor_s ON actor_s.id = actor_sra.server_id AND actor_s.guild_id = actor_sra.guild_id AND actor_s.status = 'active'
+            JOIN guilds actor_sg ON actor_sg.id = actor_sra.guild_id AND actor_sg.status = 'approved'
             WHERE actor_sra.user_id = ? AND actor_sra.role = 'admin' AND actor_sra.status = 'active'
               AND (
                 EXISTS (SELECT 1 FROM server_role_assignments target_sra WHERE target_sra.server_id = actor_sra.server_id AND target_sra.user_id = target.id AND target_sra.status = 'active')
@@ -237,29 +291,32 @@ router.get('/users/:userId', async (req, res) => {
               CASE gr.role WHEN 'owner' THEN 'guild_owner' WHEN 'admin' THEN 'guild_admin' ELSE gr.role END AS role,
               gr.assigned_at AS granted_at, assigner.username AS granted_by,
               g.name AS scope_name
-         FROM guild_roles gr JOIN guilds g ON g.id = gr.guild_id
+         FROM guild_roles gr JOIN guilds g ON g.id = gr.guild_id AND g.status = 'approved'
          LEFT JOIN users assigner ON assigner.id = gr.assigned_by
         WHERE gr.user_id = $1 AND ($3 = 1 OR EXISTS (
          SELECT 1 FROM guild_roles actor_gr
+         JOIN guilds actor_g ON actor_g.id = actor_gr.guild_id AND actor_g.status = 'approved'
           WHERE actor_gr.user_id = $2 AND actor_gr.guild_id = gr.guild_id AND actor_gr.role IN ('owner', 'admin')
        ))
        UNION ALL
        SELECT 'server', sra.id, sra.user_id, sra.guild_id, sra.server_id,
               CASE sra.role WHEN 'admin' THEN 'server_admin' ELSE sra.role END,
               sra.created_at, assigner.username, s.name
-         FROM server_role_assignments sra JOIN servers s ON s.id = sra.server_id AND s.guild_id = sra.guild_id
+         FROM server_role_assignments sra JOIN servers s ON s.id = sra.server_id AND s.guild_id = sra.guild_id AND s.status = 'active'
+         JOIN guilds g ON g.id = sra.guild_id AND g.status = 'approved'
          LEFT JOIN users assigner ON assigner.id = sra.assigned_by_user_id
         WHERE sra.user_id = $1 AND sra.status = 'active' AND ($3 = 1
-         OR EXISTS (SELECT 1 FROM guild_roles actor_gr WHERE actor_gr.user_id = $2 AND actor_gr.guild_id = sra.guild_id AND actor_gr.role IN ('owner', 'admin'))
-         OR EXISTS (SELECT 1 FROM server_role_assignments actor_sra WHERE actor_sra.user_id = $2 AND actor_sra.server_id = sra.server_id AND actor_sra.role = 'admin' AND actor_sra.status = 'active'))
+         OR EXISTS (SELECT 1 FROM guild_roles actor_gr JOIN guilds actor_g ON actor_g.id = actor_gr.guild_id AND actor_g.status = 'approved' WHERE actor_gr.user_id = $2 AND actor_gr.guild_id = sra.guild_id AND actor_gr.role IN ('owner', 'admin'))
+         OR EXISTS (SELECT 1 FROM server_role_assignments actor_sra JOIN servers actor_s ON actor_s.id = actor_sra.server_id AND actor_s.guild_id = actor_sra.guild_id AND actor_s.status = 'active' JOIN guilds actor_sg ON actor_sg.id = actor_sra.guild_id AND actor_sg.status = 'approved' WHERE actor_sra.user_id = $2 AND actor_sra.server_id = sra.server_id AND actor_sra.role = 'admin' AND actor_sra.status = 'active'))
        UNION ALL
        SELECT 'player', spm.id, spm.user_id, spm.guild_id, spm.server_id, 'player',
               spm.created_at, verifier.username, s.name
-         FROM server_player_memberships spm JOIN servers s ON s.id = spm.server_id AND s.guild_id = spm.guild_id
+         FROM server_player_memberships spm JOIN servers s ON s.id = spm.server_id AND s.guild_id = spm.guild_id AND s.status = 'active'
+         JOIN guilds g ON g.id = spm.guild_id AND g.status = 'approved'
          LEFT JOIN users verifier ON verifier.id = spm.verified_by_user_id
         WHERE spm.user_id = $1 AND spm.status = 'active' AND ($3 = 1
-         OR EXISTS (SELECT 1 FROM guild_roles actor_gr WHERE actor_gr.user_id = $2 AND actor_gr.guild_id = spm.guild_id AND actor_gr.role IN ('owner', 'admin'))
-         OR EXISTS (SELECT 1 FROM server_role_assignments actor_sra WHERE actor_sra.user_id = $2 AND actor_sra.server_id = spm.server_id AND actor_sra.role = 'admin' AND actor_sra.status = 'active'))
+         OR EXISTS (SELECT 1 FROM guild_roles actor_gr JOIN guilds actor_g ON actor_g.id = actor_gr.guild_id AND actor_g.status = 'approved' WHERE actor_gr.user_id = $2 AND actor_gr.guild_id = spm.guild_id AND actor_gr.role IN ('owner', 'admin'))
+         OR EXISTS (SELECT 1 FROM server_role_assignments actor_sra JOIN servers actor_s ON actor_s.id = actor_sra.server_id AND actor_s.guild_id = actor_sra.guild_id AND actor_s.status = 'active' JOIN guilds actor_sg ON actor_sg.id = actor_sra.guild_id AND actor_sg.status = 'approved' WHERE actor_sra.user_id = $2 AND actor_sra.server_id = spm.server_id AND actor_sra.role = 'admin' AND actor_sra.status = 'active'))
        ORDER BY granted_at DESC`,
       [targetUserId, req.user.id, global ? 1 : 0]
     );

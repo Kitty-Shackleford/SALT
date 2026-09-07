@@ -64,7 +64,7 @@ async function resolveActorAuthority(db, actor, scope = {}, options = {}) {
     `SELECT g.id
        FROM guilds g
       WHERE (CAST(g.id AS TEXT) = ? OR g.discord_guild_id = ?)
-        AND g.status IN ('pending', 'approved')
+        AND g.status = 'approved'
       LIMIT 1`,
     [String(scope.guildId), String(scope.guildId)]
   );
