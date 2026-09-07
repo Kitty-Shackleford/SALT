@@ -1,0 +1,33 @@
+name: Sleepy — Nightly maintenance
+
+on:
+  schedule:
+    # daily at 03:00 UTC
+    - cron: '0 3 * * *'
+  workflow_dispatch: {}
+
+jobs:
+  maintenance:
+    runs-on: ubuntu-latest
+    name: Run Sleepy maintenance
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      - name: Run Sleepy maintenance
+        env:
+          DOWNLOADS_DIR: downloads
+          LOGS_DIR: logs
+          DAYS_TO_KEEP: 14
+          COMPRESS_AFTER_DAYS: 7
+          DRY_RUN: 0
+        run: |
+          node scripts/sleepy-maintain.js

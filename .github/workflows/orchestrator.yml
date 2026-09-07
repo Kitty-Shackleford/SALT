@@ -1,0 +1,33 @@
+name: Orchestrator — Command & Control
+
+on:
+  workflow_dispatch: {}
+  schedule:
+    - cron: '30 2 * * *' # daily at 02:30 UTC
+
+jobs:
+  orchestrate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      - name: Run Orchestrator
+        env:
+          ORCHESTRATOR_AGENTS: ${{ secrets.ORCHESTRATOR_AGENTS || 'doc,shady,nosey,dopey,dozy,merry,sleepy,gloom,piper,forge' }}
+        run: |
+          node scripts/orchestrator.js
+
+      - name: Upload report artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: orchestrator-report
+          path: reports/

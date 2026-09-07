@@ -1,0 +1,37 @@
+name: Shady — Vulnerability & Secret Scanner
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+  schedule:
+    - cron: '0 4 * * 1' # weekly on Mondays at 04:00 UTC
+  workflow_dispatch: {}
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      - name: Install dependencies (ci)
+        run: |
+          if [ -f package-lock.json ]; then
+            npm ci --no-audit --no-fund --silent
+          else
+            echo "No package-lock.json; skipping npm ci"
+          fi
+
+      - name: Run Shady scanner
+        env:
+          GITHUB_BASE_REF: ${{ github.event.pull_request.base.ref }}
+          GITHUB_HEAD_REF: ${{ github.event.pull_request.head.ref }}
+        run: |
+          node scripts/shady-scan.js

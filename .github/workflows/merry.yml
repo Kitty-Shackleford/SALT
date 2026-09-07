@@ -1,0 +1,35 @@
+name: Merry — Changelog generator
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+jobs:
+  changelog:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      - name: Run Merry changelog generator
+        run: |
+          node scripts/merry-changelog.js
+
+      - name: Commit CHANGELOG.md if changed
+        uses: stefanzweifel/git-auto-commit-action@v4
+        with:
+          commit_message: "chore(merry): update CHANGELOG.md [skip ci]"
+          file_pattern: CHANGELOG.md
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

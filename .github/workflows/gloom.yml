@@ -1,0 +1,21 @@
+name: Gloom — Crash monitor
+
+on:
+  schedule:
+    - cron: '0 * * * *' # hourly
+  workflow_dispatch: {}
+
+jobs:
+  gloom:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Run Gloom crash parser
+        env:
+          DOWNLOADS_DIR: downloads
+        run: |
+          node scripts/gloom-parse-rpt.js

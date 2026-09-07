@@ -1,0 +1,38 @@
+name: Nosey — License & dependency auditor
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+  schedule:
+    - cron: '0 5 * * 1' # weekly on Mondays at 05:00 UTC
+  workflow_dispatch: {}
+
+jobs:
+  license-audit:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      - name: Install dependencies (ci)
+        run: |
+          if [ -f package-lock.json ]; then
+            npm ci --no-audit --no-fund --silent
+          else
+            echo "No package-lock.json; skipping npm ci"
+          fi
+
+      - name: Run Nosey license check
+        env:
+          GITHUB_BASE_REF: ${{ github.event.pull_request.base.ref }}
+          GITHUB_HEAD_REF: ${{ github.event.pull_request.head.ref }}
+        run: |
+          node scripts/nosey-license-check.js

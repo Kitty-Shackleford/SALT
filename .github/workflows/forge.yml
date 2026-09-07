@@ -1,0 +1,269 @@
+name: Forge — Build & staging deploy
+
+on:
+  push:
+    branches: [staging]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Optional image tag (defaults to git SHA)
+        required: false
+      push_images:
+        description: Push built images when registry credentials are configured
+        type: boolean
+        default: false
+      deploy:
+        description: Deploy after a successful manual build
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: forge-staging-deploy
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    outputs:
+      backend_digest: ${{ steps.backend-build.outputs.digest }}
+      bot_digest: ${{ steps.bot-build.outputs.digest }}
+      source_sha: ${{ github.sha }}
+      published: ${{ steps.publish-policy.outputs.enabled }}
+    env:
+      IMAGE_TAG: ${{ inputs.tag || github.sha }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: |
+          npm ci
+          npm ci --prefix bot
+
+      - name: Verify source revision
+        run: |
+          ENCRYPTION_KEY=$(node -e "console.log(require('crypto').randomBytes(32).toString('hex'))") npm test
+          npm run lint
+
+      - name: Validate image tag
+        run: |
+          [[ "$IMAGE_TAG" =~ ^[A-Za-z0-9_][A-Za-z0-9_.-]{0,127}$ ]] || { echo "Invalid Docker image tag"; exit 1; }
+
+      - name: Verify clean tested tree
+        run: |
+          if [[ -n "$(git status --porcelain --untracked-files=all)" ]]; then
+            echo "Tests or build preparation changed the checked-out source tree"
+            git status --short
+            exit 1
+          fi
+
+      - name: Prepare exact source build context
+        run: |
+          rm -rf /tmp/dayz-build-context
+          mkdir -p /tmp/dayz-build-context
+          git archive "$GITHUB_SHA" | tar -x -C /tmp/dayz-build-context
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Check registry configuration
+        id: registry-config
+        env:
+          DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
+          DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
+        run: |
+          if [[ -n "$DOCKER_USERNAME" && -n "$DOCKER_PASSWORD" ]]; then
+            echo "configured=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "configured=false" >> "$GITHUB_OUTPUT"
+            echo "Registry credentials are not configured; images will be built without pushing."
+          fi
+
+      - name: Resolve publish policy
+        id: publish-policy
+        env:
+          REGISTRY_CONFIGURED: ${{ steps.registry-config.outputs.configured }}
+          PUBLISH_REQUESTED: ${{ github.event_name == 'push' || inputs.push_images }}
+        run: |
+          if [[ "$REGISTRY_CONFIGURED" == "true" && "$PUBLISH_REQUESTED" == "true" ]]; then
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Login to registry
+        if: steps.publish-policy.outputs.enabled == 'true'
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+      - name: Build backend image
+        id: backend-build
+        uses: docker/build-push-action@v6
+        with:
+          context: /tmp/dayz-build-context
+          file: /tmp/dayz-build-context/Dockerfile
+          push: ${{ steps.publish-policy.outputs.enabled == 'true' }}
+          tags: ${{ steps.publish-policy.outputs.enabled == 'true' && format('{0}/dayz-dashboard:{1}', secrets.DOCKER_USERNAME, env.IMAGE_TAG) || format('dayz-dashboard:{0}', env.IMAGE_TAG) }}
+          labels: org.opencontainers.image.revision=${{ github.sha }}
+
+      - name: Build bot image
+        id: bot-build
+        uses: docker/build-push-action@v6
+        with:
+          context: /tmp/dayz-build-context
+          file: /tmp/dayz-build-context/Dockerfile.bot
+          push: ${{ steps.publish-policy.outputs.enabled == 'true' }}
+          tags: ${{ steps.publish-policy.outputs.enabled == 'true' && format('{0}/dayz-dashboard-bot:{1}', secrets.DOCKER_USERNAME, env.IMAGE_TAG) || format('dayz-dashboard-bot:{0}', env.IMAGE_TAG) }}
+          labels: org.opencontainers.image.revision=${{ github.sha }}
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check deployment configuration
+        id: deploy-config
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
+          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+          SSH_KNOWN_HOSTS: ${{ secrets.SSH_KNOWN_HOSTS }}
+          DEPLOY_REQUESTED: ${{ github.event_name == 'push' || inputs.deploy }}
+          IMAGES_PUBLISHED: ${{ needs.build.outputs.published }}
+        run: |
+          if [[ "$DEPLOY_REQUESTED" == "true" ]]; then
+            if [[ "$IMAGES_PUBLISHED" == "true" && -n "$DEPLOY_HOST" && -n "$DEPLOY_PATH" && -n "$SSH_PRIVATE_KEY" && -n "$SSH_KNOWN_HOSTS" ]]; then
+              echo "configured=true" >> "$GITHUB_OUTPUT"
+            else
+              echo "Deployment was requested, but published images or SSH deployment configuration are missing." >&2
+              exit 1
+            fi
+          else
+            echo "configured=false" >> "$GITHUB_OUTPUT"
+            echo "Build-only run requested; staging deployment will be skipped."
+          fi
+
+      - name: Checkout
+        if: steps.deploy-config.outputs.configured == 'true'
+        uses: actions/checkout@v4
+
+      - name: Setup SSH key
+        if: steps.deploy-config.outputs.configured == 'true'
+        uses: webfactory/ssh-agent@v0.9.1
+        with:
+          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+
+      - name: Configure trusted SSH hosts
+        if: steps.deploy-config.outputs.configured == 'true'
+        env:
+          SSH_KNOWN_HOSTS: ${{ secrets.SSH_KNOWN_HOSTS }}
+        run: |
+          install -d -m 700 "$HOME/.ssh"
+          printf '%s\n' "$SSH_KNOWN_HOSTS" > "$HOME/.ssh/known_hosts"
+          chmod 600 "$HOME/.ssh/known_hosts"
+
+      - name: Remote deploy immutable images with docker-compose
+        if: steps.deploy-config.outputs.configured == 'true'
+        env:
+          DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          SOURCE_SHA: ${{ needs.build.outputs.source_sha }}
+          BACKEND_IMAGE: ${{ secrets.DOCKER_USERNAME }}/dayz-dashboard@${{ needs.build.outputs.backend_digest }}
+          BOT_IMAGE: ${{ secrets.DOCKER_USERNAME }}/dayz-dashboard-bot@${{ needs.build.outputs.bot_digest }}
+        run: |
+          [[ "$DEPLOY_HOST" =~ ^([A-Za-z0-9_][A-Za-z0-9_.-]*@)?[A-Za-z0-9][A-Za-z0-9_.-]*$ ]] || { echo "Invalid deployment host format"; exit 1; }
+          [[ "$DEPLOY_HOST" != -* ]] || { echo "Invalid deployment host format"; exit 1; }
+          [[ "$DEPLOY_PATH" =~ ^/[A-Za-z0-9_./-]+$ ]] || { echo "Invalid deployment path format"; exit 1; }
+          [[ "$SOURCE_SHA" =~ ^[0-9a-f]{40}$ ]] || { echo "Invalid source revision"; exit 1; }
+          [[ "$BACKEND_IMAGE" =~ ^[a-z0-9]+([._-][a-z0-9]+)*/dayz-dashboard@sha256:[0-9a-f]{64}$ ]] || { echo "Invalid backend image digest"; exit 1; }
+          [[ "$BOT_IMAGE" =~ ^[a-z0-9]+([._-][a-z0-9]+)*/dayz-dashboard-bot@sha256:[0-9a-f]{64}$ ]] || { echo "Invalid bot image digest"; exit 1; }
+          ssh -- "$DEPLOY_HOST" bash -s -- "$DEPLOY_PATH" "$SOURCE_SHA" "$BACKEND_IMAGE" "$BOT_IMAGE" <<'REMOTE'
+          set -euo pipefail
+          deploy_path=$1
+          source_sha=$2
+          backend_image=$3
+          bot_image=$4
+          cd "$deploy_path"
+          postgres_container=$(docker-compose -f docker-compose.yml ps -q postgres)
+          test -n "$postgres_container"
+          git fetch --depth=1 origin "$source_sha"
+          git checkout --detach "$source_sha"
+          test "$(git rev-parse HEAD)" = "$source_sha"
+          if [[ -n "$(git status --porcelain --untracked-files=all)" ]]; then
+            echo "Deployment checkout contains tracked or untracked changes"
+            git status --short
+            exit 1
+          fi
+          test "$(docker-compose -f docker-compose.yml ps -q postgres)" = "$postgres_container"
+          postgres_healthy=false
+          for attempt in {1..30}; do
+            if [[ "$(docker inspect "$postgres_container" --format '{{.State.Health.Status}}')" == "healthy" ]]; then
+              postgres_healthy=true
+              break
+            fi
+            sleep 2
+          done
+          test "$postgres_healthy" = "true"
+          BACKEND_IMAGE="$backend_image" BOT_IMAGE="$bot_image" docker-compose -f docker-compose.yml pull db-init backend bot
+          backend_image_id=$(docker image inspect "$backend_image" --format '{{.Id}}')
+          bot_image_id=$(docker image inspect "$bot_image" --format '{{.Id}}')
+          test "$(docker image inspect "$backend_image" --format '{{ index .Config.Labels "org.opencontainers.image.revision" }}')" = "$source_sha"
+          test "$(docker image inspect "$bot_image" --format '{{ index .Config.Labels "org.opencontainers.image.revision" }}')" = "$source_sha"
+          docker-compose -f docker-compose.yml stop backend bot
+          postgres_network=$(docker inspect "$postgres_container" --format '{{range $name, $_ := .NetworkSettings.Networks}}{{println $name}}{{end}}' | xargs)
+          test -n "$postgres_network"
+          [[ "$postgres_network" != *" "* ]]
+          migration_name="dayz-dashboard-db-init-${source_sha:0:12}-$$"
+          migration_container=$(docker create --name "$migration_name" --network "$postgres_network" \
+            --env-file .env -e POSTGRES_HOST=postgres "$backend_image" node scripts/init-db.js)
+          cleanup_migration() { docker rm -f "$migration_container" >/dev/null 2>&1 || true; }
+          trap cleanup_migration EXIT
+          test "$(docker inspect "$migration_container" --format '{{.Image}}')" = "$backend_image_id"
+          test "$(docker inspect "$migration_container" --format '{{json .Config.Cmd}}')" = '["node","scripts/init-db.js"]'
+          docker start "$migration_container" >/dev/null
+          if ! migration_exit=$(timeout --signal=TERM --kill-after=30s 15m docker wait "$migration_container"); then
+            echo "Migration container did not complete within 15 minutes" >&2
+            exit 1
+          fi
+          test "$migration_exit" = "0"
+          cleanup_migration
+          trap - EXIT
+          test "$(docker-compose -f docker-compose.yml ps -q postgres)" = "$postgres_container"
+          test "$(docker inspect "$postgres_container" --format '{{.State.Health.Status}}')" = "healthy"
+          app_start_epoch=$(date +%s)
+          BACKEND_IMAGE="$backend_image" BOT_IMAGE="$bot_image" docker-compose -f docker-compose.yml up -d --force-recreate --no-deps --no-build backend bot
+          backend_container=$(BACKEND_IMAGE="$backend_image" BOT_IMAGE="$bot_image" docker-compose -f docker-compose.yml ps -q backend)
+          bot_container=$(BACKEND_IMAGE="$backend_image" BOT_IMAGE="$bot_image" docker-compose -f docker-compose.yml ps -q bot)
+          test -n "$backend_container"
+          test -n "$bot_container"
+          deployment_ready=false
+          for attempt in {1..30}; do
+            backend_running=$(docker inspect "$backend_container" --format '{{.State.Running}}')
+            bot_running=$(docker inspect "$bot_container" --format '{{.State.Running}}')
+            if [[ "$backend_running" == "true" && "$bot_running" == "true" ]] \
+              && curl --fail --silent --show-error --output /dev/null \
+                "http://127.0.0.1:3000/readyz?minimumBotStartedAt=$app_start_epoch" \
+              && docker logs "$bot_container" 2>&1 | grep -q 'Bot initialization complete'; then
+              deployment_ready=true
+              break
+            fi
+            sleep 2
+          done
+          test "$deployment_ready" = "true"
+          test "$(docker inspect "$backend_container" --format '{{.RestartCount}}')" = "0"
+          test "$(docker inspect "$bot_container" --format '{{.RestartCount}}')" = "0"
+          test "$(docker inspect "$backend_container" --format '{{.Image}}')" = "$(docker image inspect "$backend_image" --format '{{.Id}}')"
+          test "$(docker inspect "$bot_container" --format '{{.Image}}')" = "$(docker image inspect "$bot_image" --format '{{.Id}}')"
+          test "$(docker-compose -f docker-compose.yml ps -q postgres)" = "$postgres_container"
+          test "$(docker inspect "$postgres_container" --format '{{.State.Health.Status}}')" = "healthy"
+          REMOTE
