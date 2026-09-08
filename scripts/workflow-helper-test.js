@@ -11,6 +11,82 @@ const merrySource = path.join(root, 'scripts', 'merry-changelog.js');
 const dopeySource = path.join(root, 'scripts', 'dopey-smoke.js');
 const merryWorkflow = path.join(root, '.github', 'workflows', 'merry.yml');
 
+function findInvalidWorkflowScriptTargets(workflowTexts, repositoryRoot, trackedFiles) {
+  const invalid = [];
+  const scriptPattern = /(?:^|[\s"'`])((?:\.\/)?scripts\/[A-Za-z0-9_./-]+\.js)(?=$|[\s"'`),])/gm;
+  for (const [workflow, text] of workflowTexts) {
+    for (const match of text.matchAll(scriptPattern)) {
+      const relativePath = match[1].replace(/^\.\//, '');
+      const absolutePath = path.join(repositoryRoot, relativePath);
+      let isRegularFile = false;
+      try {
+        isRegularFile = fs.statSync(absolutePath).isFile();
+      } catch {
+        // Missing targets are reported below.
+      }
+      if (!isRegularFile || !trackedFiles.has(relativePath)) {
+        invalid.push(`${workflow}:${relativePath}`);
+      }
+    }
+  }
+  return invalid;
+}
+
+function assertWorkflowScriptTargetsExist() {
+  const workflowDir = path.join(root, '.github', 'workflows');
+  const workflows = fs.readdirSync(workflowDir)
+    .filter(name => /\.ya?ml$/i.test(name));
+  const workflowTexts = workflows.map(workflow => [
+    workflow,
+    fs.readFileSync(path.join(workflowDir, workflow), 'utf8'),
+  ]);
+  const trackedFiles = new Set(execFileSync('git', ['ls-files', '-z'], {
+    cwd: root,
+    encoding: 'utf8',
+  }).split('\0').filter(Boolean));
+  const invalid = findInvalidWorkflowScriptTargets(workflowTexts, root, trackedFiles);
+  assert.deepStrictEqual(invalid, [],
+    'workflow script targets must be regular, repository-tracked files');
+}
+
+function testWorkflowScriptTargetValidation() {
+  const fixtureRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'salt-workflow-target-test-'));
+  try {
+    fs.mkdirSync(path.join(fixtureRoot, 'scripts'));
+    fs.writeFileSync(path.join(fixtureRoot, 'scripts', 'tracked.js'), '', 'utf8');
+    fs.writeFileSync(path.join(fixtureRoot, 'scripts', 'untracked.js'), '', 'utf8');
+    fs.mkdirSync(path.join(fixtureRoot, 'scripts', 'directory.js'));
+    const workflowTexts = [[
+      'fixture.yml',
+      [
+        'node scripts/tracked.js',
+        'node ./scripts/missing-dot.js',
+        'node "scripts/missing-double.js"',
+        "node 'scripts/missing-single.js'",
+        'node --trace-warnings scripts/missing-option.js',
+        'node scripts/untracked.js',
+        'node scripts/directory.js',
+      ].join('\n'),
+    ]];
+    assert.deepStrictEqual(findInvalidWorkflowScriptTargets(
+      workflowTexts,
+      fixtureRoot,
+      new Set(['scripts/tracked.js', 'scripts/directory.js']),
+    ), [
+      'fixture.yml:scripts/missing-dot.js',
+      'fixture.yml:scripts/missing-double.js',
+      'fixture.yml:scripts/missing-single.js',
+      'fixture.yml:scripts/missing-option.js',
+      'fixture.yml:scripts/untracked.js',
+      'fixture.yml:scripts/directory.js',
+    ]);
+  } finally {
+    fs.rmSync(fixtureRoot, { recursive: true, force: true });
+  }
+}
+
+testWorkflowScriptTargetValidation();
+assertWorkflowScriptTargetsExist();
 assert.ok(fs.existsSync(merrySource), 'Merry workflow helper must exist');
 assert.ok(fs.existsSync(dopeySource), 'Dopey workflow helper must exist');
 const merryWorkflowText = fs.readFileSync(merryWorkflow, 'utf8');
