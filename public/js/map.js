@@ -39,7 +39,11 @@ let movementHeatLayer = null;
 let movementHeatmapEnabled = false;
 
 // Staff operations overlay (log-derived, exact-server scoped)
+const onlinePlayerAdminState = window.OnlinePlayerAdminState;
 let operationsRequestId = 0;
+const operationsPlayerMarkers = new Map();
+const onlinePlayerNoteDrafts = new Map();
+const onlinePlayerNoteSaveCoordinator = onlinePlayerAdminState.createSaveCoordinator();
 const operationsLayers = {
   players: null,
   events: null,
@@ -47,6 +51,11 @@ const operationsLayers = {
   territory: null,
   zones: null,
   factions: null,
+  factionTerritories: null,
+};
+const geographyLayers = {
+  settlementLabels: null,
+  settlementExtents: null,
 };
 
 // Stats tracking
@@ -75,16 +84,16 @@ function getEventColor(eventName) {
   if (/^#[0-9a-f]{6}$/i.test(savedColors[eventName] || '')) {
     return savedColors[eventName];
   }
-
+  
   let hash = 0;
   for (let i = 0; i < eventName.length; i++) {
     hash = eventName.charCodeAt(i) + ((hash << 5) - hash);
   }
-
+  
   const hue = Math.abs(hash % 360);
   const saturation = 65 + (Math.abs(hash) % 20);
   const lightness = 50 + (Math.abs(hash >> 8) % 15);
-
+  
   return 'hsl(' + hue + ', ' + saturation + '%, ' + lightness + '%)';
 }
 
@@ -104,7 +113,7 @@ function rgbToHex(color) {
   if (color.startsWith('#')) {
     return color;
   }
-
+  
   if (color.startsWith('hsl')) {
     const temp = document.createElement('div');
     temp.style.color = color;
@@ -113,7 +122,7 @@ function rgbToHex(color) {
     document.body.removeChild(temp);
     color = rgb;
   }
-
+  
   const rgb = color.match(/\d+/g);
   if (rgb) {
     const r = parseInt(rgb[0]).toString(16).padStart(2, '0');
@@ -121,7 +130,7 @@ function rgbToHex(color) {
     const b = parseInt(rgb[2]).toString(16).padStart(2, '0');
     return '#' + r + g + b;
   }
-
+  
   return '#8b5cf6';
 }
 
@@ -134,23 +143,23 @@ function updateEventColors(eventName, newColor) {
       });
     }
   });
-
+  
   const dot = document.getElementById('dot_' + eventName);
   if (dot) {
     dot.style.background = newColor;
   }
-
+  
   searchEvents();
 }
 
 function resetAllColors() {
   localStorage.removeItem('eventColors');
-
+  
   const uniqueEvents = [...new Set(allEventData.map(e => e.name))];
-
+  
   uniqueEvents.forEach(function(eventName) {
     const autoColor = getEventColor(eventName);
-
+    
     allEventData.forEach(function(event) {
       if (event.name === eventName) {
         event.color = autoColor;
@@ -159,12 +168,12 @@ function resetAllColors() {
         });
       }
     });
-
+    
     const dot = document.getElementById('dot_' + eventName);
     if (dot) {
       dot.style.background = autoColor;
     }
-
+    
     const colorPickers = document.querySelectorAll('input[type="color"]');
     colorPickers.forEach(function(picker) {
       if (picker.getAttribute('data-event') === eventName) {
@@ -172,8 +181,52 @@ function resetAllColors() {
       }
     });
   });
-
+  
   console.log('✓ All colors reset to auto-generated');
+}
+
+// B1.3 destination mini-map preview (uses public/maps tiles via destination-preview.js)
+function updateDestinationPreview(east, north, label) {
+  const panel = document.getElementById('destination-preview-panel');
+  const slot = document.getElementById('destination-preview-slot');
+  const statusEl = document.getElementById('destination-preview-status');
+  const coordsEl = document.getElementById('destination-preview-coords');
+  if (!panel) return;
+
+  const mapName = (typeof currentMapName !== 'undefined') ? currentMapName : 'enoch';
+  const eastN = Number(east);
+  const northN = Number(north);
+  if (!Number.isFinite(eastN) || !Number.isFinite(northN)) return;
+
+  panel.style.display = 'block';
+  if (window.DayzDestinationPreview && DayzDestinationPreview.mapAvailable(mapName)) {
+    slot.innerHTML = window.DayzDestinationPreview.previewHtml({ mapName, east: eastN, north: northN, name: label, sizePx: 244 });
+    statusEl.textContent = 'Mini-map from ' + (window.DayzDestinationPreview.MAPS[mapName].name) + ' tiles.';
+    coordsEl.textContent = 'east ' + Math.round(eastN) + '  north ' + Math.round(northN);
+  } else {
+    slot.innerHTML = '';
+    statusEl.textContent = 'No map tiles available for this map — preview shows coordinates only.';
+    coordsEl.textContent = 'east ' + Math.round(eastN) + '  north ' + Math.round(northN);
+  }
+}
+
+function clearDestinationPreview() {
+  const panel = document.getElementById('destination-preview-panel');
+  if (panel) panel.style.display = 'none';
+}
+
+function bindDestinationPreviewPanel() {
+  const btn = document.getElementById('destination-preview-clear');
+  if (btn) btn.addEventListener('click', clearDestinationPreview);
+  // Any map click marks a destination (independent of radius-search mode).
+  if (map) {
+    map.on('click', function (e) {
+      if (typeof currentMapName !== 'undefined' && DayzMapCoordinates.leafletToWorld) {
+        const w = DayzMapCoordinates.leafletToWorld({ lat: e.latlng.lat, lng: e.latlng.lng }, currentMapName);
+        updateDestinationPreview(w.east, w.north);
+      }
+    });
+  }
 }
 
 // Initialize map
@@ -197,6 +250,8 @@ function initMap(mapName = 'enoch') {
 
     map.on('click', onMapClick);
   }
+
+  bindDestinationPreviewPanel();
 
   const bounds = L.latLngBounds([[0, 0], [size, size]]);
   map.setMaxBounds(bounds.pad(0.5));
@@ -223,6 +278,49 @@ function initMap(mapName = 'enoch') {
       currentTiles.push(overlay);
     }
   }
+  renderStaticGeography(resolvedMapName);
+}
+
+function renderStaticGeography(mapName) {
+  if (!geographyLayers.settlementLabels) geographyLayers.settlementLabels = L.layerGroup();
+  if (!geographyLayers.settlementExtents) geographyLayers.settlementExtents = L.layerGroup();
+  geographyLayers.settlementLabels.clearLayers();
+  geographyLayers.settlementExtents.clearLayers();
+  const staticLayers = DayzMapLayerCatalog.getSettlementLayers(mapName);
+  const cfg = mapConfigs[mapName] || mapConfigs.enoch;
+  const radiusScale = cfg.imageWidth / cfg.worldWidth;
+  staticLayers.extents.forEach(function(extent) {
+    L.circle(gameToLeaflet(extent.position.east, extent.position.north, mapName), {
+      radius: extent.radiusMeters * radiusScale,
+      color: '#94a3b8', fillColor: '#64748b', weight: 1, fillOpacity: 0.08,
+      dashArray: '5 5', interactive: false,
+    }).addTo(geographyLayers.settlementExtents);
+  });
+  staticLayers.labels.forEach(function(settlement) {
+    const label = escapeHtml(settlement.names.en) + '<br><span lang="ru">' +
+      escapeHtml(settlement.names.cy) + '</span>';
+    L.marker(gameToLeaflet(settlement.position.east, settlement.position.north, mapName), {
+      icon: L.divIcon({ className: '',
+        html: '<span style="display:block;text-align:center;color:#fff;font-size:11px;font-weight:600;line-height:1.15;text-shadow:0 1px 3px #000,1px 0 3px #000;white-space:nowrap;">' + label + '</span>',
+        iconSize: [120, 30], iconAnchor: [60, 15] }),
+      interactive: false,
+    }).addTo(geographyLayers.settlementLabels);
+  });
+  applyGeographyLayerVisibility();
+}
+
+function applyGeographyLayerVisibility() {
+  const controls = {
+    settlementLabels: 'settlement-label-toggle',
+    settlementExtents: 'settlement-extent-toggle',
+  };
+  Object.entries(controls).forEach(function([name, controlId]) {
+    const layer = geographyLayers[name];
+    const control = document.getElementById(controlId);
+    if (!layer || !control || !map) return;
+    if (control.checked && !map.hasLayer(layer)) layer.addTo(map);
+    if (!control.checked && map.hasLayer(layer)) map.removeLayer(layer);
+  });
 }
 
 function addCoordinateGrid(mapName) {
@@ -319,6 +417,15 @@ async function loadServers() {
         select.appendChild(option);
       });
     }
+
+    // Shared-URL restore: ?server=<nitrado id> selects that server through
+    // the same path as a manual selection.
+    const urlServer = new URLSearchParams(window.location.search).get('server');
+    if (urlServer && select.value !== urlServer &&
+        Array.from(select.options).some(option => option.value === urlServer)) {
+      select.value = urlServer;
+      select.dispatchEvent(new Event('change'));
+    }
   } catch (err) {
     console.error('Failed to load servers:', err);
   }
@@ -347,17 +454,17 @@ async function getActiveMission(serverId, guildId, discoveryRequestId = mapDisco
     const res = await fetch('/api/server-active-mission/' + serverId + '?guildId=' + encodeURIComponent(guildId));
     const data = await res.json();
     if (discoveryRequestId !== mapDiscoveryRequestId || !selectedServerContext(serverId)) return null;
-
+    
     if (data.success && data.mapName) {
       activeMapName = data.mapName;
-
+      
       document.getElementById('active-badge').style.display = 'inline-block';
       document.getElementById('active-badge').textContent = 'Active: ' + (mapConfigs[data.mapName] ? mapConfigs[data.mapName].name : data.mapName);
       document.getElementById('active-badge').className = 'badge badge-green';
-
+      
       document.getElementById('players-badge').style.display = 'inline-block';
       document.getElementById('players-badge').textContent = data.playerCount + '/' + data.maxPlayers + ' Players';
-
+      
       // Update player stat
       const currentPlayers = data.playerCount;
       document.getElementById('stat-players').textContent = currentPlayers + '/' + data.maxPlayers;
@@ -377,11 +484,11 @@ async function getActiveMission(serverId, guildId, discoveryRequestId = mapDisco
           loadEnabledHeatmaps();
         }
       }
-
+      
       console.log('✓ Active mission:', data.mission, '→', data.mapName);
       return data.mapName;
     }
-
+    
     return null;
   } catch (err) {
     console.error('Failed to get active mission:', err);
@@ -395,41 +502,50 @@ async function loadMapsForServer(serverId) {
   if (!serverContext) return;
   try {
     document.getElementById('map-select').innerHTML = '<option value="">Loading...</option>';
-
+    
     const activeMission = await getActiveMission(serverId, serverContext.guildId, requestId);
     if (requestId !== mapDiscoveryRequestId || !selectedServerContext(serverId)) return;
-
+    
     const res = await fetch('/api/server-maps/' + serverId + '?guildId=' + encodeURIComponent(serverContext.guildId));
     const data = await res.json();
     if (requestId !== mapDiscoveryRequestId || !selectedServerContext(serverId)) return;
-
+    
     const select = document.getElementById('map-select');
     select.innerHTML = '<option value="">Select Map...</option>';
-
+    
     if (data.success && data.maps && data.maps.length > 0) {
       data.maps.forEach(function(mapName) {
         const config = mapConfigs[mapName];
         const option = document.createElement('option');
         option.value = mapName;
-
+        
         if (mapName === activeMission) {
           option.textContent = (config ? config.name : mapName) + ' ⭐ ACTIVE';
           option.selected = true;
         } else {
           option.textContent = config ? config.name : mapName;
         }
-
+        
         select.appendChild(option);
       });
-
-      if (activeMission) {
-        loadMapData(serverId, activeMission);
-        loadEnabledHeatmaps();
+      
+      if (select.options.length > 1) {
+        // Shared-URL restore: ?map=<key> overrides the auto-selected
+        // active-mission map through the same path as a manual selection.
+        const urlMap = new URLSearchParams(window.location.search).get('map');
+        if (urlMap && select.value !== urlMap &&
+            Array.from(select.options).some(option => option.value === urlMap)) {
+          select.value = urlMap;
+          select.dispatchEvent(new Event('change'));
+        } else if (activeMission) {
+          loadMapData(serverId, activeMission);
+          loadEnabledHeatmaps();
+        }
       }
     } else {
       select.innerHTML = '<option value="">No maps found - Sync server first</option>';
     }
-
+    
   } catch (err) {
     if (requestId !== mapDiscoveryRequestId || !selectedServerContext(serverId)) return;
     console.error('Failed to load maps:', err);
@@ -557,7 +673,7 @@ async function loadMapData(serverId, mapName, isAutoRefresh = false) {
   }
 
   currentMapName = mapName;
-
+  
   if (!isAutoRefresh) {
     initMap(mapName);
     loadEventHealth(serverId, mapName, serverContext.guildId);
@@ -571,7 +687,7 @@ async function loadMapData(serverId, mapName, isAutoRefresh = false) {
     if (!isAutoRefresh) {
       document.getElementById('loading-status').textContent = 'Loading event spawn locations...';
     }
-
+    
     // Clear existing markers
     Object.values(markers).forEach(function(marker) {
       marker.remove();
@@ -587,33 +703,33 @@ async function loadMapData(serverId, mapName, isAutoRefresh = false) {
 
     if (eventSpawnsData.success && eventSpawnsData.events) {
       let markerCount = 0;
-
+      
       const mapConfig = mapConfigs[mapName] || mapConfigs['enoch'];
       const scale = mapConfig.imageWidth / mapConfig.worldWidth;
 
       console.log('🗺️  Map: ' + mapName + ', Game size: ' + mapConfig.worldWidth + ', Scale: ' + scale.toFixed(3));
-
+      
       const eventTypes = {};
-
+      
       eventSpawnsData.events.forEach(function(event) {
         const eventName = event.name;
         const color = getEventColor(eventName);
-
+        
         if (!eventTypes[eventName]) {
           eventTypes[eventName] = {
             count: 0,
             color: color
           };
         }
-
+        
         event.positions.forEach(function(pos, i) {
           const latlng = gameToLeaflet(pos.x, pos.z, mapName);
           const tileX = latlng[1];
           const tileZ = latlng[0];
-
+          
           const markerRadius = 8;
           const markerWeight = 2;
-
+          
           const marker = L.circleMarker([tileZ, tileX], {
             radius: markerRadius,
             fillColor: color,
@@ -624,16 +740,16 @@ async function loadMapData(serverId, mapName, isAutoRefresh = false) {
           })
             .addTo(map)
             .bindPopup('<div class="text-gray-900"><strong style="font-size: 14px;">' + escapeHtml(eventName) + '</strong><br>Game XML: ' + pos.x.toFixed(2) + ', ' + pos.z.toFixed(2) + '<br>Tile: ' + tileX.toFixed(2) + ', ' + tileZ.toFixed(2) + '<br>Angle: ' + (pos.a || 0).toFixed(2) + '°</div>');
-
+          
           marker.on('click', function(e) {
             if (!radiusSearchMode) {
               map.setView([tileZ, tileX], 1);
             }
           });
-
+          
           const markerId = 'event_' + eventName + '_' + i;
           markers[markerId] = marker;
-
+          
           allEventData.push({
             id: markerId,
             name: eventName,
@@ -644,14 +760,14 @@ async function loadMapData(serverId, mapName, isAutoRefresh = false) {
             gameZ: pos.z,
             color: color
           });
-
+          
           markerCount++;
           eventTypes[eventName].count++;
         });
       });
-
+      
       console.log('✓ Loaded ' + markerCount + ' event spawn locations');
-
+      
       if (!isAutoRefresh) {
         initializeEventTypeFilters(eventTypes);
       } else {
@@ -669,19 +785,19 @@ async function loadMapData(serverId, mapName, isAutoRefresh = false) {
           }
         });
       }
-
+      
       updateFilterStats();
-
+      
       // Update stats with trends
       updateStatTrend('spawns', markerCount, previousStats.spawns);
       updateStatTrend('events', eventSpawnsData.events.length, previousStats.events);
-
+      
       previousStats.spawns = markerCount;
       previousStats.events = eventSpawnsData.events.length;
-
+      
       document.getElementById('stat-spawns').textContent = markerCount;
       document.getElementById('stat-events').textContent = eventSpawnsData.events.length;
-
+      
       // Update last refresh time
       const now = new Date();
       document.getElementById('last-update-time').textContent = now.toLocaleTimeString();
@@ -692,10 +808,10 @@ async function loadMapData(serverId, mapName, isAutoRefresh = false) {
 
     const mapConfig = mapConfigs[mapName] || mapConfigs.enoch;
     document.getElementById('stat-size').textContent = mapConfig.gameSize + 'm';
-
+    
     const isActive = mapName === activeMapName ? ' (ACTIVE)' : '';
     document.getElementById('server-info').textContent = mapConfig.name + isActive + ' - High Resolution Satellite View';
-
+    
     if (!isAutoRefresh) {
       document.getElementById('loading').style.display = 'none';
     }
@@ -706,7 +822,7 @@ async function loadMapData(serverId, mapName, isAutoRefresh = false) {
     if (!isAutoRefresh) {
       document.getElementById('loading').style.display = 'none';
     }
-
+    
     const mapConfig = mapConfigs[mapName] || mapConfigs['enoch'];
     document.getElementById('server-info').textContent = mapConfig.name + ' - Satellite View';
   }
@@ -715,9 +831,9 @@ async function loadMapData(serverId, mapName, isAutoRefresh = false) {
 function updateStatTrend(statName, currentValue, previousValue) {
   const trendElement = document.getElementById('stat-' + statName + '-trend');
   if (!trendElement) return;
-
+  
   const diff = currentValue - previousValue;
-
+  
   if (diff > 0) {
     trendElement.className = 'stat-trend up';
     trendElement.innerHTML = '▲ +' + diff + ' from last update';
@@ -733,27 +849,27 @@ function updateStatTrend(statName, currentValue, previousValue) {
 function initializeEventTypeFilters(eventTypes) {
   const container = document.getElementById('event-type-filters');
   container.innerHTML = '';
-
+  
   eventTypeFilters = {};
-
+  
   const sorted = Object.entries(eventTypes).sort((a, b) => b[1].count - a[1].count);
-
+  
   const buttonContainer = document.createElement('div');
   buttonContainer.style.marginBottom = '8px';
   buttonContainer.style.display = 'flex';
   buttonContainer.style.gap = '4px';
   buttonContainer.style.flexWrap = 'wrap';
-
+  
   const selectAllBtn = document.createElement('button');
   selectAllBtn.textContent = '✓ All';
   selectAllBtn.className = 'btn-small btn-success';
   selectAllBtn.onclick = selectAllEventTypes;
-
+  
   const deselectAllBtn = document.createElement('button');
   deselectAllBtn.textContent = '✕ None';
   deselectAllBtn.className = 'btn-small btn-danger';
   deselectAllBtn.onclick = deselectAllEventTypes;
-
+  
   const resetColorsBtn = document.createElement('button');
   resetColorsBtn.textContent = '🎨 Reset Colors';
   resetColorsBtn.className = 'btn-small';
@@ -761,21 +877,21 @@ function initializeEventTypeFilters(eventTypes) {
   resetColorsBtn.style.color = 'white';
   resetColorsBtn.title = 'Reset all colors to auto-generated';
   resetColorsBtn.onclick = resetAllColors;
-
+  
   buttonContainer.appendChild(selectAllBtn);
   buttonContainer.appendChild(deselectAllBtn);
   buttonContainer.appendChild(resetColorsBtn);
   container.appendChild(buttonContainer);
-
+  
   sorted.forEach(function([eventName, data]) {
     eventTypeFilters[eventName] = true;
-
+    
     const div = document.createElement('div');
     div.className = 'filter-checkbox';
     div.style.display = 'flex';
     div.style.alignItems = 'center';
     div.style.gap = '6px';
-
+    
     const checkbox = document.createElement('input');
     checkbox.type = 'checkbox';
     checkbox.id = 'filter_' + eventName;
@@ -784,7 +900,7 @@ function initializeEventTypeFilters(eventTypes) {
       eventTypeFilters[eventName] = checkbox.checked;
       applyFilters();
     };
-
+    
     const label = document.createElement('label');
     label.htmlFor = 'filter_' + eventName;
     label.style.flex = '1';
@@ -792,15 +908,15 @@ function initializeEventTypeFilters(eventTypes) {
     label.style.display = 'flex';
     label.style.alignItems = 'center';
     label.style.gap = '6px';
-
+    
     const colorDot = document.createElement('span');
     colorDot.className = 'color-dot';
     colorDot.style.background = data.color;
     colorDot.id = 'dot_' + eventName;
-
+    
     label.appendChild(colorDot);
     label.appendChild(document.createTextNode(eventName + ' (' + data.count + ')'));
-
+    
     const colorPicker = document.createElement('input');
     colorPicker.type = 'color';
     colorPicker.value = rgbToHex(data.color);
@@ -815,7 +931,7 @@ function initializeEventTypeFilters(eventTypes) {
       saveEventColor(eventName, colorPicker.value);
       updateEventColors(eventName, colorPicker.value);
     };
-
+    
     const resetBtn = document.createElement('button');
     resetBtn.textContent = '↺';
     resetBtn.title = 'Reset to auto color';
@@ -831,22 +947,35 @@ function initializeEventTypeFilters(eventTypes) {
       colorPicker.value = rgbToHex(autoColor);
       updateEventColors(eventName, autoColor);
     };
-
+    
     div.appendChild(checkbox);
     div.appendChild(label);
     div.appendChild(colorPicker);
     div.appendChild(resetBtn);
     container.appendChild(div);
   });
+
+  // Shared-URL restore: ?filters=<hidden event types, comma list>.
+  const urlFilters = new URLSearchParams(window.location.search).get('filters');
+  if (urlFilters) {
+    urlFilters.split(',').map(s => s.trim()).filter(Boolean).forEach(function (name) {
+      if (Object.prototype.hasOwnProperty.call(eventTypeFilters, name)) {
+        eventTypeFilters[name] = false;
+        const checkbox = document.getElementById('filter_' + name);
+        if (checkbox) checkbox.checked = false;
+      }
+    });
+    applyFilters();
+  }
 }
 
 function applyFilters() {
   let visibleCount = 0;
   let hiddenCount = 0;
-
+  
   allEventData.forEach(function(event) {
     const shouldShow = eventTypeFilters[event.name];
-
+    
     if (shouldShow) {
       if (!map.hasLayer(event.marker)) {
         event.marker.addTo(map);
@@ -859,15 +988,17 @@ function applyFilters() {
       hiddenCount++;
     }
   });
-
+  
   updateFilterStats();
+  renderMapLegend();
+  syncMapUrl();
 }
 
 function updateFilterStats() {
   const total = allEventData.length;
   const visible = allEventData.filter(e => eventTypeFilters[e.name]).length;
   const hidden = total - visible;
-
+  
   document.getElementById('filter-stat-total').textContent = total;
   document.getElementById('filter-stat-visible').textContent = visible;
   document.getElementById('filter-stat-hidden').textContent = hidden;
@@ -894,23 +1025,23 @@ function deselectAllEventTypes() {
 function searchEvents() {
   const query = document.getElementById('search-input').value.toLowerCase();
   const resultsContainer = document.getElementById('search-results');
-
+  
   if (query.length < 2) {
     resultsContainer.innerHTML = '';
     return;
   }
-
+  
   const matches = allEventData.filter(function(event) {
     return event.name.toLowerCase().includes(query);
   });
-
+  
   if (matches.length === 0) {
     resultsContainer.innerHTML = '<div style="padding: 8px; color: #9ca3af;">No results found</div>';
     return;
   }
-
+  
   resultsContainer.innerHTML = '';
-
+  
   matches.slice(0, 10).forEach(function(event) {
     const div = document.createElement('div');
     div.className = 'search-result-item';
@@ -918,25 +1049,25 @@ function searchEvents() {
       map.setView([event.tileZ, event.tileX], 1);
       event.marker.openPopup();
     };
-
+    
     const colorDot = document.createElement('span');
     colorDot.className = 'color-dot';
     colorDot.style.background = event.color;
-
+    
     const text = document.createElement('span');
     text.textContent = event.name;
-
+    
     const coords = document.createElement('span');
     coords.style.fontSize = '11px';
     coords.style.color = '#9ca3af';
     coords.textContent = '(' + event.gameX.toFixed(0) + ', ' + event.gameZ.toFixed(0) + ')';
-
+    
     div.appendChild(colorDot);
     div.appendChild(text);
     div.appendChild(coords);
     resultsContainer.appendChild(div);
   });
-
+  
   if (matches.length > 10) {
     const more = document.createElement('div');
     more.style.padding = '8px';
@@ -961,7 +1092,7 @@ function cancelRadiusSearch() {
   document.getElementById('cancel-radius-btn').style.display = 'none';
   document.getElementById('radius-results').textContent = '';
   map.getContainer().classList.remove('radius-mode');
-
+  
   if (radiusCircle) {
     map.removeLayer(radiusCircle);
     radiusCircle = null;
@@ -974,19 +1105,19 @@ function cancelRadiusSearch() {
 
 function onMapClick(e) {
   if (!radiusSearchMode) return;
-
+  
   const clickTileX = e.latlng.lng;
   const clickTileZ = e.latlng.lat;
-
+  
   const radius = parseInt(document.getElementById('radius-input').value) || 500;
-
+  
   const mapConfig = mapConfigs[currentMapName] || mapConfigs['enoch'];
   const scale = mapConfig.size / mapConfig.gameSize;
   const radiusTile = radius * scale;
-
+  
   if (radiusCircle) map.removeLayer(radiusCircle);
   if (radiusMarker) map.removeLayer(radiusMarker);
-
+  
   radiusCircle = L.circle([clickTileZ, clickTileX], {
     radius: radiusTile,
     fillColor: '#3b82f6',
@@ -994,7 +1125,7 @@ function onMapClick(e) {
     color: '#3b82f6',
     weight: 2
   }).addTo(map);
-
+  
   radiusMarker = L.circleMarker([clickTileZ, clickTileX], {
     radius: 8,
     fillColor: '#3b82f6',
@@ -1002,14 +1133,14 @@ function onMapClick(e) {
     weight: 2,
     fillOpacity: 1
   }).addTo(map);
-
+  
   const eventsInRadius = allEventData.filter(function(event) {
     const dx = event.tileX - clickTileX;
     const dz = event.tileZ - clickTileZ;
     const distance = Math.sqrt(dx * dx + dz * dz);
     return distance <= radiusTile;
   });
-
+  
   const grouped = {};
   eventsInRadius.forEach(function(event) {
     if (!grouped[event.name]) {
@@ -1049,27 +1180,207 @@ function operationsPopup(title, lines) {
 }
 
 function addOperationsPoint(group, item, options, title, lines) {
-  if (!item.position) return;
+  if (!item.position) return null;
   const marker = L.circleMarker(gameToLeaflet(item.position.east, item.position.north, currentMapName), options);
   marker.bindPopup(operationsPopup(title, lines));
   marker.addTo(group);
+  return marker;
+}
+
+function formatDuration(totalSeconds) {
+  const seconds = Math.max(0, Number(totalSeconds) || 0);
+  const hours = Math.floor(seconds / 3600);
+  const minutes = Math.floor((seconds % 3600) / 60);
+  if (hours) return `${hours}h ${minutes}m`;
+  return `${minutes}m`;
+}
+
+function playerMetricLines(player) {
+  const stats = player.stats || {};
+  const ratio = stats.killDeathRatio === null || stats.killDeathRatio === undefined
+    ? '—'
+    : Number(stats.killDeathRatio).toFixed(2);
+  return [
+    `${Number(stats.kills || 0)} kills · ${Number(stats.deaths || 0)} deaths · K/D ${ratio}`,
+    `${formatDuration(stats.totalPlaytimeSeconds)} tracked · ${Number(stats.totalSessions || 0)} sessions`,
+    `${formatDuration(stats.currentSessionSeconds)} this session`,
+  ];
+}
+
+function appendPlayerText(parent, text, className) {
+  const element = document.createElement('p');
+  element.className = className;
+  element.textContent = text;
+  parent.appendChild(element);
+  return element;
+}
+
+function onlinePlayerDraftKey(serverId, identityId) {
+  return `${serverId}:${identityId}`;
+}
+
+function setOnlinePlayerNoteSaveUi(identityId, saving, message) {
+  const textarea = document.getElementById(`online-player-note-${identityId}`);
+  const button = document.getElementById(`online-player-note-save-${identityId}`);
+  const feedback = document.getElementById(`online-player-note-status-${identityId}`);
+  if (textarea) textarea.disabled = saving;
+  if (button) button.disabled = saving;
+  if (feedback && message) feedback.textContent = message;
+}
+
+async function saveOnlinePlayerNote(player, textarea, requestContext) {
+  const serverContext = selectedServerContext(currentServer);
+  if (!serverContext || String(serverContext.internalServerId) !== String(requestContext.serverId) ||
+      contextGeneration !== requestContext.generation) return;
+  const draftKey = onlinePlayerDraftKey(requestContext.serverId, player.identityId);
+  if (onlinePlayerNoteSaveCoordinator.isPending(draftKey)) return;
+  const saveAttempt = onlinePlayerAdminState.captureSaveAttempt({
+    serverId: requestContext.serverId,
+    identityId: player.identityId,
+    generation: requestContext.generation,
+    note: textarea.value,
+    expectedVersion: player.staffNote.version,
+  });
+  const isCurrent = () => {
+    const currentContext = selectedServerContext(currentServer);
+    return onlinePlayerAdminState.isCurrentServer(saveAttempt, currentContext?.internalServerId);
+  };
+  setOnlinePlayerNoteSaveUi(player.identityId, true, 'Saving…');
+  await onlinePlayerNoteSaveCoordinator.run({
+    key: draftKey,
+    attempt: saveAttempt,
+    isCurrent,
+    request: async () => {
+      const response = await fetchWithCsrf(
+        `/api/operations-map/${encodeURIComponent(requestContext.serverId)}/players/` +
+          `${encodeURIComponent(player.identityId)}/note`,
+        {
+          method: 'PATCH',
+          body: JSON.stringify({ note: saveAttempt.note, expectedVersion: saveAttempt.expectedVersion }),
+        }
+      );
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok || !result.success) {
+        const error = new Error(result.error || 'Failed to save player note');
+        error.refreshRequired = error.message.includes('refresh');
+        throw error;
+      }
+      player.staffNote = result.staffNote;
+      const currentDraft = onlinePlayerNoteDrafts.has(draftKey)
+        ? onlinePlayerNoteDrafts.get(draftKey)
+        : saveAttempt.note;
+      if (onlinePlayerAdminState.shouldDiscardDraft(saveAttempt, currentDraft)) {
+        onlinePlayerNoteDrafts.delete(draftKey);
+      }
+    },
+    refresh: loadOperationsOverlay,
+    onSettled: error => setOnlinePlayerNoteSaveUi(player.identityId, false, error ? error.message : 'Saved'),
+  });
+}
+
+function renderOnlinePlayerList(players, requestContext) {
+  const list = document.getElementById('online-player-list');
+  const summary = document.getElementById('online-player-summary');
+  list.replaceChildren();
+  summary.textContent = `${players.length} online · ${players.filter(player => player.position).length} positioned`;
+  if (!players.length) {
+    appendPlayerText(list, 'No fresh online-player roster is available.', 'text-sm text-gray-400');
+    return;
+  }
+
+  for (const player of players) {
+    const card = document.createElement('article');
+    card.className = 'bg-gray-900 border border-gray-700 rounded p-3';
+    const header = document.createElement('div');
+    header.className = 'flex justify-between items-start gap-2';
+    const name = document.createElement('strong');
+    name.textContent = player.gamertag;
+    header.appendChild(name);
+    if (player.position) {
+      const locate = document.createElement('button');
+      locate.type = 'button';
+      locate.className = 'btn-small btn-primary';
+      locate.textContent = 'Locate';
+      locate.setAttribute('aria-label', `Locate ${player.gamertag} on map`);
+      locate.addEventListener('click', () => {
+        document.getElementById('operations-player-toggle').checked = true;
+        applyOperationsLayerVisibility();
+        map.setView(gameToLeaflet(player.position.east, player.position.north, currentMapName), Math.max(map.getZoom(), 2));
+        operationsPlayerMarkers.get(player.identityId)?.openPopup();
+      });
+      header.appendChild(locate);
+    }
+    card.appendChild(header);
+    for (const line of playerMetricLines(player)) appendPlayerText(card, line, 'text-xs text-gray-300 mt-1');
+    appendPlayerText(card, player.position
+      ? `${player.positionFresh ? 'Recent' : 'Stale'} position · X ${Math.round(player.position.east)} · Z ${Math.round(player.position.north)}`
+      : 'No position observed in the active server session', 'text-xs text-gray-400 mt-1');
+
+    const textarea = document.createElement('textarea');
+    const noteInputId = `online-player-note-${player.identityId}`;
+    const noteLabel = document.createElement('label');
+    noteLabel.className = 'sr-only';
+    noteLabel.htmlFor = noteInputId;
+    noteLabel.textContent = `Private staff note for ${player.gamertag}`;
+    card.appendChild(noteLabel);
+    textarea.id = noteInputId;
+    textarea.className = 'search-box mt-2';
+    textarea.rows = 2;
+    textarea.maxLength = 1000;
+    textarea.placeholder = 'Private staff note';
+    const draftKey = onlinePlayerDraftKey(requestContext.serverId, player.identityId);
+    const savePending = onlinePlayerNoteSaveCoordinator.isPending(draftKey);
+    textarea.value = onlinePlayerNoteDrafts.has(draftKey)
+      ? onlinePlayerNoteDrafts.get(draftKey)
+      : (player.staffNote?.text || '');
+    textarea.disabled = savePending;
+    textarea.addEventListener('input', () => onlinePlayerNoteDrafts.set(draftKey, textarea.value));
+    card.appendChild(textarea);
+    const controls = document.createElement('div');
+    controls.className = 'flex justify-between items-center gap-2 mt-2';
+    const feedback = document.createElement('span');
+    feedback.className = 'text-xs text-gray-400';
+    feedback.id = `online-player-note-status-${player.identityId}`;
+    feedback.setAttribute('role', 'status');
+    feedback.setAttribute('aria-live', 'polite');
+    feedback.textContent = savePending ? 'Saving…' : (player.staffNote?.updatedAt
+      ? `Updated ${formatObservationTime(player.staffNote.updatedAt)}${player.staffNote.updatedBy ? ` by ${player.staffNote.updatedBy}` : ''}`
+      : 'No staff note');
+    const save = document.createElement('button');
+    save.type = 'button';
+    save.id = `online-player-note-save-${player.identityId}`;
+    save.className = 'btn-small btn-success';
+    save.textContent = 'Save note';
+    save.disabled = savePending;
+    save.setAttribute('aria-label', `Save private staff note for ${player.gamertag}`);
+    save.addEventListener('click', () => saveOnlinePlayerNote(player, textarea, requestContext));
+    controls.append(feedback, save);
+    card.appendChild(controls);
+    list.appendChild(card);
+  }
 }
 
 function buildOperationsLayers(snapshot) {
   const next = {
     players: L.layerGroup(), events: L.layerGroup(), purchases: L.layerGroup(),
     territory: L.layerGroup(), zones: L.layerGroup(), factions: L.layerGroup(),
+    factionTerritories: L.layerGroup(),
   };
 
-  for (const player of snapshot.rosterPlayers || []) {
-    addOperationsPoint(next.players, player, {
+  operationsPlayerMarkers.clear();
+  for (const player of snapshot.onlinePlayers || []) {
+    if (!player.position) continue;
+    const marker = addOperationsPoint(next.players, player, {
       radius: 8, color: player.positionFresh ? '#22c55e' : '#f59e0b', weight: 3,
       fillColor: player.positionFresh ? '#16a34a' : '#d97706', fillOpacity: 0.85,
-    }, `Roster observation: ${player.gamertag}`, [
+    }, `Online player: ${player.gamertag}`, [
       player.positionFresh ? 'Recent position evidence' : 'Stale position evidence',
+      ...playerMetricLines(player),
+      player.staffNote?.text ? `Staff note: ${player.staffNote.text}` : null,
       `Observed: ${formatObservationTime(player.positionObservedAt)}`,
       `X ${Math.round(player.position.east)} · Z ${Math.round(player.position.north)}`,
     ]);
+    if (marker) operationsPlayerMarkers.set(player.identityId, marker);
   }
 
   const eventStyles = {
@@ -1135,6 +1446,32 @@ function buildOperationsLayers(snapshot) {
       'Faction annotation; not territory ownership',
     ]);
   }
+  for (const territory of snapshot.factionTerritories || []) {
+    const colors = { pending: '#f59e0b', approved: '#22c55e', rejected: '#6b7280', revoked: '#ef4444' };
+    const color = colors[territory.status] || '#6b7280';
+    const latlng = gameToLeaflet(territory.pole.east, territory.pole.north, currentMapName);
+    const circle = L.circle(latlng, {
+      radius: territory.radiusMeters * radiusScale,
+      color, fillColor: color, weight: 2, fillOpacity: territory.status === 'approved' ? 0.14 : 0.06,
+      dashArray: territory.status === 'approved' ? null : '6 5',
+    });
+    let popup = operationsPopup(`🚩 ${territory.factionName}`, [
+      `${territory.status} · version ${territory.version}`,
+      `${territory.radiusMeters} m flag protection radius`,
+      'Explicit submitted flag-pole marker',
+      territory.decisionNote,
+    ]);
+    if (territory.status === 'pending') {
+      popup += `<br><button onclick="reviewFactionTerritory(${territory.id}, 'approved', ${territory.version})">Approve</button> ` +
+        `<button onclick="reviewFactionTerritory(${territory.id}, 'rejected', ${territory.version})">Reject</button>`;
+    } else if (territory.status === 'approved') {
+      popup += `<br><button onclick="reviewFactionTerritory(${territory.id}, 'revoked', ${territory.version})">Revoke</button>`;
+    }
+    circle.bindPopup(popup).addTo(next.factionTerritories);
+    L.marker(latlng, {
+      icon: L.divIcon({ html: '<span style="font-size:22px">🚩</span>', className: '', iconSize: [24, 24] }),
+    }).addTo(next.factionTerritories);
+  }
   return next;
 }
 
@@ -1143,6 +1480,7 @@ function applyOperationsLayerVisibility() {
     players: 'operations-player-toggle', events: 'operations-event-toggle',
     purchases: 'operations-purchase-toggle', territory: 'operations-territory-toggle',
     zones: 'operations-zone-toggle', factions: 'operations-faction-toggle',
+    factionTerritories: 'operations-faction-territory-toggle',
   };
   for (const [name, controlId] of Object.entries(controls)) {
     const layer = operationsLayers[name];
@@ -1159,14 +1497,41 @@ function clearOperationsLayers() {
     if (operationsLayers[name] && map && map.hasLayer(operationsLayers[name])) map.removeLayer(operationsLayers[name]);
     operationsLayers[name] = null;
   }
+  operationsPlayerMarkers.clear();
   document.getElementById('operations-counts').textContent = '';
+  document.getElementById('online-player-list').replaceChildren();
+  document.getElementById('online-player-summary').textContent = 'No current roster loaded.';
   document.getElementById('operations-status').textContent = 'Select a server and map to load exact-server log telemetry.';
 }
+
+async function reviewFactionTerritory(territoryId, decision, expectedVersion) {
+  const serverContext = selectedServerContext(currentServer);
+  if (!serverContext || !currentMapName) return;
+  const generation = contextGeneration;
+  const note = decision === 'approved' ? '' : (prompt('Optional decision note:') || '');
+  try {
+    const response = await fetchWithCsrf(
+      `/api/faction-territories/${encodeURIComponent(serverContext.internalServerId)}/${encodeURIComponent(territoryId)}`,
+      {
+        method: 'PATCH',
+        body: JSON.stringify({ decision, expectedVersion, note }),
+      }
+    );
+    const result = await response.json().catch(() => ({}));
+    if (generation !== contextGeneration || !selectedServerContext(currentServer)) return;
+    if (!response.ok || !result.success) throw new Error(result.error || 'Territory review failed');
+    await loadOperationsOverlay();
+  } catch (error) {
+    if (generation !== contextGeneration) return;
+    alert(error.message);
+  }
+}
+window.reviewFactionTerritory = reviewFactionTerritory;
 
 async function loadOperationsOverlay() {
   const serverContext = selectedServerContext(currentServer);
   if (!serverContext || !currentMapName) return;
-  const mapDefinition = window.DayZMapCoordinates.getMapDefinition(currentMapName);
+  const mapDefinition = window.DayzMapCoordinates.getMapDefinition(currentMapName);
   if (!mapDefinition.verifiedGeometry) {
     clearOperationsLayers();
     document.getElementById('operations-status').textContent =
@@ -1200,6 +1565,10 @@ async function loadOperationsOverlay() {
     }
 
     const nextLayers = buildOperationsLayers(result);
+    renderOnlinePlayerList(result.onlinePlayers || [], {
+      serverId: serverContext.internalServerId,
+      generation: requestContextGeneration,
+    });
     for (const name of Object.keys(operationsLayers)) {
       if (operationsLayers[name] && map.hasLayer(operationsLayers[name])) map.removeLayer(operationsLayers[name]);
       operationsLayers[name] = nextLayers[name];
@@ -1211,12 +1580,14 @@ async function loadOperationsOverlay() {
       ? `Verified active session since ${sessionStarted} · roster observed ${observed} · snapshot ${formatObservationTime(result.generatedAt)}`
       : `Verified active session since ${sessionStarted} · roster evidence is stale or unavailable · snapshot ${formatObservationTime(result.generatedAt)}`;
     document.getElementById('operations-counts').textContent = [
-      `${result.rosterPlayers.length}/${result.telemetry.rosterCount} observed roster players positioned`,
+      `${result.onlinePlayers.length} online players`,
+      `${result.telemetry.positionedCount} with active-session positions`,
       `${result.recentEvents.length} combat events`,
       `${result.purchases.length} purchases`,
       `${result.territoryObservations.length} build/territory observations`,
       `${result.zones.length} review zones`,
       `${result.factionMarkers.length} faction markers`,
+      `${result.factionTerritories.length} governed faction territories`,
     ].join(' · ');
   } catch (error) {
     if (requestId !== operationsRequestId || requestContextGeneration !== contextGeneration) return;
@@ -1226,24 +1597,9 @@ async function loadOperationsOverlay() {
   }
 }
 
-function toggleFilterPanel() {
-  const panel = document.getElementById('filter-panel');
-  const isMinimized = panel.classList.contains('minimized');
-
-  if (isMinimized) {
-    panel.classList.remove('minimized');
-    panel.classList.add('maximized');
-    localStorage.setItem('filterPanelState', 'maximized');
-  } else {
-    panel.classList.add('minimized');
-    panel.classList.remove('maximized');
-    localStorage.setItem('filterPanelState', 'minimized');
-  }
-}
-
 function toggleAutoRefresh() {
   autoRefreshEnabled = document.getElementById('auto-refresh-toggle').checked;
-
+  
   if (autoRefreshEnabled) {
     startAutoRefresh();
     document.getElementById('auto-refresh-badge').style.display = 'inline-flex';
@@ -1251,20 +1607,21 @@ function toggleAutoRefresh() {
     stopAutoRefresh();
     document.getElementById('auto-refresh-badge').style.display = 'none';
   }
-
+  
   localStorage.setItem('autoRefreshEnabled', autoRefreshEnabled);
+  syncMapUrl();
 }
 
 function startAutoRefresh() {
   stopAutoRefresh();
-
+  
   refreshSeconds = 30;
   updateRefreshTimer();
-
+  
   refreshCountdown = setInterval(function() {
     refreshSeconds--;
     updateRefreshTimer();
-
+    
     if (refreshSeconds <= 0) {
       if (currentServer && currentMapName) {
         console.log('🔄 Auto-refreshing map data...');
@@ -1307,7 +1664,18 @@ function loadEnabledHeatmaps() {
 
 function clearSelectedContext() {
   currentMapName = null;
+  onlinePlayerNoteDrafts.clear();
   clearOperationsLayers();
+  for (const layer of Object.values(geographyLayers)) {
+    if (layer) {
+      layer.clearLayers();
+      if (map) map.removeLayer(layer);
+    }
+  }
+  currentTiles.forEach(tile => tile.remove());
+  currentTiles = [];
+  if (coordinateGridLayer && map) map.removeLayer(coordinateGridLayer);
+  coordinateGridLayer = null;
   Object.values(markers).forEach(marker => marker.remove());
   markers = {};
   allEventData = [];
@@ -1331,6 +1699,17 @@ document.getElementById('server-select').addEventListener('change', function(e) 
   mapDataRequestId++;
   eventHealthRequestId++;
   currentServer = e.target.value;
+
+  // Live context pill: display the selected server's snapshot (internal id
+  // from the option; the shell never infers authorization itself)
+  if (window.dzcShellPollServer) {
+    var shellOpt = e.target.options[e.target.selectedIndex];
+    if (currentServer && shellOpt && shellOpt.dataset.internalServerId) {
+      window.dzcShellPollServer(shellOpt.dataset.internalServerId, shellOpt.textContent.split(' (')[0]);
+    } else {
+      window.dzcShellPollServerStop();
+    }
+  }
   clearSelectedContext();
   if (currentServer) {
     loadMapsForServer(currentServer);
@@ -1338,6 +1717,7 @@ document.getElementById('server-select').addEventListener('change', function(e) 
       startAutoRefresh();
     }
   }
+  syncMapUrl();
 });
 
 document.getElementById('map-select').addEventListener('change', function(e) {
@@ -1350,6 +1730,7 @@ document.getElementById('map-select').addEventListener('change', function(e) {
     loadMapData(currentServer, mapName);
     loadEnabledHeatmaps();
   }
+  syncMapUrl();
 });
 
 // Initialize
@@ -1366,27 +1747,186 @@ document.getElementById('event-health-refresh').addEventListener('click', functi
 document.getElementById('server-info').textContent = 'Livonia - High Resolution Satellite View';
 document.getElementById('stat-size').textContent = '12800m';
 
-// Restore filter panel state
-const savedPanelState = localStorage.getItem('filterPanelState') || 'maximized';
-const panel = document.getElementById('filter-panel');
-if (savedPanelState === 'minimized') {
-  panel.classList.add('minimized');
-  panel.classList.remove('maximized');
-}
+// ─── Card 6/9: shareable URL state, docked panel, legend ───────────────────
+// State lives in the URL (see public/js/map-url-state.js for the param
+// scheme): server, map, layers, filters, radius, refresh, open, panel.
+const mapUrlState = window.MapUrlState ? window.MapUrlState.parse(window.location.search) : null;
 
-// Restore auto-refresh state
-const savedAutoRefresh = localStorage.getItem('autoRefreshEnabled');
-if (savedAutoRefresh !== null) {
-  autoRefreshEnabled = savedAutoRefresh === 'true';
-  document.getElementById('auto-refresh-toggle').checked = autoRefreshEnabled;
-  if (autoRefreshEnabled) {
-    document.getElementById('auto-refresh-badge').style.display = 'inline-flex';
+if (mapUrlState) {
+  const radiusEl = document.getElementById('radius-input');
+  if (radiusEl && mapUrlState.radius) radiusEl.value = mapUrlState.radius;
+
+  // Auto-refresh: ?refresh=0 forces off; otherwise the existing localStorage
+  // preference (default: on) still applies.
+  if (mapUrlState.autoRefresh === false) {
+    autoRefreshEnabled = false;
+    document.getElementById('auto-refresh-toggle').checked = false;
+  } else {
+    const savedAutoRefresh = localStorage.getItem('autoRefreshEnabled');
+    autoRefreshEnabled = savedAutoRefresh !== null ? savedAutoRefresh === 'true' : true;
+    document.getElementById('auto-refresh-toggle').checked = autoRefreshEnabled;
+    if (autoRefreshEnabled) {
+      document.getElementById('auto-refresh-badge').style.display = 'inline-flex';
+    }
+  }
+
+  // Layer toggles (defaults: operations overlay + settlement labels on,
+  // settlement radii + all heatmaps off).
+  // LAYER_CONTROLS lives on the module API, not on the parsed state.
+  Object.entries(window.MapUrlState.LAYER_CONTROLS).forEach(function ([key, controlId]) {
+    const control = document.getElementById(controlId);
+    if (control) control.checked = mapUrlState.layers.has(key);
+  });
+  heatmapEnabled = document.getElementById('heatmap-toggle').checked;
+  document.getElementById('heatmap-controls').style.display = heatmapEnabled ? 'block' : 'none';
+  killHeatmapEnabled = document.getElementById('kill-heatmap-toggle').checked;
+  deathHeatmapEnabled = document.getElementById('death-heatmap-toggle').checked;
+  movementHeatmapEnabled = document.getElementById('movement-heatmap-toggle').checked;
+
+  // Shared-URL restore: ?map=<key> on the initial (server-less) select.
+  // When ?server= is also present, loadMapsForServer re-applies the same
+  // param after repopulating the server's map list.
+  const urlMap = mapUrlState.map;
+  const mapSel = document.getElementById('map-select');
+  if (urlMap && mapSel.value !== urlMap &&
+      Array.from(mapSel.options).some(o => o.value === urlMap)) {
+    mapSel.value = urlMap;
+    initMap(urlMap);
   }
 }
 
+// Section open/closed restore (URL 'open' param; default: all open).
+document.querySelectorAll('#map-panel .map-section').forEach(function (section) {
+  const head = section.querySelector('.map-section-head');
+  const body = section.querySelector('.map-section-body');
+  if (!head || !body) return;
+  const open = mapUrlState ? mapUrlState.openSections.has(section.dataset.section) : true;
+  body.hidden = !open;
+  head.setAttribute('aria-expanded', open ? 'true' : 'false');
+});
+
+// Whole-panel collapse (desktop) / full-screen sheet (<=780px, toggled by
+// the floating Controls button). Mobile starts with the sheet closed so the
+// map is full-bleed.
+function mapIsMobile() {
+  return window.matchMedia ? window.matchMedia('(max-width: 780px)').matches : window.innerWidth <= 780;
+}
+function setMapPanelOpen(open) {
+  const panelEl = document.getElementById('map-panel');
+  const fab = document.getElementById('map-panel-fab');
+  panelEl.hidden = !open;
+  if (fab) {
+    fab.classList.toggle('is-visible', !open);
+    fab.setAttribute('aria-expanded', open ? 'true' : 'false');
+    // Mobile sheet: focus follows the sheet (inside while open, back to
+    // the trigger when closed) for keyboard + screen-reader access.
+    if (mapIsMobile()) {
+      if (open) panelEl.focus();
+      else fab.focus();
+    }
+  }
+}
+setMapPanelOpen(!mapIsMobile() && !!(mapUrlState ? mapUrlState.panelOpen : true));
+document.getElementById('map-panel-fab').addEventListener('click', function () {
+  setMapPanelOpen(document.getElementById('map-panel').hidden);
+  syncMapUrl();
+});
+document.getElementById('map-panel-collapse').addEventListener('click', function () {
+  setMapPanelOpen(false);
+  syncMapUrl();
+});
+document.addEventListener('keydown', function (ev) {
+  if (ev.key === 'Escape' && mapIsMobile() && !document.getElementById('map-panel').hidden) {
+    setMapPanelOpen(false);
+  }
+});
+document.querySelectorAll('#map-panel .map-section-head').forEach(function (head) {
+  head.addEventListener('click', function () {
+    const body = document.getElementById(head.getAttribute('aria-controls'));
+    if (!body) return;
+    const open = body.hidden;
+    body.hidden = !open;
+    head.setAttribute('aria-expanded', open ? 'true' : 'false');
+    syncMapUrl();
+  });
+});
+
+// Legend for active layers (with an explicit "nothing on" empty state).
+const LEGEND_ITEMS = [
+  ['loot', 'Loot despawn heat', 'grad-loot'],
+  ['kill', 'Kill locations', 'grad-kill'],
+  ['death', 'Death locations', 'grad-death'],
+  ['movement', 'Player movement', 'grad-movement'],
+  ['roster', 'Roster (fresh / stale)', '#22c55e'],
+  ['combat', 'Combat events', '#ef4444'],
+  ['purchases', 'Purchases', '#38bdf8'],
+  ['build', 'Build / territory obs.', '#facc15'],
+  ['zones', 'Review zones', '#ef4444'],
+  ['factions', 'Faction markers', '#2dd4bf'],
+  ['faction-territory', 'Faction territories', '#22c55e'],
+  ['settlements', 'Settlement labels', '#94a3b8'],
+  ['settlement-radii', 'Settlement radii', '#94a3b8'],
+];
+function renderMapLegend() {
+  const el = document.getElementById('layer-legend');
+  if (!el) return;
+  el.replaceChildren();
+  const active = LEGEND_ITEMS.filter(function ([key]) {
+    const control = document.getElementById(mapUrlState ? window.MapUrlState.LAYER_CONTROLS[key] : '');
+    return control && control.checked;
+  });
+  if (!active.length) {
+    const empty = document.createElement('p');
+    empty.className = 'map-empty';
+    empty.textContent = 'No layers active — enable a layer above.';
+    el.appendChild(empty);
+    return;
+  }
+  active.forEach(function ([key, label, swatch]) {
+    const row = document.createElement('div');
+    row.className = 'map-legend-row';
+    const s = document.createElement('span');
+    const gradient = swatch.indexOf('grad-') === 0;
+    s.className = 'map-legend-swatch' + (gradient ? ' ' + swatch : ' sq');
+    if (!gradient) s.style.background = swatch;
+    const t = document.createElement('span');
+    t.textContent = label;
+    row.appendChild(s);
+    row.appendChild(t);
+    el.appendChild(row);
+  });
+}
+
+// Write the current control state back to the URL (replaceState — no
+// history spam). Called from every control handler that changes state.
+function syncMapUrl() {
+  if (!window.MapUrlState) return;
+  const layers = new Set();
+  Object.entries(window.MapUrlState.LAYER_CONTROLS).forEach(function ([key, id]) {
+    const control = document.getElementById(id);
+    if (control && control.checked) layers.add(key);
+  });
+  const hiddenFilters = Object.keys(eventTypeFilters).filter(function (name) { return !eventTypeFilters[name]; });
+  const openSections = new Set();
+  document.querySelectorAll('#map-panel .map-section').forEach(function (section) {
+    if (!section.querySelector('.map-section-body[hidden]')) openSections.add(section.dataset.section);
+  });
+  const query = window.MapUrlState.buildSearch({
+    server: document.getElementById('server-select').value,
+    map: document.getElementById('map-select').value,
+    layers: layers,
+    hiddenFilters: hiddenFilters,
+    radius: parseInt(document.getElementById('radius-input').value, 10) || window.MapUrlState.DEFAULT_RADIUS,
+    autoRefresh: autoRefreshEnabled,
+    openSections: openSections,
+    panelOpen: !document.getElementById('map-panel').hidden,
+  });
+  window.history.replaceState(null, '', window.location.pathname + (query ? '?' + query : ''));
+}
+renderMapLegend();
+
 // Set up event listeners
 document.getElementById('refresh-btn').addEventListener('click', manualRefresh);
-document.getElementById('filter-header').addEventListener('click', toggleFilterPanel);
 document.getElementById('search-input').addEventListener('keyup', searchEvents);
 document.getElementById('radius-btn').addEventListener('click', startRadiusSearch);
 document.getElementById('cancel-radius-btn').addEventListener('click', cancelRadiusSearch);
@@ -1394,9 +1934,22 @@ document.getElementById('auto-refresh-toggle').addEventListener('change', toggle
 document.getElementById('operations-refresh').addEventListener('click', loadOperationsOverlay);
 document.getElementById('operations-window').addEventListener('change', loadOperationsOverlay);
 for (const id of ['operations-player-toggle', 'operations-event-toggle', 'operations-purchase-toggle',
-  'operations-territory-toggle', 'operations-zone-toggle', 'operations-faction-toggle']) {
-  document.getElementById(id).addEventListener('change', applyOperationsLayerVisibility);
+  'operations-territory-toggle', 'operations-zone-toggle', 'operations-faction-toggle',
+  'operations-faction-territory-toggle']) {
+  document.getElementById(id).addEventListener('change', function () {
+    applyOperationsLayerVisibility();
+    renderMapLegend();
+    syncMapUrl();
+  });
 }
+for (const id of ['settlement-label-toggle', 'settlement-extent-toggle']) {
+  document.getElementById(id).addEventListener('change', function () {
+    applyGeographyLayerVisibility();
+    renderMapLegend();
+    syncMapUrl();
+  });
+}
+document.getElementById('radius-input').addEventListener('change', syncMapUrl);
 
 // ─── Loot Despawn Heatmap ───────────────────────────────────────────────────
 
@@ -1501,7 +2054,11 @@ function toggleHeatmap() {
 }
 
 // Heatmap event listeners
-document.getElementById('heatmap-toggle').addEventListener('change', toggleHeatmap);
+document.getElementById('heatmap-toggle').addEventListener('change', function () {
+  toggleHeatmap();
+  renderMapLegend();
+  syncMapUrl();
+});
 document.getElementById('heatmap-days').addEventListener('change', loadHeatmap);
 document.getElementById('heatmap-grid').addEventListener('change', loadHeatmap);
 document.querySelectorAll('.heatmap-filter-btn').forEach(function(btn) {
@@ -1631,6 +2188,8 @@ document.getElementById('kill-heatmap-toggle').addEventListener('change', functi
   } else {
     loadKillHeatmap();
   }
+  renderMapLegend();
+  syncMapUrl();
 });
 
 // Toggle: death heatmap
@@ -1644,6 +2203,8 @@ document.getElementById('death-heatmap-toggle').addEventListener('change', funct
   } else {
     loadDeathHeatmap();
   }
+  renderMapLegend();
+  syncMapUrl();
 });
 
 // Toggle: movement heatmap
@@ -1657,6 +2218,8 @@ document.getElementById('movement-heatmap-toggle').addEventListener('change', fu
   } else {
     loadMovementHeatmap();
   }
+  renderMapLegend();
+  syncMapUrl();
 });
 
 // Reload all three when the shared days/grid selectors change

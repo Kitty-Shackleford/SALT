@@ -477,7 +477,7 @@ function recordingDb(overrides = {}) {
     assert.match(init, /account\.platform/);
     assert.match(init, /selectionVersion/);
     assert.match(source('public/js/components/transactionList.js'), /requestVersion/);
-    for (const page of ['public/economy-transactions.html', 'public/dashboard/economy-transactions.html']) {
+    for (const page of ['public/dashboard/economy-transactions.html']) {
       assert.match(source(page), /id="economyMembershipSelect"/,
         `${page} is missing the exact-server membership selector`);
     }

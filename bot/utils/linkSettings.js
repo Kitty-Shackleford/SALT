@@ -7,6 +7,27 @@ const ACTOR_ROLE_LOCK_NAMESPACE = 2147483001;
 const VERIFICATION_MODES = new Set(['admin_approval', 'emote', 'open']);
 const ROLE_KEYS = new Set(['assignOnJoin', 'assignOnLink', 'removeOnLink', 'removeOnLeave']);
 
+function pruneStaleRoleSettings(settings, availableRoleIds) {
+  const normalized = parseLinkSettings(settings);
+  const available = availableRoleIds instanceof Set
+    ? new Set([...availableRoleIds].map(String))
+    : new Set((availableRoleIds || []).map(String));
+  const removed = new Set();
+
+  for (const roleKey of ROLE_KEYS) {
+    normalized.roles[roleKey] = normalized.roles[roleKey].filter(roleId => {
+      if (available.has(roleId)) return true;
+      removed.add(roleId);
+      return false;
+    });
+  }
+
+  return {
+    settings: normalized,
+    removedRoleIds: [...removed].sort(),
+  };
+}
+
 async function getLinkSettings(db, serverId, options = {}) {
   if (!Number.isInteger(Number(serverId)) || Number(serverId) <= 0) {
     throw new Error('A valid server ID is required for link settings');
@@ -233,8 +254,15 @@ async function mutateBotLinkSettings(db, options) {
     const currentRow = currentResult.rows[0];
     const enabled = currentRow?.enabled === true || currentRow?.enabled === 1
       || currentRow?.enabled === '1' || currentRow?.enabled === 't';
-    const next = parseLinkSettings(enabled ? currentRow.config : null);
+    const previous = parseLinkSettings(enabled ? currentRow.config : null);
+    let next = previous;
+    let removedStaleRoleIds = [];
     const change = options.change || {};
+    if (change.type === 'role' && options.availableRoleIds) {
+      const pruned = pruneStaleRoleSettings(previous, options.availableRoleIds);
+      next = pruned.settings;
+      removedStaleRoleIds = pruned.removedRoleIds;
+    }
     if (change.type === 'verification') {
       if (!VERIFICATION_MODES.has(change.mode)) {
         const error = new Error('Unsupported verification mode');
@@ -264,11 +292,18 @@ async function mutateBotLinkSettings(db, options) {
     }
 
     const normalized = await validateGuildRoleSettings(client, serverId, next);
-    const previous = parseLinkSettings(enabled ? currentRow.config : null);
+    const staleRoleIdSet = new Set(removedStaleRoleIds);
     const managedRoleIds = [...new Set([
-      ...previous.roles.assignOnLink,
+      ...previous.roles.assignOnLink.filter(roleId => !staleRoleIdSet.has(roleId)),
       ...normalized.roles.assignOnLink,
     ])];
+    if (removedStaleRoleIds.length) {
+      await client.query(
+        `DELETE FROM discord_link_role_policy_history
+          WHERE server_id = $1 AND role_id = ANY($2::TEXT[])`,
+        [serverId, removedStaleRoleIds]
+      );
+    }
     if (managedRoleIds.length) {
       await client.query(
         `INSERT INTO discord_link_role_policy_history (server_id, role_id, last_managed_at)
@@ -291,6 +326,7 @@ async function mutateBotLinkSettings(db, options) {
       [actorUserId, scope.guild_id, serverId, String(serverId), JSON.stringify({
         source: 'discord_bot',
         change,
+        removedStaleRoleCount: removedStaleRoleIds.length,
       })]
     );
     const jobsResult = await client.query(
@@ -339,6 +375,7 @@ async function mutateBotLinkSettings(db, options) {
 module.exports = {
   DEFAULT_LINK_SETTINGS,
   parseLinkSettings,
+  pruneStaleRoleSettings,
   getLinkSettings,
   validateGuildRoleSettings,
   saveLinkSettings,

@@ -1,6 +1,6 @@
 'use strict';
 
-const PLAYER_MAP_FEATURES = Object.freeze([
+const LEGACY_PLAYER_MAP_FEATURES = Object.freeze([
   'structures',
   'deaths',
   'trail',
@@ -8,6 +8,10 @@ const PLAYER_MAP_FEATURES = Object.freeze([
   'lastPosition',
   'factionMembers',
   'factionMarkers',
+]);
+const PLAYER_MAP_FEATURES = Object.freeze([
+  ...LEGACY_PLAYER_MAP_FEATURES,
+  'factionTerritories',
 ]);
 
 const FEATURE_FIELDS = Object.freeze({
@@ -20,7 +24,7 @@ const FEATURE_FIELDS = Object.freeze({
 
 function parsePlayerMapSettings(value) {
   if (value === undefined || value === null) {
-    return { enabledFeatures: [...PLAYER_MAP_FEATURES] };
+    return { enabledFeatures: [...LEGACY_PLAYER_MAP_FEATURES] };
   }
 
   let parsed = value;
@@ -80,6 +84,7 @@ function projectPlayerMapPayload(payload, settings) {
 }
 
 module.exports = {
+  LEGACY_PLAYER_MAP_FEATURES,
   PLAYER_MAP_FEATURES,
   parsePlayerMapSettings,
   isPlayerMapFeatureEnabled,

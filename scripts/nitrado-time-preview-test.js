@@ -118,7 +118,7 @@ function testTypingUpdatesPreviewWithoutSaving() {
 }
 
 function testPagesLoadSharedPreviewWithHonestLabels() {
-  for (const file of ['public/dashboard/settings.html', 'public/nitrado-settings.html']) {
+  for (const file of ['public/dashboard/settings.html']) {
     const html = fs.readFileSync(path.join(root, file), 'utf8');
     assert.match(html, /id="timePreviewCard"/, file);
     for (const id of ['timePreviewCurrent', 'timePreviewDraft']) assert(html.includes(`id="${id}"`));

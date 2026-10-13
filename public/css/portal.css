@@ -1,0 +1,297 @@
+/* ============================================================================
+ * Player portal — mobile-first top pages (card 7/9)
+ * ----------------------------------------------------------------------------
+ * Scoped to .dzc-portal (the shell content wrapper on /player). Design target:
+ * 375px first, scaled up at 640px/780px. Every color is a --dzc-* token, so it
+ * is correct under all 5 base themes + the holiday layer.
+ *
+ * The reference table contract (card 5) lives in shell.css and is consumed
+ * here for the leaderboard + session history tables (.dzc-table-wrap/.dzc-
+ * table, stacked card rows at <=640px). This file only carries portal-
+ * specific components: stat cards, deltas, sparklines, guild/account rows,
+ * and touch-target sizing for primary actions.
+ * ==========================================================================*/
+
+/* -- Content gutter (mobile-first) ------------------------------------------ */
+.dzc-portal > .container {
+  padding-left: var(--dzc-space-4);
+  padding-right: var(--dzc-space-4);
+}
+@media (min-width: 780px) {
+  .dzc-portal > .container {
+    padding-left: var(--dzc-space-6);
+    padding-right: var(--dzc-space-6);
+  }
+}
+
+/* -- Text tokens over theme surfaces (light-theme safe) ----------------------
+ * The legacy markup carries tailwind text-white / gray-400, which are correct
+ * on its own dark cards but invisible on token surfaces under sakhal (the
+ * light theme). Scope these to portal components so every theme is AA. */
+.dzc-portal .guild-card { color: var(--dzc-text); }
+.dzc-portal .guild-card p,
+.dzc-portal .guild-card .text-gray-400 { color: var(--dzc-text-muted); }
+.dzc-portal .text-gray-400 { color: var(--dzc-text-muted); }
+.dzc-portal .text-gray-300 { color: var(--dzc-text); }
+/* Hardcoded dark card containers become dark "islands" on light bases
+ * (sakhal) and swallow the themed text inside; map them to the token surface. */
+.dzc-portal .bg-gray-800 { background-color: var(--dzc-surface); }
+.dzc-portal .dzc-acct-row .font-bold { color: var(--dzc-text); }
+.dzc-portal .dzc-acct-row .text-sm { color: var(--dzc-text-muted); }
+/* serverNames line only — .text-xs alone would also hit the badge spans,
+ * whose white-on-dark-chip color is correct. */
+.dzc-portal .dzc-acct-row .text-gray-500 { color: var(--dzc-text-muted); }
+.dzc-portal .dzc-session-card .font-semibold { color: var(--dzc-text); }
+
+/* -- Header ------------------------------------------------------------------ */
+.dzc-portal-head {
+  flex-wrap: wrap;
+  gap: var(--dzc-space-3);
+}
+.dzc-portal-head h1 {
+  font-size: clamp(1.6rem, 4vw + 0.6rem, 3rem);
+  letter-spacing: var(--dzc-letter-spacing-display);
+}
+/* Primary actions stay bottom-reachable and tappable (>=44px). */
+.dzc-portal-head > div:last-child a {
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+}
+
+/* -- Stat cards (My Stats) --------------------------------------------------- */
+.dzc-stat-card {
+  background: var(--dzc-surface);
+  border: 1px solid var(--dzc-border);
+  border-radius: var(--dzc-radius-md);
+  padding: var(--dzc-space-4);
+  margin-bottom: var(--dzc-space-4);
+}
+.dzc-stat-card-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: var(--dzc-space-2);
+  margin-bottom: var(--dzc-space-3);
+}
+.dzc-stat-card-tag {
+  font-family: var(--dzc-font-display);
+  font-size: 1.25rem;
+  letter-spacing: var(--dzc-letter-spacing-display);
+  color: var(--dzc-text);
+  overflow-wrap: anywhere;
+}
+.dzc-stat-card-sub {
+  font-size: 0.8rem;
+  color: var(--dzc-text-muted);
+}
+.dzc-stat-card-guild {
+  font-size: 0.75rem;
+  color: var(--dzc-text-muted);
+  white-space: nowrap;
+}
+/* Numeric hierarchy: big tabular display numerals, small uppercase labels.
+ * 2x2 on phones, 4-across from 640px. */
+.dzc-stat-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: var(--dzc-space-3);
+  margin: 0;
+}
+@media (min-width: 640px) {
+  .dzc-stat-grid { grid-template-columns: repeat(4, 1fr); }
+}
+.dzc-stat { text-align: center; }
+.dzc-stat-num {
+  font-family: var(--dzc-font-display);
+  font-size: clamp(1.5rem, 5vw, 2.25rem);
+  font-variant-numeric: tabular-nums;
+  line-height: 1.1;
+  color: var(--dzc-text);
+}
+.dzc-stat-num.is-kills { color: var(--dzc-stat); }
+.dzc-stat-num.is-deaths { color: var(--dzc-danger); }
+.dzc-stat-num.is-playtime { color: var(--dzc-info); }
+.dzc-stat-num.is-kd.is-good { color: var(--dzc-stat); }
+.dzc-stat-num.is-kd.is-ok { color: var(--dzc-warning); }
+.dzc-stat-num.is-kd.is-bad { color: var(--dzc-danger); }
+.dzc-stat-label {
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--dzc-text-muted);
+}
+/* Comparison delta chip (vs community average). */
+.dzc-delta {
+  display: inline-block;
+  margin-top: 4px;
+  font-size: 0.72rem;
+  font-variant-numeric: tabular-nums;
+  color: var(--dzc-text-muted);
+}
+.dzc-delta.is-up { color: var(--dzc-stat); }
+.dzc-delta.is-down { color: var(--dzc-danger); }
+/* The stat-green token hits only 3.36:1 at this size on sakhal's white
+ * surface (< 4.5 for 11.5px text) — darken it for the light theme only. */
+html[data-theme='sakhal'] .dzc-delta.is-up {
+  color: color-mix(in srgb, var(--dzc-stat) 60%, var(--dzc-text) 40%);
+}
+.dzc-stat-lastseen {
+  margin-top: var(--dzc-space-3);
+  font-size: 0.8rem;
+  color: var(--dzc-text-muted);
+}
+
+/* -- Sub-section cards inside My Stats --------------------------------------- */
+/* Stacked full-width cards; scroll target offset clears the sticky topbar. */
+.dzc-portal .portal-subsection {
+  scroll-margin-top: calc(var(--dzc-shell-topbar-h) + var(--dzc-space-2));
+}
+.dzc-portal .portal-subsection > div {
+  background: var(--dzc-surface-2);
+  border: 1px solid var(--dzc-border);
+  border-radius: var(--dzc-radius-md);
+  padding: var(--dzc-space-4);
+  margin-top: var(--dzc-space-4);
+}
+.dzc-portal .portal-subsection > div > h3 {
+  font-size: 1.1rem;
+  color: var(--dzc-text);
+}
+
+/* -- Session sparkline -------------------------------------------------------- */
+.dzc-spark {
+  display: block;
+  width: 100%;
+  height: 56px;
+  margin-bottom: var(--dzc-space-2);
+}
+.dzc-spark-line {
+  fill: none;
+  stroke: var(--dzc-accent);
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.dzc-spark-fill { fill: var(--dzc-accent-soft); }
+.dzc-spark-label {
+  font-size: 0.7rem;
+  color: var(--dzc-text-muted);
+  font-variant-numeric: tabular-nums;
+  margin-bottom: var(--dzc-space-3);
+}
+
+/* -- Sessions cards ------------------------------------------------------------ */
+.dzc-session-card {
+  background: var(--dzc-surface);
+  border: 1px solid var(--dzc-border);
+  border-radius: var(--dzc-radius-md);
+  padding: var(--dzc-space-3);
+}
+.dzc-session-card h5 {
+  color: var(--dzc-text);
+  margin-bottom: var(--dzc-space-2);
+}
+.dzc-session-card .dzc-delta { margin-top: 2px; }
+
+/* -- Guild cards (root / discover) --------------------------------------------- */
+.dzc-portal .guild-card {
+  background: var(--dzc-surface-2);
+  border: 1px solid var(--dzc-border);
+  border-radius: var(--dzc-radius-md);
+  min-height: 44px;
+}
+.dzc-portal .guild-card:hover { border-color: var(--dzc-border-strong); }
+.dzc-portal .guild-card:focus-visible {
+  outline: 2px solid var(--dzc-accent);
+  outline-offset: 2px;
+}
+
+/* -- Account rows (discovery + search results) --------------------------------- */
+.dzc-acct-row {
+  background: var(--dzc-surface-2);
+  border: 1px solid var(--dzc-border);
+  border-radius: var(--dzc-radius-md);
+  flex-direction: column;
+  align-items: stretch;
+  min-height: 44px;
+}
+@media (min-width: 640px) {
+  .dzc-acct-row { flex-direction: row; align-items: center; }
+}
+.dzc-acct-row .link-account-btn {
+  min-height: 44px;
+  width: 100%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+@media (min-width: 640px) {
+  .dzc-acct-row .link-account-btn { width: auto; }
+}
+
+/* -- Account-linking search row -------------------------------------------------- */
+.dzc-search-row {
+  flex-direction: column;
+  align-items: stretch;
+}
+@media (min-width: 640px) {
+  .dzc-search-row { flex-direction: row; align-items: center; }
+}
+.dzc-portal #searchGamertag { min-height: 44px; }
+.dzc-portal #searchGamertagBtn,
+.dzc-portal #backToGuildsBtn,
+.dzc-portal #refreshBtn,
+.dzc-portal #sortBy {
+  min-height: 44px;
+}
+.dzc-portal #refreshBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.dzc-portal #autoRefreshToggle {
+  width: 22px;
+  height: 22px;
+}
+
+/* -- Link confirmation modal (presentation only) --------------------------------- */
+#linkModal { padding: var(--dzc-space-4); }
+#linkModal > div { max-width: 26rem; }
+#linkModal .flex.gap-2 button {
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* -- Overflow guards ------------------------------------------------------------ */
+/* Body-part diagram and economy action rows must not force horizontal scroll. */
+.dzc-portal .body-row { flex-wrap: wrap; justify-content: center; }
+.dzc-portal .body-part-visual { min-width: 64px; }
+.dzc-portal #economy-actions { flex-wrap: wrap; }
+.dzc-portal #economy-actions button { min-height: 44px; }
+
+/* -- High-contrast: thicken structural borders + stronger focus ------------------ */
+html[data-theme='high-contrast'] .dzc-portal .dzc-stat-card,
+html[data-theme='high-contrast'] .dzc-portal .portal-subsection > div,
+html[data-theme='high-contrast'] .dzc-portal .guild-card,
+html[data-theme='high-contrast'] .dzc-portal .dzc-acct-row,
+html[data-theme='high-contrast'] .dzc-session-card,
+html[data-theme='high-contrast'] #linkModal > div {
+  border-width: 2px;
+}
+html[data-theme='high-contrast'] .dzc-portal #refreshBtn:focus-visible,
+html[data-theme='high-contrast'] .dzc-portal #searchGamertagBtn:focus-visible,
+html[data-theme='high-contrast'] .dzc-portal #backToGuildsBtn:focus-visible,
+html[data-theme='high-contrast'] .dzc-portal .guild-card:focus-visible,
+html[data-theme='high-contrast'] #linkModal button:focus-visible {
+  outline: 3px solid var(--dzc-accent);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dzc-portal .guild-card,
+  .dzc-portal .dzc-stat-card { transition: none; }
+}

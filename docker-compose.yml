@@ -73,8 +73,6 @@ services:
         condition: service_completed_successfully
 
   tui:
-    profiles:
-      - tools
     build: .
     env_file:
       - .env
@@ -89,9 +87,6 @@ services:
     tty: true
     stdin_open: true
     restart: "no"
-    depends_on:
-      db-init:
-        condition: service_completed_successfully
 
 volumes:
   postgres-data:

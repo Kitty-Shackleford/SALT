@@ -14,7 +14,7 @@ async function testExactServerStatusProjection() {
       if (sql.includes('FROM servers s')) {
         return [{
           server_id: 42,
-          platform_server_id: '90000002',
+          platform_server_id: '19811740',
           token_hash: 'encrypted',
         }];
       }
@@ -45,7 +45,7 @@ async function testExactServerStatusProjection() {
     capabilityService: {
       async probe(input) {
         assert.deepStrictEqual(input, {
-          platformServerId: '90000002',
+          platformServerId: '19811740',
           token: 'provider-token',
           includeContent: false,
           includeProviderPath: false,
@@ -72,7 +72,7 @@ async function testExactServerStatusProjection() {
   const result = await service.getStatus({
     db,
     internalServerId: 42,
-    discordGuildId: '900000000000000002',
+    discordGuildId: '123456789012345678',
   });
 
   assert.strictEqual(result.providerState, 'candidate_present');
@@ -101,7 +101,7 @@ async function testExactServerStatusProjection() {
   assert(calls[0][0].includes('g.discord_guild_id = ?'));
   assert(calls[0][0].includes("s.status = 'active'"));
   assert(calls[0][0].includes("g.status = 'approved'"));
-  assert.deepStrictEqual(calls[0][1], [42, '900000000000000002']);
+  assert.deepStrictEqual(calls[0][1], [42, '123456789012345678']);
   for (const [sql, params] of calls.slice(1)) {
     assert(sql.includes('JOIN servers scoped_server ON scoped_server.id = pm.server_id'));
     assert(sql.includes('JOIN guilds scoped_guild ON scoped_guild.id = scoped_server.guild_id'));
@@ -109,7 +109,7 @@ async function testExactServerStatusProjection() {
     assert(sql.includes('pm.provider_service_id = ?'));
     assert(sql.includes("scoped_server.status = 'active'"));
     assert(sql.includes("scoped_guild.status = 'approved'"));
-    assert.deepStrictEqual(params, [42, '900000000000000002', '90000002']);
+    assert.deepStrictEqual(params, [42, '123456789012345678', '19811740']);
   }
 }
 
@@ -124,10 +124,10 @@ async function testRestoreAndDriftStates() {
     });
     return service.getStatus({
       internalServerId: 42,
-      discordGuildId: '900000000000000002',
+      discordGuildId: '123456789012345678',
       db: { async query(sql) {
         if (sql.includes('FROM servers s')) {
-          return [{ server_id: 42, platform_server_id: '90000002', token_hash: 'encrypted' }];
+          return [{ server_id: 42, platform_server_id: '19811740', token_hash: 'encrypted' }];
         }
         if (sql.includes("workflow = 'mission_init'")) return [operation];
         return [];
@@ -158,7 +158,7 @@ async function testDeniedOrAmbiguousContextStopsBeforeProvider() {
     () => service.getStatus({
       db: { async query() { return []; } },
       internalServerId: 42,
-      discordGuildId: '900000000000000002',
+      discordGuildId: '123456789012345678',
     }),
     error => error.code === 'MISSION_INIT_STATUS_UNAVAILABLE' && error.status === 404
   );
@@ -166,12 +166,12 @@ async function testDeniedOrAmbiguousContextStopsBeforeProvider() {
     () => service.getStatus({
       db: { async query() {
         return [
-          { server_id: 42, platform_server_id: '90000002', token_hash: 'one' },
-          { server_id: 42, platform_server_id: '90000002', token_hash: 'two' },
+          { server_id: 42, platform_server_id: '19811740', token_hash: 'one' },
+          { server_id: 42, platform_server_id: '19811740', token_hash: 'two' },
         ];
       } },
       internalServerId: 42,
-      discordGuildId: '900000000000000002',
+      discordGuildId: '123456789012345678',
     }),
     error => error.code === 'MISSION_INIT_STATUS_UNAVAILABLE'
   );

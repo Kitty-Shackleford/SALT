@@ -38,7 +38,7 @@ function handlerTargets(handler) {
   walk(handler, node => {
     if (node.type !== 'CallExpression') return;
 
-    if (node.callee?.type === 'Identifier' && node.callee.name === 'renderWithCsrf') {
+    if (node.callee?.type === 'Identifier' && ['renderWithCsrf', 'renderShellPage'].includes(node.callee.name)) {
       const target = node.arguments[0];
       if (target?.type !== 'CallExpression' || target.callee?.name !== 'pub') return;
       const parts = target.arguments.map(literalString);

@@ -4,7 +4,6 @@ let currentTab = 'pending';
 let guilds = [];
 let pendingAction = null;
 let guildLoadGeneration = 0;
-let guildActionGeneration = 0;
 
 function esc(value) {
   return String(value ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;')
@@ -41,7 +40,7 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('tab-pending').addEventListener('click', () => switchTab('pending'));
   document.getElementById('tab-approved').addEventListener('click', () => switchTab('approved'));
   document.getElementById('tab-disabled').addEventListener('click', () => switchTab('disabled'));
-
+  
   // Modal buttons
   document.getElementById('cancelBtn').addEventListener('click', closeModal);
   document.getElementById('confirmBtn').addEventListener('click', executeAction);
@@ -49,20 +48,20 @@ document.addEventListener('DOMContentLoaded', () => {
 
 function switchTab(tab) {
   currentTab = tab;
-
+  
   // Update tab styles
   document.querySelectorAll('.tab-btn').forEach(btn => {
     btn.className = 'tab-btn bg-gray-700 hover:bg-gray-600 px-6 py-3 rounded';
   });
-
+  
   const colors = {
     pending: 'bg-yellow-600',
     approved: 'bg-green-600',
     disabled: 'bg-red-600'
   };
-
+  
   document.getElementById(`tab-${tab}`).className = `tab-btn ${colors[tab]} px-6 py-3 rounded font-semibold`;
-
+  
   loadGuilds();
 }
 
@@ -93,8 +92,8 @@ async function loadGuilds() {
 
 function displayGuilds() {
   if (guilds.length === 0) {
-    document.getElementById('guilds-container').innerHTML =
-      `<p class="text-gray-400 text-center py-8">No ${currentTab} guilds found</p>`;
+    document.getElementById('guilds-container').innerHTML = 
+      `<div class="dzc-empty"><div class="dzc-empty-title">No ${currentTab} guilds found</div></div>`;
     return;
   }
 
@@ -105,7 +104,7 @@ function displayGuilds() {
   `;
 
   document.getElementById('guilds-container').innerHTML = html;
-
+  
   // Add event listeners
   attachEventListeners();
 }
@@ -149,7 +148,7 @@ function renderGuildCard(guild) {
     <div class="bg-gray-700 p-6 rounded-lg">
       <div class="flex items-start justify-between">
         <div class="flex items-center gap-4 flex-1">
-          ${guild.icon_url ?
+          ${guild.icon_url ? 
             `<img src="${esc(guild.icon_url)}" class="w-16 h-16 rounded" alt="" />` :
             '<div class="w-16 h-16 rounded bg-gray-600 flex items-center justify-center text-3xl">🛡️</div>'
           }
@@ -180,7 +179,7 @@ function attachEventListeners() {
       const action = this.getAttribute('data-action');
       const guildId = this.getAttribute('data-guild-id');
       const guild = guilds.find(g => g.guild_id === guildId);
-
+      
       if (guild) {
         showConfirmModal(action, guild);
       }
@@ -194,7 +193,7 @@ function showConfirmModal(action, guild) {
   const message = document.getElementById('modalMessage');
   const reasonInput = document.getElementById('reasonInput');
   const confirmBtn = document.getElementById('confirmBtn');
-
+  
   const guildName = esc(guild.guildName || 'Unknown Guild');
   const configs = {
     deny: {
@@ -219,22 +218,20 @@ function showConfirmModal(action, guild) {
       btnText: '✅ Re-enable'
     }
   };
-
+  
   const config = configs[action];
-
+  
   title.textContent = config.title;
   message.innerHTML = config.message;
   reasonInput.style.display = config.showReason ? 'block' : 'none';
   confirmBtn.className = `${config.btnClass} px-4 py-2 rounded`;
   confirmBtn.textContent = config.btnText;
-
+  
   pendingAction = { action, guildId: guild.guild_id };
-  guildActionGeneration++;
   modal.classList.remove('hidden');
 }
 
 function closeModal() {
-  guildActionGeneration++;
   document.getElementById('confirmModal').classList.add('hidden');
   document.getElementById('actionReason').value = '';
   pendingAction = null;
@@ -242,25 +239,20 @@ function closeModal() {
 
 async function executeAction() {
   if (!pendingAction) return;
-
-  const generation = guildActionGeneration;
+  
   const { action, guildId } = pendingAction;
-  const isCurrent = () => generation === guildActionGeneration &&
-    pendingAction?.action === action && String(pendingAction?.guildId) === String(guildId);
   const reason = document.getElementById('actionReason').value;
-
+  
   const endpoint = `/api/admin/guilds/${guildId}/${action}`;
-
+  
   try {
     const response = await fetchWithCsrf(endpoint, {
       method: 'POST',
       body: JSON.stringify({ reason })
     });
-    if (!isCurrent()) return;
-
+    
     const data = await response.json();
-    if (!isCurrent()) return;
-
+    
     if (data.success) {
       closeModal();
       loadGuilds(); // Reload
@@ -274,7 +266,6 @@ async function executeAction() {
       alert('❌ Error: ' + (data.error || 'Unknown error'));
     }
   } catch (err) {
-    if (!isCurrent()) return;
     console.error('Error executing action:', err);
     alert('❌ Failed to execute action');
   }

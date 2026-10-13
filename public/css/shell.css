@@ -1,0 +1,646 @@
+/* ============================================================================
+ * DayZ Dashboard — Route-aware app shell (card 3/9)
+ * ----------------------------------------------------------------------------
+ * Server-rendered sidebar + topbar injected around authenticated page bodies by
+ * utils/appShell.js. Every color, radius, and elevation comes from the --dzc-*
+ * theme tokens in theme.css, so the shell is correct under all 5 base themes
+ * and the holiday layer without any name-based logic.
+ *
+ * Two-role accent discipline (from card 2) is honored here:
+ *   --dzc-accent  → identity / selection (active nav item, brand, links)
+ *   --dzc-stat    → "act": live indicators, primary positive state (pill dot)
+ * Restrained enterprise surface: 1px borders, subtle shadows, 6-10px radii,
+ * no gradient decoration, no glow. Tabular numerals on stat readouts.
+ * ==========================================================================*/
+
+:root {
+  --dzc-shell-width: 248px;
+  --dzc-shell-topbar-h: 56px;
+}
+
+/* -- Layout ------------------------------------------------------------------ */
+/* Body inherits the resolved theme tokens so page content without explicit
+ * colors stays readable on light bases (sakhal) — no hardcoded dark-page
+ * tailwind (bg-gray-900 text-white) left on shell pages. */
+body {
+  background: var(--dzc-bg);
+  color: var(--dzc-text);
+}
+
+.dzc-shell {
+  display: flex;
+  min-height: 100vh;
+  background: var(--dzc-bg);
+}
+
+/* Main column: offset by the sidebar on desktop, full-bleed on mobile. */
+.dzc-shell-main {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+/* The injected content wrapper holds the original page markup; it keeps the
+ * page's own container but no longer needs to reserve room for the old
+ * inline nav. */
+.dzc-shell-content {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+/* -- Sidebar ------------------------------------------------------------------ */
+.dzc-shell-sidebar {
+  flex: 0 0 auto;
+  width: var(--dzc-shell-width);
+  display: flex;
+  flex-direction: column;
+  gap: var(--dzc-space-4);
+  padding: var(--dzc-space-4) var(--dzc-space-3) var(--dzc-space-5);
+  background: var(--dzc-surface);
+  border-right: 1px solid var(--dzc-border);
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+/* Brand block */
+.dzc-shell-brand {
+  display: flex;
+  align-items: center;
+  gap: var(--dzc-space-2);
+  padding: var(--dzc-space-1) var(--dzc-space-2);
+}
+.dzc-shell-brand-mark {
+  width: 34px;
+  height: 34px;
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--dzc-radius-md);
+  background: var(--dzc-accent);
+  color: var(--dzc-accent-contrast);
+}
+.dzc-shell-brand-mark svg { width: 20px; height: 20px; }
+.dzc-shell-brand-name {
+  font-family: var(--dzc-font-display);
+  font-size: 1rem;
+  letter-spacing: var(--dzc-letter-spacing-display);
+  text-transform: uppercase;
+  color: var(--dzc-text);
+  line-height: 1.1;
+}
+.dzc-shell-brand-sub {
+  font-size: 0.72rem;
+  color: var(--dzc-text-muted);
+  letter-spacing: 0.04em;
+}
+/* Player surface brand: "act" color mark so the portal reads as a different
+ * product surface than owner/operator (accent is reserved for identity/nav). */
+.dzc-shell-brand--player .dzc-shell-brand-mark {
+  background: var(--dzc-stat);
+}
+
+/* Nav groups */
+.dzc-shell-nav { display: flex; flex-direction: column; gap: var(--dzc-space-4); }
+.dzc-nav-group { display: flex; flex-direction: column; gap: 2px; }
+.dzc-nav-group-title {
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  /* muted (not faint): faint fails WCAG AA on the faint-variant surfaces */
+  color: var(--dzc-text-muted);
+  padding: 0 var(--dzc-space-2) var(--dzc-space-1);
+}
+.dzc-shell-nav-item {
+  display: flex;
+  align-items: center;
+  gap: var(--dzc-space-2);
+  padding: var(--dzc-space-2) var(--dzc-space-2);
+  border-radius: var(--dzc-radius-md);
+  color: var(--dzc-text-muted);
+  text-decoration: none;
+  font-size: 0.92rem;
+  line-height: 1.2;
+  border: 1px solid transparent;
+  background: transparent;
+  font-family: var(--dzc-font-body);
+  cursor: pointer;
+  text-align: left;
+  width: 100%;
+}
+.dzc-shell-nav-item:hover {
+  background: var(--dzc-surface-2);
+  color: var(--dzc-text);
+}
+.dzc-shell-nav-item.is-active {
+  background: var(--dzc-accent);
+  color: var(--dzc-accent-contrast);
+  font-weight: 600;
+}
+.dzc-shell-nav-item.is-dimmed {
+  color: var(--dzc-text-muted);
+  cursor: default;
+  pointer-events: none;
+}
+.dzc-shell-nav-item.is-dimmed .dzc-nav-icon { opacity: 0.5; }
+.dzc-shell-nav-item:focus-visible {
+  outline: 2px solid var(--dzc-accent);
+  outline-offset: 2px;
+}
+.dzc-nav-icon { width: 16px; height: 16px; flex: 0 0 auto; }
+.dzc-nav-icon svg { width: 16px; height: 16px; display: block; }
+.dzc-nav-label { flex: 1 1 auto; }
+.dzc-nav-badge {
+  font-size: 0.68rem;
+  font-weight: 600;
+  color: var(--dzc-text-muted);
+  border: 1px solid var(--dzc-border);
+  border-radius: 999px;
+  padding: 0 6px;
+  line-height: 1.4;
+}
+
+/* Sidebar footer (account / logout) */
+.dzc-shell-foot {
+  margin-top: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  border-top: 1px solid var(--dzc-border);
+  padding-top: var(--dzc-space-3);
+}
+
+/* -- Topbar ------------------------------------------------------------------ */
+.dzc-shell-topbar {
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  gap: var(--dzc-space-3);
+  min-height: var(--dzc-shell-topbar-h);
+  padding: var(--dzc-space-2) var(--dzc-space-4);
+  background: var(--dzc-surface);
+  border-bottom: 1px solid var(--dzc-border);
+}
+.dzc-shell-crumb {
+  display: flex;
+  align-items: center;
+  gap: var(--dzc-space-2);
+  flex-wrap: wrap;
+  min-width: 0;
+  color: var(--dzc-text-muted);
+  font-size: 0.9rem;
+}
+.dzc-shell-crumb-sep { color: var(--dzc-text-faint); }
+.dzc-shell-crumb-current {
+  color: var(--dzc-text);
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Context pill — server-injected guild name; live fields updated client-side.
+ * "act" role = --dzc-stat for the live indicator. Tabular numerals. */
+.dzc-context-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--dzc-space-2);
+  margin-left: auto;
+  padding: var(--dzc-space-1) var(--dzc-space-3);
+  background: var(--dzc-surface-2);
+  border: 1px solid var(--dzc-border);
+  border-radius: 999px;
+  font-size: 0.82rem;
+  color: var(--dzc-text-muted);
+  white-space: nowrap;
+}
+.dzc-context-pill[data-live="true"] { border-color: var(--dzc-border-strong); }
+.dzc-pill-dot {
+  width: 8px; height: 8px; border-radius: 50%;
+  background: var(--dzc-text-faint);
+  flex: 0 0 auto;
+}
+.dzc-context-pill[data-state="online"] .dzc-pill-dot { background: var(--dzc-stat); }
+.dzc-context-pill[data-state="degraded"] .dzc-pill-dot { background: var(--dzc-warning); }
+.dzc-context-pill[data-state="offline"] .dzc-pill-dot { background: var(--dzc-danger); }
+.dzc-pill-guild { color: var(--dzc-text); font-weight: 600; max-width: 180px; overflow: hidden; text-overflow: ellipsis; }
+.dzc-pill-meta {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-variant-numeric: tabular-nums;
+}
+.dzc-pill-meta .dzc-pill-sep { color: var(--dzc-text-faint); }
+.dzc-pill-meta[data-empty="true"] { display: none; }
+
+/* Hamburger (mobile only) */
+.dzc-shell-hamburger {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  width: 44px; height: 44px; /* 44px touch target (mobile acceptance) */
+  border: 1px solid var(--dzc-border);
+  border-radius: var(--dzc-radius-md);
+  background: var(--dzc-surface);
+  color: var(--dzc-text);
+  cursor: pointer;
+  flex: 0 0 auto;
+}
+.dzc-shell-hamburger svg { width: 20px; height: 20px; }
+.dzc-shell-hamburger:focus-visible { outline: 2px solid var(--dzc-accent); outline-offset: 2px; }
+.dzc-shell-backdrop {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 39;
+}
+
+/* -- Mobile drawer (<=780px) ------------------------------------------------- */
+@media (max-width: 780px) {
+  .dzc-shell { display: block; }
+  .dzc-shell-sidebar {
+    position: fixed;
+    inset: 0 auto 0 0;
+    width: min(84vw, 320px);
+    height: 100vh;
+    transform: translateX(-100%);
+    transition: transform 0.2s ease;
+    z-index: 40;
+    box-shadow: var(--dzc-shadow-lg);
+  }
+  .dzc-shell.is-open .dzc-shell-sidebar { transform: translateX(0); }
+  .dzc-shell.is-open .dzc-shell-backdrop { display: block; }
+  .dzc-shell-main { margin-left: 0; }
+  .dzc-shell-hamburger { display: inline-flex; }
+  .dzc-context-pill .dzc-pill-guild { max-width: 110px; }
+}
+
+/* High-contrast: thicken shell borders + stronger focus, matching card 2. */
+html[data-theme='high-contrast'] .dzc-shell-sidebar,
+html[data-theme='high-contrast'] .dzc-shell-topbar,
+html[data-theme='high-contrast'] .dzc-shell-nav-item,
+html[data-theme='high-contrast'] .dzc-context-pill,
+html[data-theme='high-contrast'] .dzc-shell-hamburger {
+  border-width: 2px;
+}
+html[data-theme='high-contrast'] .dzc-shell-nav-item:focus-visible,
+html[data-theme='high-contrast'] .dzc-shell-hamburger:focus-visible {
+  outline: 3px solid var(--dzc-accent);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dzc-shell-sidebar { transition: none; }
+  /* Cross-cutting (card 8/9): kill remaining page motion for users who opt
+     out — spinners, sparklines, toasts, transitions on any shell page. */
+  .dzc-shell *,
+  .dzc-shell *::before,
+  .dzc-shell *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* Cross-cutting a11y (card 8/9): keyboard focus must be visible on every
+   interactive element in shell-page content, via the theme focus-ring token.
+   Higher specificity than page-level `:focus { outline: none }` resets. */
+.dzc-shell-content a:focus-visible,
+.dzc-shell-content button:focus-visible,
+.dzc-shell-content input:focus-visible,
+.dzc-shell-content select:focus-visible,
+.dzc-shell-content textarea:focus-visible,
+.dzc-shell-content [tabindex]:not([tabindex="-1"]):focus-visible {
+  outline: 2px solid var(--dzc-accent);
+  outline-offset: 2px;
+}
+
+/* ==========================================================================
+ * Reference table contract (card 5/9 — /server-players is the exemplar)
+ * ----------------------------------------------------------------------------
+ * Cards 6/7 reuse these classes instead of copy-paste; every shell page
+ * already loads this file. Full pattern: docs/reference-table-contract.md.
+ *
+ *   <div class="dzc-table-wrap">
+ *     <table class="dzc-table">
+ *       <thead><tr>
+ *         <th scope="col" data-sort="col" aria-sort="none">
+ *           <button type="button" class="dzc-sort">Col
+ *             <span class="dzc-sort-dir" aria-hidden="true"></span></button>
+ *         </th>
+ *       </tr></thead>
+ *       <tbody>
+ *         <tr class="dzc-row">…<td class="dzc-num">12</td>…</tr>
+ *         <tr class="dzc-state-row"><td colspan="N">Loading…</td></tr>
+ *       </tbody>
+ *     </table>
+ *     <div class="dzc-table-foot">…showing text… page buttons …
+ *       <span class="dzc-freshness">updated 12s ago</span></div>
+ *   </div>
+ *
+ * Rules: --dzc-* tokens only (correct under all 5 base themes + holiday
+ * layer); 8–9px cell padding; 13px body text; right-aligned tabular
+ * numerics (.dzc-num); hover + selected row (accent-soft fill + inset
+ * accent bar on the first cell); row actions are quiet icon+label .dzc-btn
+ * with .is-danger visually distinct; ≤640px the table degrades to stacked
+ * card rows with labels from td[data-label].
+ * ========================================================================== */
+
+/* -- Page + shared quiet chrome ------------------------------------------- */
+.dzc-page { background: var(--dzc-bg); color: var(--dzc-text); min-height: 100vh; }
+
+.dzc-card {
+  background: var(--dzc-surface);
+  border: 1px solid var(--dzc-border);
+  border-radius: var(--dzc-radius-md);
+}
+.dzc-card.is-clickable { cursor: pointer; transition: border-color 0.15s; }
+.dzc-card.is-clickable:hover { border-color: var(--dzc-border-strong); }
+
+.dzc-input {
+  background: var(--dzc-surface-2);
+  border: 1px solid var(--dzc-border);
+  border-radius: var(--dzc-radius-sm);
+  color: var(--dzc-text);
+  font-size: 13px;
+  padding: 5px 10px;
+}
+.dzc-input::placeholder { color: var(--dzc-text-faint); }
+.dzc-input:focus-visible { outline: 2px solid var(--dzc-accent); outline-offset: 1px; }
+
+.dzc-note-warn {
+  border: 1px solid color-mix(in srgb, var(--dzc-warning) 40%, var(--dzc-border));
+  background: color-mix(in srgb, var(--dzc-warning) 8%, transparent);
+  border-radius: var(--dzc-radius-sm);
+}
+
+.dzc-visually-hidden {
+  position: absolute;
+  width: 1px; height: 1px;
+  margin: -1px; padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* Text tokens (utility-grade) */
+.dzc-muted { color: var(--dzc-text-muted); font-size: 12px; }
+.dzc-faint { color: var(--dzc-text-faint); }
+.dzc-danger { color: var(--dzc-danger); }
+.dzc-warn { color: var(--dzc-warning); }
+.dzc-info { color: var(--dzc-info); }
+
+/* -- Buttons (quiet icon+label; row actions use this) --------------------- */
+.dzc-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  border: 1px solid var(--dzc-border);
+  border-radius: var(--dzc-radius-sm);
+  background: var(--dzc-surface-2);
+  color: var(--dzc-text-muted);
+  font-size: 12px;
+  line-height: 1.3;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.dzc-btn:hover { color: var(--dzc-text); border-color: var(--dzc-border-strong); }
+.dzc-btn:disabled { opacity: 0.45; cursor: not-allowed; }
+.dzc-btn:focus-visible { outline: 2px solid var(--dzc-accent); outline-offset: 2px; }
+.dzc-btn.is-danger {
+  color: var(--dzc-danger);
+  border-color: color-mix(in srgb, var(--dzc-danger) 45%, var(--dzc-border));
+}
+.dzc-btn.is-danger:hover {
+  background: color-mix(in srgb, var(--dzc-danger) 12%, var(--dzc-surface));
+  color: var(--dzc-danger);
+}
+.dzc-btn.is-warn {
+  color: var(--dzc-warning);
+  border-color: color-mix(in srgb, var(--dzc-warning) 45%, var(--dzc-border));
+}
+.dzc-btn.is-warn:hover {
+  background: color-mix(in srgb, var(--dzc-warning) 12%, var(--dzc-surface));
+  color: var(--dzc-warning);
+}
+.dzc-btn.is-stat {
+  color: var(--dzc-stat);
+  border-color: color-mix(in srgb, var(--dzc-stat) 45%, var(--dzc-border));
+}
+.dzc-btn.is-stat:hover {
+  background: color-mix(in srgb, var(--dzc-stat) 12%, var(--dzc-surface));
+  color: var(--dzc-stat);
+}
+
+/* -- Table ----------------------------------------------------------------- */
+.dzc-table-wrap {
+  background: var(--dzc-surface);
+  border: 1px solid var(--dzc-border);
+  border-radius: var(--dzc-radius-md);
+  overflow: hidden;
+}
+.dzc-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.dzc-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  background: var(--dzc-surface-2);
+  border-bottom: 1px solid var(--dzc-border-strong);
+  padding: 8px 9px; /* dense but breathable: 8–9px cell padding */
+  text-align: left;
+  white-space: nowrap;
+  color: var(--dzc-text-muted);
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+/* Sticky under the shell topbar when composed on a shell page. */
+.dzc-shell .dzc-table thead th { top: var(--dzc-shell-topbar-h); }
+
+/* Sortable columns: the <button> carries the interaction + keyboard focus;
+ * the <th> carries aria-sort so assistive tech reads the column state. */
+.dzc-sort {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: none;
+  border: 0;
+  padding: 0;
+  margin: 0;
+  font: inherit;
+  letter-spacing: inherit;
+  text-transform: inherit;
+  color: inherit;
+  cursor: pointer;
+}
+.dzc-sort:hover { color: var(--dzc-text); }
+.dzc-sort:focus-visible { outline: 2px solid var(--dzc-accent); outline-offset: 2px; }
+.dzc-sort-dir { font-size: 10px; color: var(--dzc-text-faint); }
+.dzc-table th[aria-sort='ascending'] .dzc-sort,
+.dzc-table th[aria-sort='descending'] .dzc-sort { color: var(--dzc-text); }
+
+.dzc-table tbody td {
+  padding: 8px 9px;
+  border-bottom: 1px solid var(--dzc-border);
+  color: var(--dzc-text);
+  white-space: nowrap;
+  vertical-align: middle;
+}
+.dzc-table tbody tr:last-child td { border-bottom: 0; }
+.dzc-table tbody tr { transition: background-color 0.1s ease; }
+.dzc-table tbody tr.dzc-row:hover { background: var(--dzc-surface-2); }
+.dzc-table tbody tr.dzc-row.is-alt-row:hover {
+  background: color-mix(in srgb, var(--dzc-danger) 8%, var(--dzc-surface-2));
+}
+.dzc-table tbody tr.dzc-row.is-selected,
+.dzc-table tbody tr.dzc-row.is-selected:hover { background: var(--dzc-accent-soft); }
+.dzc-table tbody tr.dzc-row.is-selected td:first-child {
+  box-shadow: inset 2px 0 0 var(--dzc-accent);
+}
+
+/* Right-aligned tabular numerics; muted secondary columns. */
+.dzc-num { text-align: right; font-variant-numeric: tabular-nums; }
+
+/* Loading / empty / error rows (single full-width row, rendered by the page
+ * script; .is-error for failure states). */
+.dzc-state-row td {
+  padding: 28px 16px;
+  text-align: center;
+  color: var(--dzc-text-muted);
+  font-size: 13px;
+  white-space: normal;
+}
+.dzc-state-row.is-error td { color: var(--dzc-danger); }
+
+/* Badges (platform, ALT, review confidence). */
+.dzc-badge {
+  display: inline-block;
+  background: var(--dzc-surface-3);
+  color: var(--dzc-text-muted);
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.4;
+  padding: 1px 5px;
+  border-radius: var(--dzc-radius-sm);
+}
+.dzc-badge.is-danger {
+  background: color-mix(in srgb, var(--dzc-danger) 16%, transparent);
+  color: var(--dzc-danger);
+}
+.dzc-badge.is-warn {
+  background: color-mix(in srgb, var(--dzc-warning) 18%, transparent);
+  color: var(--dzc-warning);
+}
+
+/* Row actions (quiet, right-aligned). */
+.dzc-row-actions { display: inline-flex; gap: 4px; justify-content: flex-end; }
+
+/* Pagination footer: showing X of Y · page controls · freshness. */
+.dzc-table-foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-top: 1px solid var(--dzc-border);
+  background: var(--dzc-surface);
+  font-size: 12px;
+  color: var(--dzc-text-muted);
+}
+.dzc-page-ind { font-variant-numeric: tabular-nums; color: var(--dzc-text); }
+.dzc-freshness {
+  margin-left: auto;
+  color: var(--dzc-text-faint);
+  font-variant-numeric: tabular-nums;
+}
+
+/* List entries (whitelist / banlist / priority panel items). */
+.dzc-list-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 3px 8px;
+  border: 1px solid var(--dzc-border);
+  border-radius: var(--dzc-radius-sm);
+  background: var(--dzc-surface-2);
+  font-size: 12px;
+}
+.dzc-list-item.is-whitelist {
+  border-color: color-mix(in srgb, var(--dzc-stat) 40%, var(--dzc-border));
+}
+.dzc-list-item.is-blacklist {
+  border-color: color-mix(in srgb, var(--dzc-danger) 40%, var(--dzc-border));
+}
+.dzc-list-item.is-prioritylist {
+  border-color: color-mix(in srgb, var(--dzc-warning) 40%, var(--dzc-border));
+}
+.dzc-list-remove {
+  background: none;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+  color: var(--dzc-text-faint);
+  font: inherit;
+  line-height: 1;
+}
+.dzc-list-remove:hover { color: var(--dzc-danger); }
+
+/* -- Mobile: stacked card rows (≤640px) -------------------------------------- */
+@media (max-width: 640px) {
+  .dzc-table thead { display: none; }
+  .dzc-table,
+  .dzc-table tbody,
+  .dzc-table tr,
+  .dzc-table td { display: block; }
+  .dzc-table tbody tr.dzc-row {
+    border: 1px solid var(--dzc-border);
+    border-radius: var(--dzc-radius-md);
+    margin: 8px 8px 0;
+    background: var(--dzc-surface);
+  }
+  .dzc-table tbody tr.dzc-row:last-child { margin-bottom: 8px; }
+  .dzc-table tbody tr.dzc-row td {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 12px;
+    border-bottom: 1px solid var(--dzc-border);
+    padding: 6px 12px;
+    text-align: right;
+    white-space: normal;
+  }
+  .dzc-table tbody tr.dzc-row td:last-child { border-bottom: 0; }
+  .dzc-table tbody tr.dzc-row td[data-label]::before {
+    content: attr(data-label);
+    /* muted (not faint): faint fails WCAG AA on light-theme surfaces at 11px */
+    color: var(--dzc-text-muted);
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    flex: 0 0 auto;
+    text-align: left;
+  }
+}
+
+/* High-contrast: thicken structural borders, matching card 2. */
+html[data-theme='high-contrast'] .dzc-table-wrap,
+html[data-theme='high-contrast'] .dzc-table thead th,
+html[data-theme='high-contrast'] .dzc-table tbody td,
+html[data-theme='high-contrast'] .dzc-btn,
+html[data-theme='high-contrast'] .dzc-input,
+html[data-theme='high-contrast'] .dzc-card {
+  border-width: 2px;
+}

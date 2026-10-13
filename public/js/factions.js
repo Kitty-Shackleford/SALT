@@ -109,7 +109,7 @@ async function loadFactions() {
   const container = document.getElementById('factions-tab');
   if (!container) return;
 
-  container.innerHTML = '<p class="text-gray-400">Loading factions…</p>';
+  container.innerHTML = '<div class="dzc-skeleton" style="height:1.25rem;width:220px"></div>';
 
   try {
     const res = await fetch(`/api/factions/${_guildId}`);
@@ -141,7 +141,7 @@ async function loadFactionDetail(factionId) {
   const container = document.getElementById('factions-tab');
   if (!container) return;
 
-  container.innerHTML = '<p class="text-gray-400">Loading faction…</p>';
+  container.innerHTML = '<div class="dzc-skeleton" style="height:1.25rem;width:220px"></div>';
 
   try {
     const res = await fetch(`/api/factions/${_guildId}/${factionId}`);
@@ -384,7 +384,7 @@ function renderFactionDetail(faction, members, callerRank) {
 
     <div class="bg-gray-800 rounded-lg p-6">
       <h3 class="text-lg font-bold mb-4">👥 Members (${members.length})</h3>
-      ${memberRows || '<p class="text-gray-400">No members found.</p>'}
+      ${memberRows || '<div class="dzc-empty"><div class="dzc-empty-title">No members found.</div></div>'}
     </div>
   `;
 }
@@ -846,3 +846,4 @@ function initFactions(guildId, identityId) {
   window.callerFactionGuildId = guildId;
   loadFactions();
 }
+

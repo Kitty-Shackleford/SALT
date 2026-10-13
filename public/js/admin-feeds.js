@@ -17,8 +17,9 @@ api.get('/api/user')
     window.location.href = '/';
   });
 
-// Logout
-document.getElementById('logoutBtn').addEventListener('click', () => {
+// Logout (shell header owns logout; legacy per-page button is gone)
+const logoutBtn = document.getElementById('logoutBtn');
+if (logoutBtn) logoutBtn.addEventListener('click', () => {
   window.location.href = '/logout';
 });
 

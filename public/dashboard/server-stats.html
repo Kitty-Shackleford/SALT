@@ -4,12 +4,13 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Server Health &amp; Stats - DayZ Dashboard</title>
+  <link rel="stylesheet" href="/css/theme.css">
   <link rel="stylesheet" href="/css/tailwind.css">
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js" integrity="sha384-e6nUZLBkQ86NJ6TVVKAeSaK8jWa3NhkYWZFomE39AvDbQWeie9PlQqM3pmYW5d1g" crossorigin="anonymous"></script>
   <script src="/js/instance-config.js" defer></script>
 </head>
 <body class="bg-gray-900 text-white">
-  <main class="container mx-auto max-w-7xl p-4 sm:p-6">
+  <div class="container mx-auto max-w-7xl p-4 sm:p-6">
     <header class="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
       <div>
         <p class="text-xs font-semibold uppercase tracking-wider text-blue-300">Operations</p>
@@ -22,16 +23,6 @@
       </div>
     </header>
 
-    <nav aria-label="Dashboard" class="mb-6 rounded-lg border border-gray-700 bg-gray-800 p-3">
-      <div class="flex flex-wrap gap-2 text-sm">
-        <a href="/dashboard" class="rounded bg-gray-700 px-3 py-2 hover:bg-gray-600">Servers</a>
-        <a href="/dashboard/server-control" class="rounded bg-gray-700 px-3 py-2 hover:bg-gray-600">Control</a>
-        <a href="/dashboard/feeds" class="rounded bg-gray-700 px-3 py-2 hover:bg-gray-600">Feeds</a>
-        <a href="/dashboard/automation" class="rounded bg-gray-700 px-3 py-2 hover:bg-gray-600">Automation</a>
-        <a href="/dashboard/server-stats" aria-current="page" class="rounded bg-blue-600 px-3 py-2 font-semibold">Health &amp; Stats</a>
-        <a href="/dashboard/activity-log" class="rounded bg-gray-700 px-3 py-2 hover:bg-gray-600">Activity</a>
-      </div>
-    </nav>
 
     <section aria-labelledby="scope-heading" class="mb-4 rounded-lg border border-gray-700 bg-gray-800 p-4">
       <h2 id="scope-heading" class="sr-only">Server and chart range</h2>
@@ -56,7 +47,7 @@
 
     <section class="mb-6 flex flex-col gap-3 rounded-lg border border-gray-700 bg-gray-800 p-4 sm:flex-row sm:items-center sm:justify-between" aria-label="Data freshness">
       <div class="flex items-center gap-3">
-        <span id="overallStatus" class="rounded-full border border-gray-600 bg-gray-700 px-3 py-1 text-sm font-semibold">Unknown</span>
+        <span id="overallStatus" class="rounded-full border border-gray-600 bg-gray-700 px-3 py-1 text-sm font-semibold" aria-live="polite">Unknown</span>
         <span id="selectedServerLabel" class="text-sm text-gray-300">Select a server</span>
       </div>
       <dl class="grid grid-cols-2 gap-x-6 gap-y-1 text-sm tabular-nums">
@@ -135,7 +126,7 @@
         </div>
       </section>
     </div>
-  </main>
+  </div>
   <script src="/js/serverStatsState.js"></script>
   <script src="/js/serverStats.js"></script>
 </body>

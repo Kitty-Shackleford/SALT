@@ -3,8 +3,13 @@
 const { admTupleToWorld } = require('../utils/dayzCoordinates');
 const { FINANCIAL_LINK_METHODS, isFinancialLinkMethod } = require('../utils/linkTrust');
 const { lockUserRoleMutations } = require('../utils/roleMutationLocks');
+const { chargeTeleportCost } = require('./teleportCostService');
 
-const PLAYER_SOURCES = new Set(['shop']);
+// Player-sourced teleport paths. 'shop' is the shop checkout (paid via the
+// shop order, no wallet cost); 'player' is a self-service teleport request
+// (the Phase B /player command) and is the path the per-teleport wallet cost
+// is charged to, when the server has the feature enabled.
+const PLAYER_SOURCES = new Set(['shop', 'player']);
 
 function positiveId(value, label) {
   const canonical = typeof value === 'number'
@@ -145,6 +150,18 @@ async function requestPlayerTeleport(db, input) {
     ]
   );
   const request = rows[0];
+  // Player-sourced teleports pay the per-teleport wallet cost (when the
+  // server has the feature enabled). Shop-sourced teleports are paid through
+  // the shop order and must never carry a second wallet charge. Charging
+  // here (inside the caller's transaction) means a failed charge rolls the
+  // request back atomically.
+  if (eligible.source !== 'shop') {
+    await chargeTeleportCost(db, {
+      serverId: Number(input.serverId),
+      identityId: Number(input.identityId),
+      requestId: request.id,
+    });
+  }
   await db.query(
     `INSERT INTO teleport_events
        (request_id, guild_id, server_id, identity_id, actor_user_id, event_type, metadata)
@@ -228,6 +245,182 @@ async function requestModeratorTeleport(db, input) {
   return request;
 }
 
+async function requestModeratorTeleportCoords(db, input) {
+  // Coordinate/mass teleport variant of requestModeratorTeleport: the destination
+  // is a real (possibly 'coords') destination ID, and the player's current
+  // snapshot position is bound as the request source at insert time. Binding
+  // the source up front is what lets the processor claim an ONLINE player
+  // immediately (the normal next-login path instead waits for a disconnect /
+  // logout snapshot that may not arrive for a player still in-game).
+  const { serverId, guildId, actorUserId } = await lockModeratorAuthorization(db, input);
+  const identityId = positiveId(input.identityId, 'Player identity ID');
+  const destinationId = positiveId(input.destinationId, 'Teleport destination ID');
+  const source = boundedText(input.source, 32, 'Teleport source');
+  if (!['admin', 'console', 'punishment', 'pra_enforcement'].includes(source)) {
+    throw new Error('Moderator teleport source is invalid');
+  }
+  const sourcePosition = [input.sourcePosX, input.sourcePosY, input.sourcePosZ].map(Number);
+  if (sourcePosition.some(coordinate => typeof coordinate !== 'number' || !Number.isFinite(coordinate))) {
+    throw new Error('Teleport source coordinate position is invalid');
+  }
+  const membership = await db.get(
+    `SELECT id FROM server_player_memberships
+     WHERE server_id = ? AND guild_id = ? AND identity_id = ? AND status = 'active'
+     FOR UPDATE`,
+    [serverId, guildId, identityId]
+  );
+  if (!membership) throw teleportError('TELEPORT_TARGET_UNAVAILABLE', 'Player is not active on this server', 404);
+  await lockDestination(db, { serverId, guildId, destinationId, allowPrivate: true });
+  const restriction = await lockActiveRestriction(db, serverId, identityId);
+  // A coordinate mass-teleport has no single destination to compare a PRA
+  // restriction against, so any active PRA restriction blocks it. Callers that
+  // want to skip (and report) restricted players filter them before calling.
+  if (restriction) {
+    throw teleportError('PRA_RESTRICTED', 'Active PRA restriction prevents this teleport');
+  }
+  await assertNoLiveRequest(db, serverId, identityId);
+  const observedAt = input.sourceObservedAt || new Date();
+  const rows = await db.query(
+    `INSERT INTO teleport_requests
+       (guild_id, server_id, identity_id, destination_id, restriction_id,
+        requested_by_user_id, source, reason, forced, respect_pra, notify_player,
+        status, source_pos_x, source_pos_y, source_pos_z, source_observed_at)
+     VALUES (?, ?, ?, ?, NULL, ?, ?, ?, FALSE, TRUE, ?,
+             'waiting_disconnect', ?, ?, ?, ?) RETURNING *`,
+    [guildId, serverId, identityId, destinationId, actorUserId, source,
+      boundedText(input.reason, 500, 'Teleport reason'), input.notifyPlayer !== false,
+      sourcePosition[0], sourcePosition[1], sourcePosition[2], observedAt]
+  );
+  const request = rows[0];
+  await db.query(
+    `INSERT INTO teleport_events
+       (request_id, guild_id, server_id, identity_id, actor_user_id, event_type, metadata)
+     VALUES (?, ?, ?, ?, ?, 'requested', ?)`,
+    [request.id, guildId, serverId, identityId, actorUserId,
+      JSON.stringify({ source, destinationId, sourceType: 'mass_snapshot', sourcePosition })]
+  );
+  return request;
+}
+
+/**
+ * Mass teleport preview: find online players on the server whose latest
+ * position snapshot is fresh within `ttlMinutes`, minus those under an active
+ * PRA restriction, capped at `cap`. The preview returns the full eligible list
+ * with overflow counted but NOT queued — the caller shows it, then invokes
+ * executeMassTeleport to queue the same identities (re-verified there).
+ */
+async function previewMassTeleport(db, input) {
+  const { serverId, guildId } = await lockModeratorAuthorization(db, input);
+  const destinationId = positiveId(input.destinationId, 'Teleport destination ID');
+  const ttlMinutes = Number(input.ttlMinutes ?? 10);
+  if (!Number.isFinite(ttlMinutes) || ttlMinutes < 1 || ttlMinutes > 1440) {
+    throw new Error('Mass teleport TTL must be between 1 and 1440 minutes');
+  }
+  const cap = Number(input.cap ?? 25);
+  if (!Number.isInteger(cap) || cap < 1 || cap > 500) {
+    throw new Error('Mass teleport cap must be between 1 and 500');
+  }
+  await lockDestination(db, { serverId, guildId, destinationId, allowPrivate: true });
+  const rows = await db.query(
+    `SELECT ps.identity_id, ps.pos_x, ps.pos_y, ps.pos_z, ps.timestamp,
+            pr.id AS pra_restriction_id
+     FROM player_position_snapshots ps
+     JOIN player_sessions psn
+       ON psn.server_id = ps.server_id
+      AND psn.identity_id = ps.identity_id
+      AND psn.logout_at IS NULL
+     JOIN server_player_memberships spm
+       ON spm.server_id = ps.server_id
+      AND spm.identity_id = ps.identity_id
+      AND spm.status = 'active'
+     LEFT JOIN player_pra_restrictions pr
+       ON pr.server_id = ps.server_id
+      AND pr.identity_id = ps.identity_id
+      AND pr.status = 'active'
+     WHERE ps.server_id = ?
+       AND ps.identity_id IS NOT NULL
+       AND ps.pos_x IS NOT NULL AND ps.pos_y IS NOT NULL AND ps.pos_z IS NOT NULL
+       AND ps.timestamp >= NOW() - (? || ' minutes')::interval
+     ORDER BY ps.timestamp DESC, ps.id DESC, ps.identity_id`,
+    [serverId, String(Math.floor(ttlMinutes))]
+  );
+  // One row per identity: keep only the freshest snapshot, then classify.
+  const latestByIdentity = new Map();
+  for (const row of rows) {
+    if (!latestByIdentity.has(row.identity_id)) latestByIdentity.set(row.identity_id, row);
+  }
+  const eligible = [];
+  const skippedPra = [];
+  for (const row of latestByIdentity.values()) {
+    if (row.pra_restriction_id != null) {
+      skippedPra.push(row.identity_id);
+      continue;
+    }
+    eligible.push({
+      identityId: row.identity_id,
+      position: [Number(row.pos_x), Number(row.pos_y), Number(row.pos_z)],
+      observedAt: row.timestamp,
+    });
+  }
+  eligible.sort((a, b) => new Date(b.observedAt) - new Date(a.observedAt));
+  return {
+    destinationId,
+    ttlMinutes,
+    cap,
+    totalEligible: eligible.length,
+    skippedPraCount: skippedPra.length,
+    overflowCount: Math.max(0, eligible.length - cap),
+    preview: eligible.slice(0, cap),
+    skippedPraIds: skippedPra,
+  };
+}
+
+/**
+ * Queue teleports for the given identities (as returned by
+ * previewMassTeleport.preview). Each identity is queued independently via the
+ * coordinate variant so one bad player cannot sink the rest; failures are
+ * reported, not fatal.
+ */
+async function executeMassTeleport(db, input) {
+  const { serverId, actorUserId } = await lockModeratorAuthorization(db, input);
+  const destinationId = positiveId(input.destinationId, 'Teleport destination ID');
+  const identities = Array.isArray(input.identities) ? input.identities : [];
+  if (identities.length === 0) {
+    return { queued: 0, failed: 0, skipped: 0, results: [] };
+  }
+  const results = [];
+  for (const identity of identities) {
+    const identityId = positiveId(identity.identityId, 'Player identity ID');
+    try {
+      const request = await requestModeratorTeleportCoords(db, {
+        serverId,
+        identityId,
+        destinationId,
+        actorUserId,
+        source: 'admin',
+        reason: input.reason || 'mass teleport',
+        sourcePosX: identity.position[0],
+        sourcePosY: identity.position[1],
+        sourcePosZ: identity.position[2],
+        sourceObservedAt: identity.observedAt || new Date(),
+      });
+      results.push({ identityId, requestId: request.id, status: 'queued' });
+    } catch (error) {
+      results.push({
+        identityId,
+        status: 'failed',
+        reason: error.code || error.message,
+      });
+    }
+  }
+  return {
+    queued: results.filter(r => r.status === 'queued').length,
+    failed: results.filter(r => r.status === 'failed').length,
+    skipped: 0,
+    results,
+  };
+}
+
 async function resolveTeleportSource(db, request) {
   const toEnforceVector = row => {
     const world = admTupleToWorld(row);
@@ -281,8 +474,12 @@ async function resolveTeleportSource(db, request) {
 module.exports = {
   requestPlayerTeleport,
   requestModeratorTeleport,
+  requestModeratorTeleportCoords,
+  previewMassTeleport,
+  executeMassTeleport,
   lockModeratorAuthorization,
   lockPlayerTeleportEligibility,
+  lockDestination,
   resolveTeleportSource,
   teleportError,
 };

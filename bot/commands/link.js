@@ -46,7 +46,7 @@ module.exports = {
       option.setName('server')
         .setDescription('Server ID (required when the gamertag exists on multiple servers)')
         .setRequired(false)),
-
+  
   async execute(interaction) {
     await interaction.deferReply({ flags: MessageFlags.Ephemeral });
 
@@ -112,7 +112,7 @@ module.exports = {
         LEFT JOIN linked_accounts la ON pi.id = la.identity_id
         LEFT JOIN server_player_memberships spm
           ON spm.identity_id = pi.id AND spm.server_id = s.id
-        WHERE s.guild_id = $1
+        WHERE s.guild_id = $1 
           AND LOWER(pg.gamertag) = LOWER($2)
           AND s.status = 'active'
           AND s.id = $3
@@ -257,7 +257,7 @@ module.exports = {
             .map(step => `${step.position}. **${step.label}**`)
             .join('\n');
           return interaction.editReply({
-            content: `🔐 **Ownership check required**\n\nJoin **${account.server_name}** as **${gamertag}** and perform these emotes in order:\n${steps}\n\nWait for the next log sync, then run \`/link gamertag:${gamertag} server:${account.platform_server_id}\` again. This challenge expires in 30 minutes.`
+            content: `🔐 **Ownership check required**\n\nJoin **${account.server_name}** as **${gamertag}** and perform these emotes in order, in-game:\n${steps}\n\nYour emotes are read from the server log, which is downloaded automatically — allow up to about 15 minutes after your last emote. Then run \`/link gamertag:${gamertag} server:${account.platform_server_id}\` again. This challenge expires in 30 minutes.`
           });
         }
       }

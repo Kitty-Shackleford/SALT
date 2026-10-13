@@ -217,15 +217,15 @@ router.get('/mission-files/active-locks', ensureAuthenticated, async (req, res) 
 // Get list of editable files (SPECIFIC PATH)
 router.get('/mission-files/list/:serverId?', ensureAuthenticated, async (req, res) => {
   const { serverId } = req.params;
-
+  
   console.log('📁 Mission files list requested for server:', serverId);
   console.log('   User:', req.user.username);
-
+  
   try {
     // If no server ID, list all available servers
     if (!serverId) {
       console.log('   📂 No server ID provided, listing available servers...');
-
+      
       try {
         const rows = await req.app.locals.db.all(`
               SELECT DISTINCT s.platform_server_id AS server_id
@@ -247,9 +247,9 @@ router.get('/mission-files/list/:serverId?', ensureAuthenticated, async (req, re
             servers.push(id);
           }
         }
-
+        
         console.log('   ✅ Found servers:', servers);
-
+        
         return res.json({
           success: true,
           availableServers: servers,
@@ -264,7 +264,7 @@ router.get('/mission-files/list/:serverId?', ensureAuthenticated, async (req, re
         });
       }
     }
-
+    
     // If server ID provided, scan that server's files
     if (!await requireServerFileAccess(req, res, serverId)) return;
 
@@ -333,15 +333,15 @@ router.post('/mission-files/:serverId/:fileName(*)/check-conflict', ensureAuthen
       'utf8'
     );
     const currentHash = crypto.createHash('sha256').update(currentContent).digest('hex');
-
+    
     const hasConflict = expectedHash !== currentHash;
-
+    
     if (hasConflict) {
       console.log('   ⚠️ CONFLICT DETECTED!');
     } else {
       console.log('   ✅ No conflicts');
     }
-
+    
     res.json({
       success: true,
       hasConflict,
@@ -423,19 +423,19 @@ router.post('/mission-files/:serverId/:fileName(*)/restore', ensureAuthenticated
     if (!backupFileName.startsWith(`${sanitizedFileName}.`) || !/\.\d+\.backup$/.test(backupFileName)) {
       return res.status(400).json({ success: false, error: 'Invalid backup path' });
     }
-
+    
     // Read backup content
     const backupContent = readContainedFileSync(backupDir, resolvedBackupPath, 'utf8');
-
+    
     // Write to original file location
     const { filePath, serverRoot } = await resolveMissionFilePath(req.app.locals.db, req.user, serverId, fileName);
     if (!filePath) {
       return res.status(404).json({ success: false, error: 'Server download path not found. Sync files first.' });
     }
     writeContainedFileSync(serverRoot, path.relative(serverRoot, filePath), backupContent, 'utf8');
-
+    
     console.log('   ✅ Restored from backup');
-
+    
     res.json({
       success: true,
       message: 'File restored from backup successfully'

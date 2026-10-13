@@ -149,6 +149,56 @@ function fakeDb({ restriction = null, liveRequest = null } = {}) {
   assert.deepStrictEqual(moderatorServerParams, [1]);
   assert(!deniedCalls.some(sql => /INSERT INTO teleport_requests/.test(sql)));
 
+  // Player-sourced teleports (self-service) pay the per-teleport wallet cost
+  // when the server has the feature enabled; the charge must run inside the
+  // same transaction as the request insert.
+  const chargedCalls = [];
+  const playerCostDb = {
+    // eslint-disable-next-line no-unused-vars -- mock params unused
+    async get(sql, params) {
+      if (/FROM guild_economy_config/.test(sql)) return { enabled: true, teleport_cost_enabled: true, teleport_cost: '2.50' };
+      if (/FROM teleport_wallet_charges/.test(sql)) { chargedCalls.push('charge-lookup'); return null; }
+      if (/UPDATE player_wallets SET cash_on_hand = cash_on_hand - /.test(sql)) {
+        chargedCalls.push('wallet-debit');
+        return { cash_on_hand: '7.50' };
+      }
+      if (/FROM player_wallets/.test(sql)) { chargedCalls.push('wallet'); return { cash_on_hand: '10.00' }; }
+      if (/FROM servers/.test(sql)) return { id: 1, guild_id: 2 };
+      if (/FROM linked_accounts/.test(sql)) return { id: 3, verification_method: 'self_asserted' };
+      if (/FROM server_player_memberships/.test(sql)) return { id: 4, server_id: 1, guild_id: 2, identity_id: 5, user_id: 6, source_link_id: 3 };
+      if (/FROM teleport_destinations/.test(sql)) return { id: 7, server_id: 1, guild_id: 2, name: 'Outpost', map_name: 'sakhal', destination_type: 'named', pos_x: 100, pos_y: 20, pos_z: 200, is_private: false, is_active: true };
+      if (/FROM player_pra_restrictions/.test(sql)) return null;
+      if (/FROM teleport_requests/.test(sql)) return null;
+      throw new Error(`Unexpected get: ${sql}`);
+    },
+    // eslint-disable-next-line no-unused-vars -- mock params unused
+    async query(sql, params) {
+      if (/INSERT INTO teleport_requests/.test(sql)) {
+        return [{ id: 9, server_id: 1, guild_id: 2, identity_id: 5, destination_id: 7, source: 'player', status: 'waiting_disconnect' }];
+      }
+      if (/INSERT INTO economy_transactions/.test(sql)) { chargedCalls.push('ledger'); return []; }
+      if (/INSERT INTO teleport_wallet_charges/.test(sql)) { chargedCalls.push('charge-insert'); return [{ id: 1 }]; }
+      if (/INSERT INTO teleport_events/.test(sql)) return [];
+      throw new Error(`Unexpected query: ${sql}`);
+    },
+    // eslint-disable-next-line no-unused-vars -- mock params unused
+    async run(sql, params) {
+      if (/UPDATE player_wallets SET cash_on_hand = cash_on_hand - /.test(sql)) { chargedCalls.push('wallet-debit'); return { changes: 1 }; }
+      if (/INSERT INTO economy_transactions/.test(sql)) { chargedCalls.push('ledger'); return { changes: 1 }; }
+      throw new Error(`Unexpected run: ${sql}`);
+    },
+    async transaction(callback) { return callback(this); },
+  };
+  const playerRequest = await requestPlayerTeleport(playerCostDb, {
+    serverId: 1, identityId: 5, actorUserId: 6, destinationId: 7, source: 'player',
+    reason: 'Self-service teleport',
+  });
+  assert.strictEqual(playerRequest.id, 9);
+  assert(chargedCalls.includes('charge-lookup'), 'player teleport must check for an existing charge');
+  assert(chargedCalls.includes('wallet-debit'), 'player teleport must debit the wallet');
+  assert(chargedCalls.includes('ledger'), 'player teleport must write the economy ledger entry');
+  assert(chargedCalls.includes('charge-insert'), 'player teleport must record the charge row');
+
   console.log('✅ Teleport service tests passed');
 })().catch(error => {
   console.error(error);

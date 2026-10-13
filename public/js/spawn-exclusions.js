@@ -52,7 +52,7 @@ function statusBadge(status) {
 function renderZones(zones) {
   const container = document.getElementById('zonesContainer');
   if (!zones.length) {
-    container.innerHTML = '<p class="text-gray-400 py-6 text-center">No candidates on this page.</p>';
+    container.innerHTML = '<div class="dzc-empty"><div class="dzc-empty-title">No candidates on this page.</div></div>';
     return;
   }
   container.innerHTML = `<div class="grid gap-4">${zones.map(zone => `
@@ -82,7 +82,7 @@ function renderZones(zones) {
 async function loadZones() {
   if (!currentServerId) return;
   const container = document.getElementById('zonesContainer');
-  container.innerHTML = '<p class="text-gray-400 animate-pulse">Loading review queue…</p>';
+  container.innerHTML = '<div class="dzc-skeleton" style="height:1.25rem;width:220px"></div>';
   try {
     const params = new URLSearchParams({ page: String(currentPage), pageSize: String(pageSize) });
     const data = await parseResponse(await fetch(`/api/spawn-exclusions/${encodeURIComponent(currentServerId)}?${params}`));

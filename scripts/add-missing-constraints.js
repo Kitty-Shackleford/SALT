@@ -2,10 +2,10 @@ const { initializeDatabase } = require('../db/abstraction');
 
 async function addMissingConstraints() {
   console.log('🔧 Adding missing database constraints...\n');
-
+  
   try {
     const db = await initializeDatabase();
-
+    
     // Add unique constraint to guild_tokens
     console.log('📝 Adding UNIQUE constraint to guild_tokens...');
     try {
@@ -18,7 +18,7 @@ async function addMissingConstraints() {
         throw err;
       }
     }
-
+    
     // Add unique constraint to servers
     console.log('📝 Adding UNIQUE constraint to servers...');
     try {
@@ -31,10 +31,10 @@ async function addMissingConstraints() {
         throw err;
       }
     }
-
+    
     console.log('\n✅ All constraints added successfully!\n');
     process.exit(0);
-
+    
   } catch (error) {
     console.error('❌ Error adding constraints:', error);
     process.exit(1);

@@ -4,11 +4,12 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Spawn Exclusions - DayZ Dashboard</title>
+  <link rel="stylesheet" href="/css/theme.css">
   <link rel="stylesheet" href="/css/tailwind.css">
   <script src="/js/instance-config.js" defer></script>
 </head>
 <body class="bg-gray-900 text-white">
-  <main class="container mx-auto p-6 max-w-7xl">
+  <div class="container mx-auto p-6 max-w-7xl">
     <header class="flex flex-wrap justify-between items-center gap-3 mb-6">
       <div>
         <h1 class="text-4xl font-bold">🛡️ Spawn Exclusions</h1>
@@ -17,13 +18,6 @@
       <a href="/dashboard" class="bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded">← Dashboard</a>
     </header>
 
-    <nav class="bg-gray-800 rounded-lg p-3 mb-6 border border-gray-700">
-      <div class="flex gap-2 flex-wrap">
-        <a href="/dashboard" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">🎮 Servers</a>
-        <a href="/dashboard/shop-admin" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">🛒 Shop</a>
-        <a href="/dashboard/spawn-exclusions" class="bg-blue-600 px-4 py-2 rounded font-semibold">🛡️ Exclusions</a>
-      </div>
-    </nav>
 
     <section class="bg-blue-950 border border-blue-700 text-blue-100 p-4 rounded-lg mb-6 text-sm">
       A raised Territory Flag creates evidence only. Pending candidates do not block spawning. Confirm a candidate only after verifying it represents an established base core.
@@ -55,7 +49,7 @@
         <button id="nextPageBtn" disabled class="bg-gray-700 hover:bg-gray-600 disabled:opacity-40 px-4 py-2 rounded">Next →</button>
       </div>
     </section>
-  </main>
+  </div>
   <script src="/js/spawn-exclusions.js"></script>
 </body>
 </html>

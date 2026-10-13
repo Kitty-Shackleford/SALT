@@ -304,7 +304,7 @@ async function downloadNitradoFile(token, platformServerId, filePath, ftpCreds =
 async function resolveMessagesXmlPath(token, platformServerId, missionFolder, missionBasePath, ftpCreds) {
   const DEFAULT_PATH = 'db/messages.xml';
   const CUSTOM_FALLBACK = 'custom/messages.xml';
-
+  
   try {
     const cfgPath = `${missionBasePath}/${missionFolder}/cfgeconomycore.xml`;
     let content = await downloadNitradoFile(token, platformServerId, cfgPath, ftpCreds);
@@ -820,7 +820,7 @@ async function fetchOnlinePlayers(
  * Shows online players with session details.
  * onlinePlayers: array of { gamertag, login_at, updated_at } from fetchOnlinePlayers()
  */
-function buildEmbed(serverName, gameserver, restartLabel, onlinePlayers = [], lastLogSyncTime = null, nextLogSyncTime = null, restartAtMs = null) {
+function buildEmbed(serverName, gameserver, restartLabel, onlinePlayers = [], lastLogSyncTime = null, nextLogSyncTime = null, restartAtMs = null, nextWipeAtMs = null) {
   const query = gameserver.query || {};
   const cfg = gameserver.settings?.config || {};
   const status = gameserver.status === 'started' ? 'Online' : 'Offline';
@@ -850,6 +850,16 @@ function buildEmbed(serverName, gameserver, restartLabel, onlinePlayers = [], la
   const cacheCount = onlinePlayers.length;
   const displayCount = Math.max(liveCount, cacheCount);
   const restartDisplay = formatRestartEmbedLabel(restartAtMs, restartLabel);
+
+  // Phase 1: wipe countdown line (optional; only shown when a next wipe is set
+  // and is in the future).
+  let nextWipeLine = '';
+  if (nextWipeAtMs && Number.isFinite(nextWipeAtMs)) {
+    const wipeSecs = Math.floor(nextWipeAtMs / 1000);
+    if (wipeSecs > Math.floor(Date.now() / 1000)) {
+      nextWipeLine = `🧹 Next Wipe <t:${wipeSecs}:F> (<t:${wipeSecs}:R>)`;
+    }
+  }
 
   // Build footer with last sync time
   let footerText = 'Updated';
@@ -909,7 +919,7 @@ function buildEmbed(serverName, gameserver, restartLabel, onlinePlayers = [], la
         },
         {
           name: '─── Next Restart ──────────────────────',
-          value: [restartDisplay, lastRestartLine].filter(Boolean).join('\n'),
+          value: [restartDisplay, lastRestartLine, nextWipeLine].filter(Boolean).join('\n'),
           inline: false
         },
         {
@@ -955,7 +965,8 @@ function buildEmbed(serverName, gameserver, restartLabel, onlinePlayers = [], la
           name: '─── Next Restart ──────────────────────',
           value: [
             restartDisplay,
-            lastRestartLine
+            lastRestartLine,
+            nextWipeLine
           ].filter(Boolean).join('\n'),
           inline: false
         },
@@ -996,7 +1007,8 @@ function buildEmbed(serverName, gameserver, restartLabel, onlinePlayers = [], la
         name: '─── Next Restart ──────────────────────',
         value: [
           restartDisplay,
-          lastRestartLine
+          lastRestartLine,
+          nextWipeLine
         ].filter(Boolean).join('\n'),
         inline: false
       },
@@ -1181,7 +1193,7 @@ async function updateGuild(client, guildRow, { updateVoiceChannels = true } = {}
   const restartLabel = restartResult?.label || null;
   const restartAtMs  = restartResult?.restartAtMs || null;
   const serverName = resolveServerName(dbName, gameserver);
-
+  
   // Fetch online player list with debugging
   const onlinePlayers = await fetchOnlinePlayers(
     server_db_id,
@@ -1195,7 +1207,7 @@ async function updateGuild(client, guildRow, { updateVoiceChannels = true } = {}
       playerService: nitradoService,
     }
   );
-
+  
   // Get sync timing info from automation_settings
   let lastLogSyncTime = null;
   let nextLogSyncTime = null;
@@ -1222,7 +1234,7 @@ async function updateGuild(client, guildRow, { updateVoiceChannels = true } = {}
   } catch (err) {
     console.log(`ℹ️  Could not fetch sync timing:`, err.message);
   }
-
+  
   const renderState = {
     serverName,
     gameserver,
@@ -1233,6 +1245,23 @@ async function updateGuild(client, guildRow, { updateVoiceChannels = true } = {}
     platformServerId: platform_server_id,
   };
   statusRenderCache.set(String(server_db_id), renderState);
+
+  // Phase 1: wipe countdown — read next_wipe_at for this server (optional).
+  let nextWipeAtMs = null;
+  try {
+    const wipeRow = await pool.query(
+      'SELECT next_wipe_at FROM server_wipe_info WHERE server_id = $1 LIMIT 1',
+      [server_db_id]
+    );
+    const wipeAt = wipeRow.rows[0]?.next_wipe_at;
+    if (wipeAt) {
+      const ms = new Date(wipeAt).getTime();
+      if (Number.isFinite(ms)) nextWipeAtMs = ms;
+    }
+  } catch (wipeErr) {
+    console.log(`ℹ️  Could not fetch wipe countdown:`, wipeErr.message);
+  }
+
   const embed = buildEmbed(
     renderState.serverName,
     renderState.gameserver,
@@ -1240,7 +1269,8 @@ async function updateGuild(client, guildRow, { updateVoiceChannels = true } = {}
     onlinePlayers,
     renderState.lastLogSyncTime,
     renderState.nextLogSyncTime,
-    renderState.restartAtMs
+    renderState.restartAtMs,
+    nextWipeAtMs
   );
 
   // Edit the pinned embed. Cache generations are acknowledged only after this

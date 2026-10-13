@@ -4,7 +4,7 @@ const { MAP_DEFINITIONS } = require('../public/js/dayz-map-coordinates');
 
 const DEFAULT_TRIGGER_SIZE = Object.freeze([1.25, 2.5, 1.25]);
 const MAP_NAME_PATTERN = /^[a-z0-9_-]+$/;
-const DESTINATION_TYPES = new Set(['named', 'spawn', 'pra', 'punishment']);
+const DESTINATION_TYPES = new Set(['named', 'spawn', 'pra', 'punishment', 'coords']);
 
 function finitePosition(value, label) {
   if (!Array.isArray(value) || value.length !== 3 ||

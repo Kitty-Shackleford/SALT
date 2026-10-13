@@ -1,10 +1,28 @@
 const express = require('express');
 const router = express.Router();
-const { requireRole } = require('../middleware/auth');
+const { requireRole, ensureAdmin } = require('../middleware/auth');
 const { encryptToken } = require('../utils/encryption');
 const { sanitizeServerName, sanitizeForLog } = require('../utils/textSanitizer');
 const nitradoService = require('../services/nitradoService');
 const { sendExternalApiError } = require('../utils/externalApiResponse');
+const themeService = require('../services/themeService');
+
+/**
+ * Resolve a :guildId path param to the numeric DB guild id. requireRole
+ * already guarantees membership/role; the dashboard admin UI links with the
+ * Discord guild id, so accept either form (mirrors requireRole's resolution).
+ */
+async function resolveGuildDbId(db, identifier) {
+  const raw = String(identifier || '');
+  if (/^\d+$/.test(raw)) {
+    // Discord snowflakes are 64-bit and overflow Postgres int4 when bound as
+    // bare numbers, so widen the comparison to bigint on both sides.
+    const row = await db.get('SELECT id FROM guilds WHERE id::bigint = ?::bigint', [raw]);
+    if (row) return row.id;
+  }
+  const row = await db.get('SELECT id FROM guilds WHERE discord_guild_id = ?', [raw]);
+  return row ? row.id : null;
+}
 
 /**
  * POST /api/guilds/:guildId/token
@@ -147,7 +165,7 @@ router.get('/:guildId/servers', async (req, res) => {
 
   try {
     const rows = await db.query(`
-      SELECT
+      SELECT 
         s.id,
         s.platform_server_id as nitrado_server_id,
         s.name as server_name,
@@ -261,10 +279,109 @@ router.get('/:guildId/servers', async (req, res) => {
   } catch (error) {
     console.error('❌ [API] Error:', error);
     console.error('   Stack:', error.stack);
-    res.status(500).json({
+    res.status(500).json({ 
       success: false,
-      error: error.message
+      error: error.message 
     });
+  }
+});
+
+/**
+ * GET /api/guilds/:guildId/theme
+ * Current guild theme settings plus the resolved override for preview.
+ * Site-admin only (mirrors the /api/admin guild-management endpoints the
+ * admin Theme page calls); :guildId may be the DB id or Discord guild id.
+ */
+router.get('/:guildId/theme', ensureAdmin, async (req, res) => {
+  try {
+    const db = req.app.locals.db;
+    const guildId = await resolveGuildDbId(db, req.params.guildId);
+    if (!guildId) return res.status(404).json({ success: false, error: 'Guild not found' });
+    const row = await themeService.getGuildThemeSettings(db, guildId);
+    const settings = {
+      themeDefault: row
+        ? (themeService.normalizeThemeName(row.theme_default) || themeService.DEFAULT_BASE_THEME)
+        : themeService.DEFAULT_BASE_THEME,
+      accentColor: row && row.accent_color ? row.accent_color : null,
+      holidayTheme: row ? row.holiday_theme : null,
+      holidayStart: row && row.holiday_start ? row.holiday_start : null,
+      holidayEnd: row && row.holiday_end ? row.holiday_end : null,
+      holidayPacks: row && row.holiday_packs && typeof row.holiday_packs === 'object'
+        ? row.holiday_packs
+        : {},
+    };
+    const resolved = themeService.resolveTheme(row, null, new Date());
+    res.json({
+      success: true,
+      settings,
+      resolved: {
+        baseTheme: resolved.baseTheme,
+        holidayPack: resolved.holidayPack,
+        accentColor: resolved.accentColor,
+        overrideCss: resolved.overrideCss,
+      },
+    });
+  } catch (error) {
+    console.error('❌ [API] guild theme read error:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * PUT /api/guilds/:guildId/theme
+ * Update guild theme settings (partial). Fields: themeDefault, accentColor,
+ * holidayTheme, holidayStart, holidayEnd. Unknown fields are ignored; invalid
+ * values are a 400.
+ */
+router.put('/:guildId/theme', ensureAdmin, async (req, res) => {
+  try {
+    const db = req.app.locals.db;
+    const guildId = await resolveGuildDbId(db, req.params.guildId);
+    if (!guildId) return res.status(404).json({ success: false, error: 'Guild not found' });
+    const body = req.body || {};
+
+    let fields;
+    try {
+      fields = themeService.normalizeThemeSettings(body);
+    } catch (err) {
+      return res.status(400).json({ success: false, error: err.message });
+    }
+    if (Object.keys(fields).length === 0) {
+      return res.status(400).json({ success: false, error: 'No updatable theme fields provided' });
+    }
+
+    const columns = Object.keys(fields);
+    const placeholders = columns.map(() => '?').join(', ');
+    const updateSet = columns
+      .map(col => `${col} = EXCLUDED.${col}`)
+      .join(', ');
+    await db.query(
+      `INSERT INTO guild_theme_settings
+         (guild_id, ${columns.join(', ')}, updated_by_user_id, updated_at)
+       VALUES (?, ${placeholders}, ?, NOW())
+       ON CONFLICT (guild_id) DO UPDATE SET
+         ${updateSet},
+         updated_by_user_id = EXCLUDED.updated_by_user_id,
+         updated_at = NOW()`,
+      [guildId, ...Object.values(fields), req.user.id]
+    );
+    themeService.invalidateGuildThemeSettings(guildId);
+
+    const row = await themeService.getGuildThemeSettings(db, guildId);
+    res.json({
+      success: true,
+      settings: {
+        themeDefault: themeService.normalizeThemeName(row.theme_default) || themeService.DEFAULT_BASE_THEME,
+        accentColor: row.accent_color,
+        holidayTheme: row.holiday_theme,
+        holidayStart: row.holiday_start,
+        holidayEnd: row.holiday_end,
+        holidayPacks: row.holiday_packs && typeof row.holiday_packs === 'object' ? row.holiday_packs : {},
+      },
+    });
+  } catch (error) {
+    console.error('❌ [API] guild theme update error:', error);
+    res.status(500).json({ success: false, error: error.message });
   }
 });
 

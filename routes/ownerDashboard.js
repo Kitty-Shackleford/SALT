@@ -203,7 +203,7 @@ async function writeNitradoList(token, platformServerId, dir, filename, lines) {
 async function ensureGuildApproved(req, res, next) {
   const db = req.app.locals.db;
   const userId = req.user.id;
-
+  
   try {
     // Get user's guilds via guild_roles
     const guilds = await db.query(
@@ -212,14 +212,14 @@ async function ensureGuildApproved(req, res, next) {
        WHERE gr.user_id = ? AND gr.role = 'owner' AND g.status = 'approved'`,
       [userId]
     );
-
+    
     if (guilds.length === 0) {
-      return res.status(403).json({
+      return res.status(403).json({ 
         error: 'Your guild is pending approval or has been disabled. Contact an administrator.',
         status: 'pending_or_disabled'
       });
     }
-
+    
     next();
   } catch (err) {
     console.error('Error checking guild status:', err);
@@ -258,7 +258,7 @@ router.get('/servers', async (req, res) => {
       WHERE g.status = 'approved' AND s.status = 'active'
       ORDER BY s.created_at DESC
     `;
-
+  
   try {
     const rows = await db.query(query, [userId]);
     res.json({ success: true, servers: rows });
@@ -275,7 +275,7 @@ router.get('/servers', async (req, res) => {
 router.get('/servers/:id', ensureServerAccess, async (req, res) => {
   const db = req.app.locals.db;
   const serverId = req.params.id;
-
+  
   // Correlated subqueries avoid GROUP BY on s.* which PostgreSQL rejects.
   const query = `
     SELECT
@@ -304,7 +304,7 @@ router.get('/servers/:id', ensureServerAccess, async (req, res) => {
       AND s.status = 'active'
       AND g.status = 'approved'
   `;
-
+  
   try {
     const row = await db.get(query, [serverId]);
     if (!row) return res.status(404).json({ error: 'Server not found' });

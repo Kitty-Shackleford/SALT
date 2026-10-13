@@ -19,6 +19,7 @@ const {
   processWaitingTeleports,
   refreshRestartEvidence,
 } = require('./services/teleportProcessorService');
+const { processTeleportWalletRefunds } = require('./services/teleportCostService');
 const {
   buildScheduledLogSyncPlan,
   captureDatabaseClock,
@@ -31,6 +32,7 @@ const {
   selectServerIdsToParse,
 } = require('./utils/logSyncScheduling');
 const { acquireExactServerLogLocks } = require('./utils/logIngestionLock');
+const { providerLogAvailability } = require('./utils/providerLogAvailability');
 const {
   PIPELINES,
   beginPipelineRun,
@@ -52,9 +54,14 @@ function startScheduler(db) {
     try {
       const servers = await db.query(
         `SELECT DISTINCT server_id
-         FROM teleport_requests
-         WHERE status IN ('waiting_disconnect', 'provisioning', 'armed', 'cleanup_pending', 'cleanup_processing', 'cleanup_restart_pending')
-            OR (status = 'failed' AND order_item_id IS NOT NULL AND refunded_at IS NULL)
+         FROM (
+           SELECT server_id FROM teleport_requests
+           WHERE status IN ('waiting_disconnect', 'provisioning', 'armed', 'cleanup_pending', 'cleanup_processing', 'cleanup_restart_pending')
+              OR (status = 'failed' AND order_item_id IS NOT NULL AND refunded_at IS NULL)
+           UNION
+           SELECT server_id FROM teleport_wallet_charges
+           WHERE status = 'pending'
+         ) teleport_queue_servers
          ORDER BY server_id`
       );
       for (const server of servers) {
@@ -74,6 +81,10 @@ function startScheduler(db) {
         const restarts = restartEvidenceReady
           ? await processTeleportRestarts(db, server.server_id)
           : [];
+        const refunds = await processTeleportWalletRefunds(db, server.server_id);
+        if (refunds > 0) {
+          console.log(`   💸 Refunded ${refunds} pending teleport wallet charge(s) for server ${server.server_id}`);
+        }
         const retries = [...expired, ...cleanup, ...waiting, ...restarts]
           .filter(outcome => outcome.status === 'retry');
         if (retries.length > 0) {
@@ -113,6 +124,50 @@ function startScheduler(db) {
     return hasUnparsedLogFiles(row.last_sync_at, mtimes);
   }
 
+  /**
+   * Explain WHY a set of sync server ids cannot be resolved for a user, so the
+   * scheduler can log the real cause (disabled guild, inactive server, missing
+   * token binding, no owner/admin role) instead of a generic warning.
+   * Returns one short reason per requested server id.
+   */
+  async function diagnoseUnauthorizedSyncServers(db, userId, serverIds) {
+    const reasons = [];
+    for (const platformId of serverIds || []) {
+      const rows = await db.query(
+        `SELECT s.id, s.name, s.status AS server_status, g.status AS guild_status,
+                gt.id AS token_id, gt.nitrado_user_id,
+                gr.role AS guild_role
+         FROM servers s
+         JOIN guilds g ON g.id = s.guild_id
+         LEFT JOIN guild_roles gr ON gr.guild_id = g.id AND gr.user_id = ?
+         LEFT JOIN guild_tokens gt ON gt.guild_id = g.id AND gt.token_type = 'nitrado'
+         WHERE CAST(s.platform_server_id AS TEXT) = ?`,
+        [userId, String(platformId)]
+      );
+      if (!rows || rows.length === 0) {
+        reasons.push(`${platformId}: no registered server with this platform id`);
+        continue;
+      }
+      if (rows.length > 1) {
+        reasons.push(`${platformId}: ambiguous — ${rows.length} servers share this platform id`);
+        continue;
+      }
+      const row = rows[0];
+      const problems = [];
+      if (row.guild_status !== 'approved') problems.push(`guild is ${row.guild_status}`);
+      if (row.server_status !== 'active') problems.push(`server is ${row.server_status}`);
+      if (!row.token_id) problems.push('guild has no Nitrado token bound');
+      else if (!row.nitrado_user_id) problems.push('Nitrado token lacks a nitrado_user_id');
+      if (!row.guild_role) problems.push(`user ${userId} has no owner/admin role in the guild`);
+      reasons.push(`${platformId} (${row.name}): ${problems.join(', ') || 'no single reason identified'}`);
+    }
+    return reasons;
+  }
+
+  // Memoized skips for sync configs whose servers cannot be authorized (see
+  // diagnoseUnauthorizedSyncServers above). Keyed by user id + server list.
+  const unauthorizedSyncSkips = new Map();
+
   /* eslint-disable require-atomic-updates */
   async function checkAndRunLogSync() {
     if (syncRunning) {
@@ -124,9 +179,9 @@ function startScheduler(db) {
 
     try {
       const rows = await db.query(
-        `SELECT u.id, u.username, u.discord_id, a.auto_log_sync
-         FROM users u
-         JOIN automation_settings a ON u.id = a.user_id
+        `SELECT u.id, u.username, u.discord_id, a.auto_log_sync 
+         FROM users u 
+         JOIN automation_settings a ON u.id = a.user_id 
          WHERE a.auto_log_sync IS NOT NULL`
       );
 
@@ -164,9 +219,37 @@ function startScheduler(db) {
               continue;
             }
 
+            // A sync server that cannot resolve (disabled guild, missing token
+            // binding, inactive server) will keep failing until the config or
+            // the DB state changes. Memoize that for 15 minutes and log the
+            // reason once, so a disabled guild does not re-query and re-warn
+            // every 30-second scheduler tick.
+            const syncPlanKey = row.id + ':' + serverIds.join(',');
+            const cachedSkip = unauthorizedSyncSkips.get(syncPlanKey);
+            if (cachedSkip && cachedSkip.until > now.getTime()) {
+              continue;
+            }
+
             const authorizedServers = await resolveOperationalServers(db, row.id, serverIds);
             if (!authorizedServers || authorizedServers.length !== serverIds.length) {
-              console.log('   ⚠️  One or more sync servers are ambiguous or unauthorized');
+              const missing = authorizedServers
+                ? serverIds.filter(id => !authorizedServers.some(s => s.platformServerId === String(id)))
+                : serverIds;
+              const reasons = await diagnoseUnauthorizedSyncServers(db, row.id, missing);
+              console.log(`   ⚠️  One or more sync servers cannot be authorized for ${row.username}: ${missing.join(', ')} (${reasons.join('; ') || 'no matching server+token row'})`);
+              unauthorizedSyncSkips.set(syncPlanKey, { until: now.getTime() + 15 * 60 * 1000 });
+              // A config that cannot resolve is not a transient provider
+              // failure: advancing lastRun stops the 30-second retry storm while
+              // the guild/token state is fixed. The reason is logged above.
+              settings.lastRun = now.toISOString();
+              try {
+                await db.run(
+                  'UPDATE automation_settings SET auto_log_sync = ? WHERE user_id = ?',
+                  [JSON.stringify(settings), row.id]
+                );
+              } catch (updateErr) {
+                console.error(`   ❌ Failed to persist lastRun for ${row.username}:`, updateErr.message);
+              }
               continue;
             }
             const serverByPlatformId = new Map(
@@ -202,6 +285,19 @@ function startScheduler(db) {
               const token = await getDecryptedToken(db, row.id, serverIds);
             if (!token) {
               console.log(`   ⚠️  No unique authorized token found for this sync configuration`);
+              continue;
+            }
+
+            // A transient provider-log failure (incomplete download, missing
+            // config directory) parks the server in an availability backoff via
+            // the shared tracker. While every configured server is backed off,
+            // the download phase would fail immediately with no work done, so
+            // treat that as "nothing to do yet" instead of a failed run: this
+            // keeps lastRun from freezing and the retry loop from spinning.
+            const nowMs = Date.now();
+            const backedOffNow = serverIds.filter(serverId => !providerLogAvailability.canAttempt(serverId, nowMs));
+            if (backedOffNow.length === serverIds.length) {
+              console.log(`   ⏳ Log storage is backed off for all ${serverIds.length} sync server(s); skipping cycle without marking the run failed`);
               continue;
             }
 
@@ -332,13 +428,20 @@ function startScheduler(db) {
               forcedErrorCode,
             });
             const runSuccessful = isLogSyncRunSuccessful({
-              syncErrors: result.errors,
+              syncErrors: result.blockingErrors,
               parseErrors,
               requiredParseCount: serversToParse.length,
               parsedCount: parsedServers,
             });
             if (!runSuccessful) {
               console.error('   ❌ Sync run incomplete; lastRun preserved so it remains retryable');
+              if (result.errors.length > 0) {
+                console.error(`      sync errors: ${result.errors.join('; ')}`);
+              }
+              if (parseErrors.length > 0) {
+                console.error(`      parse errors: ${parseErrors.join('; ')}`);
+              }
+              console.error(`      (parsed ${parsedServers}/${serversToParse.length} server(s); required ${serversToParse.length})`);
               await finishPipelineRuns(run => exactOutcomeForRun(run));
               continue;
             }
@@ -496,7 +599,16 @@ function startScheduler(db) {
     if (bountyExpirationRunning) return;
     bountyExpirationRunning = true;
     try {
-      const servers = await db.query("SELECT id FROM servers WHERE status = 'active' ORDER BY id");
+      // Only servers with an economy config can settle bounties (wallet
+      // credits require it); expireBounties() throws without one. Pre-filter
+      // here instead of logging an error every 5 minutes per economy-less
+      // server.
+      const servers = await db.query(
+        `SELECT s.id FROM servers s
+         JOIN guild_economy_config gec ON gec.server_id = s.id
+         WHERE s.status = 'active'
+         ORDER BY s.id`
+      );
       for (const server of (servers || [])) {
         try {
           const result = await db.transaction(() => expireBounties(db, server.id));

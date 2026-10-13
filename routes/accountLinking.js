@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const { validateGameAccountId, validateGuildId } = require('../middleware/validators');
-const { verifyGuildMembership } = require('../utils/discordAPI');
+const { verifyGuildMembership, classifyMembershipVerificationError } = require('../utils/discordAPI');
 const {
   createEmoteChallengeSequence,
   evaluateEmoteChallenge,
@@ -61,19 +61,21 @@ router.get('/available-accounts', async (req, res) => {
   }
 
   if (!req.user.access_token) {
-    return res.status(401).json({ error: 'Discord access token not found' });
+    return res.status(401).json({ error: 'Your Discord session has expired or is invalid. Log out of the dashboard and sign in with Discord again.' });
   }
 
+  let isMember;
   try {
-    const isMember = await verifyGuildMembership(req.user.access_token, guildId);
-    if (!isMember) {
-      return res.status(403).json({ error: 'You are not a member of this Discord server' });
-    }
+    isMember = await verifyGuildMembership(req.user.access_token, guildId);
   } catch (err) {
     console.error('Error verifying guild membership:', err);
-    return res.status(502).json({ error: 'Failed to verify Discord server membership' });
+    const failure = classifyMembershipVerificationError(err);
+    return res.status(failure.status).json({ error: failure.error });
   }
-
+  if (!isMember) {
+    return res.status(403).json({ error: 'You are not a member of this Discord server' });
+  }
+  
   let query = `
     SELECT pi.id,
            pi.platform,
@@ -98,22 +100,22 @@ router.get('/available-accounts', async (req, res) => {
       AND g.status = 'approved'
       AND s.status = 'active'
   `;
-
+  
   const params = [guildId, serverId];
-
+  
   if (platform) {
     query += ' AND pi.platform = ?';
     params.push(platform);
   }
-
+  
   if (search) {
     query += ' AND pg.gamertag LIKE ?';
     params.push(`%${search}%`);
   }
-
+  
   query += ' GROUP BY pi.id, pi.platform, pg.gamertag, la.id';
   query += ' ORDER BY pg.gamertag ASC LIMIT 100';
-
+  
   try {
     const rows = await db.query(query, params);
     res.json({
@@ -134,10 +136,10 @@ router.get('/available-accounts', async (req, res) => {
 // Get current user's linked accounts
 router.get('/my-accounts', async (req, res) => {
   const db = req.app.locals.db;
-
+  
   try {
     const rows = await db.query(`
-      SELECT
+      SELECT 
         pi.*,
         pg.gamertag,
         la.linked_at
@@ -202,11 +204,19 @@ router.post('/link', validateGameAccountId, validateGuildId, async (req, res) =>
     return res.status(401).json({ error: 'Discord access token not found. Please log out and log back in.' });
   }
 
+  let isMember;
   try {
-    if (!await verifyGuildMembership(req.user.access_token, guildId)) {
-      return res.status(403).json({ error: 'You are not a member of this Discord server' });
-    }
+    isMember = await verifyGuildMembership(req.user.access_token, guildId);
+  } catch (err) {
+    console.error('Error verifying guild membership:', err);
+    const failure = classifyMembershipVerificationError(err);
+    return res.status(failure.status).json({ error: failure.error });
+  }
+  if (!isMember) {
+    return res.status(403).json({ error: 'You are not a member of this Discord server' });
+  }
 
+  try {
     const account = await db.get(`
       SELECT pi.id, pg.gamertag, s.id AS server_id, s.name AS server_name,
              s.guild_id, g.discord_guild_id,
@@ -230,7 +240,7 @@ router.post('/link', validateGameAccountId, validateGuildId, async (req, res) =>
     `, [gameAccountId, guildId, serverId]);
 
     if (!account) {
-      return res.status(404).json({ error: 'Game account not found on an approved server in this Discord guild' });
+      return res.status(404).json({ error: 'This gamertag was not found on an active server in this community. If you have played recently, wait a few minutes for the next log sync and try again.' });
     }
     if (account.linkedId && account.linkedUserId !== req.user.id) {
       return res.status(409).json({ error: 'This account is already linked to another user' });
@@ -437,7 +447,7 @@ router.post('/link', validateGameAccountId, validateGuildId, async (req, res) =>
         sequence: formatEmoteSequence(sequence),
         expiresAt: challenge.expires_at,
         serverName: account.server_name,
-        message: 'Perform these emotes in order, wait for the next log sync, then press Link again.'
+        message: 'Perform these emotes in order, in-game on that server. Your emotes are read from the server log, which is synced automatically — allow up to about 15 minutes. Press Link again once you have performed them all. This challenge expires in 30 minutes.'
       });
     }
 
@@ -526,26 +536,26 @@ router.post('/link', validateGameAccountId, validateGuildId, async (req, res) =>
       return res.status(409).json({ error: 'Link verification settings changed; refresh and try again' });
     }
     if (error.code === '23505' || error.code === 'CHALLENGE_CONSUMED' || error.code === 'OWNERSHIP_CONFLICT') {
-      return res.status(409).json({ error: 'This account is already linked or has an active challenge' });
+      return res.status(409).json({ error: 'This account is already linked, or its ownership challenge was already used. Check your linked accounts, or contact a server admin.' });
     }
     console.error('Error in account linking:', error);
-    return res.status(500).json({ error: 'Failed to verify and link account ownership' });
+    return res.status(500).json({ error: 'Failed to verify and link account ownership. Please try again in a few minutes, and contact a server admin if it keeps happening.' });
   }
 });
 
 // Unlink a game account
 router.post('/unlink', async (req, res) => {
   const { gameAccountId, serverId } = req.body;
-
+  
   if (!gameAccountId) {
     return res.status(400).json({ error: 'gameAccountId is required' });
   }
   if (!/^\d+$/.test(String(serverId || ''))) {
     return res.status(400).json({ error: 'serverId is required' });
   }
-
+  
   const db = req.app.locals.db;
-
+  
   try {
     const account = await db.get(`
       SELECT pi.id, pg.gamertag, s.id AS server_id, s.guild_id,
@@ -607,7 +617,7 @@ router.post('/unlink', async (req, res) => {
     });
   } catch (error) {
     console.error('Error in account unlinking:', error);
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: 'Failed to remove your server membership. Please try again.' });
   }
 });
 module.exports = router;

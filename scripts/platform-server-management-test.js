@@ -1,5 +1,8 @@
 'use strict';
 
+const { ensureTestEncryptionKey } = require('./lib/test-env');
+ensureTestEncryptionKey();
+
 const assert = require('assert');
 const fs = require('fs');
 const path = require('path');
@@ -143,13 +146,13 @@ function testSafeServerNames() {
     resolveServerDisplayName,
   } = require('../utils/serverNames');
 
-  assert.strictEqual(normalizeProviderServerName('Chernarus PvP', '90000001'), 'Chernarus PvP');
-  assert.strictEqual(normalizeProviderServerName('Serveur Élite 🎮', '90000001'), 'Serveur Élite 🎮');
-  assert.strictEqual(normalizeProviderServerName('Bad\u0000Name', '90000001'), '90000001');
-  assert.strictEqual(normalizeProviderServerName('<img src=x>', '90000001'), '90000001');
-  assert.strictEqual(normalizeProviderServerName('@everyone', '90000001'), '90000001');
+  assert.strictEqual(normalizeProviderServerName('Chernarus PvP', '19811731'), 'Chernarus PvP');
+  assert.strictEqual(normalizeProviderServerName('Serveur Élite 🎮', '19811731'), 'Serveur Élite 🎮');
+  assert.strictEqual(normalizeProviderServerName('Bad\u0000Name', '19811731'), '19811731');
+  assert.strictEqual(normalizeProviderServerName('<img src=x>', '19811731'), '19811731');
+  assert.strictEqual(normalizeProviderServerName('@everyone', '19811731'), '19811731');
   assert.throws(() => normalizeProviderServerName('<img src=x>', '@everyone'), /service ID/i);
-  assert.strictEqual(normalizeProviderServerName('   ', '90000001'), '90000001');
+  assert.strictEqual(normalizeProviderServerName('   ', '19811731'), '19811731');
   assert.strictEqual(normalizeCustomServerName('  My Server  '), 'My Server');
   assert.strictEqual(normalizeCustomServerName('   '), null);
   assert.throws(() => normalizeCustomServerName('Bad\u0007Name'), /printable/i);

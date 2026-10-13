@@ -1,5 +1,6 @@
 const economyHelper = require('./economyHelper');
 const { startCasinoExpiryWorker } = require('../workers/casinoExpiryProcessor');
+const { startBirthdayAnnouncer } = require('../workers/birthdayAnnouncer');
 
 /**
  * Run daily scheduled economy tasks (bank fees and inactivity tax)
@@ -41,6 +42,7 @@ async function runDailyTasks(db, businessDate = null) {
 function startEconomyScheduler(db) {
   console.log('Starting economy scheduler...');
   startCasinoExpiryWorker(db);
+  startBirthdayAnnouncer(db);
 
   const scheduleTime = new Date();
   scheduleTime.setUTCHours(0, 0, 0, 0);

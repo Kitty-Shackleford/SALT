@@ -5,10 +5,10 @@ const assert = require('node:assert/strict');
 const Module = require('node:module');
 const path = require('node:path');
 const { ACTOR_ROLE_LOCK_NAMESPACE, lockPgUserRoleMutations } = require('../utils/roleMutationLocks');
-const GUILD = '900000000000000001';
-const ACTOR = '900000000000000002';
-const OWNER = '900000000000000003';
-const OTHER = '900000000000000004'; // adjacent snowflake must never alias GUILD
+const GUILD = '123456789012345678';
+const ACTOR = '223456789012345678';
+const OWNER = '323456789012345678';
+const OTHER = '123456789012345679'; // adjacent snowflake must never alias GUILD
 const GUILD_DB = 71;
 const ACTOR_DB = 20;
 const OWNER_DB = 10;
@@ -168,8 +168,11 @@ async function runCommand(options = {}) {
     [path.join(root, 'bot/db.js'), { connect: async () => client }],
     [path.join(root, 'utils/encryption.js'), { encryptToken: () => 'encrypted-fixture' }],
     [path.join(root, 'services/nitradoService.js'), {
-      listGameServers: async () => options.noServers ? [] : [{ id: '901', name: 'Fixture server', platform: 'xbox' }],
-      getAuthenticatedUser: async () => ({ id: '900' }),
+      validateRegistrationToken: async () => ({ status: 'valid', userId: '900', username: 'fixture', scopes: ['user_info', 'service'], missingScopes: [] }),
+      getRegistrationData: async () => ({
+        dayzServers: options.noServers ? [] : [{ id: '901', name: 'Fixture server', platform: 'xbox' }],
+        user: { id: '900' },
+      }),
     }],
     [path.join(root, 'bot/utils/website.js'), { getWebsiteLink: () => 'https://dashboard.invalid' }],
   ]);

@@ -1,0 +1,41 @@
+name: Dozy — Performance profiler
+
+on:
+  schedule:
+    - cron: '0 2 * * 2' # weekly on Tuesdays at 02:00 UTC
+  workflow_dispatch: {}
+
+jobs:
+  profile:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Start static server and run Dozy profiler
+        env:
+          # Static assets only — the app endpoints need a live backend+DB,
+          # which the weekly perf report is not about. CI's perf gate uses
+          # the same script against the same static server.
+          ENDPOINTS: "http://127.0.0.1:8080/css/theme.css,http://127.0.0.1:8080/js/dashboard.js"
+          TIMEOUT_MS: 8000
+          THRESHOLD_MS: 1500
+        run: |
+          python3 -m http.server 8080 --directory public >/tmp/dozy-http.log 2>&1 &
+          server_pid=$!
+          trap 'kill "$server_pid" 2>/dev/null || true' EXIT
+          for attempt in {1..10}; do
+            if curl --fail --silent --show-error http://127.0.0.1:8080/css/theme.css >/dev/null; then
+              break
+            fi
+            if ! kill -0 "$server_pid" 2>/dev/null; then
+              break
+            fi
+            sleep 1
+          done
+          node scripts/dozy-profile.js

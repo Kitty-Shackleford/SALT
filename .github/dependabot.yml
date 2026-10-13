@@ -1,0 +1,58 @@
+# Dependabot — keeps npm deps, Actions, and base images current, and auto-PRs
+# security bumps (this is what would have caught the axios advisory that
+# red-lined CI on 2026-10-09).
+version: 2
+updates:
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: weekly
+      day: monday
+      time: "04:00"
+    open-pull-requests-limit: 10
+    commit-message:
+      prefix: "chore(deps)"
+    groups:
+      production-direct:
+        dependency-type: "production"
+        patterns:
+          - "axios"
+          - "discord.js"
+          - "pg"
+          - "express"
+      dev-tooling:
+        dependency-type: "development"
+        patterns:
+          - "eslint"
+          - "tailwindcss"
+
+  - package-ecosystem: "npm"
+    directory: "/bot"
+    schedule:
+      interval: weekly
+      day: monday
+      time: "05:00"
+    open-pull-requests-limit: 10
+    commit-message:
+      prefix: "chore(bot-deps)"
+    groups:
+      discord-and-http:
+        patterns:
+          - "discord.js"
+          - "axios"
+
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "chore(actions)"
+
+  - package-ecosystem: "docker"
+    directory: "/"
+    schedule:
+      interval: monthly
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "chore(base-image)"

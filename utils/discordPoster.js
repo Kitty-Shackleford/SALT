@@ -237,6 +237,32 @@ async function postViaBot(channelId, content, isEmbed = false) {
 }
 
 /**
+ * List a guild's channels via the bot token.
+ * @param {string} discordGuildId
+ * @returns {Promise<Array<{id: string, name: string, type: number}>>}
+ */
+async function fetchGuildChannels(discordGuildId) {
+  if (!/^\d{1,20}$/.test(String(discordGuildId || ''))) {
+    throw new Error('Invalid Discord guild ID');
+  }
+  const botToken = process.env.DISCORD_BOT_TOKEN;
+  if (!botToken) throw new Error('Discord bot token not configured');
+
+  const response = await fetchDiscord(`https://discord.com/api/v10/guilds/${discordGuildId}/channels`, {
+    headers: { Authorization: `Bot ${botToken}` }
+  });
+  if (!response.ok) {
+    throw new Error(`Guild channel list failed: ${response.status}`);
+  }
+  const channels = await response.json();
+  return (Array.isArray(channels) ? channels : []).map(channel => ({
+    id: String(channel.id),
+    name: channel.name || '',
+    type: channel.type
+  }));
+}
+
+/**
  * Post message to Discord (tries webhook first, falls back to bot)
  */
 async function postToDiscord(channelId, webhookUrl, content, isEmbed = false) {
@@ -260,6 +286,7 @@ module.exports = {
   postToDiscord,
   postViaWebhook,
   postViaBot,
+  fetchGuildChannels,
   validateDiscordDestination,
   MIN_DELAY_MS
 };

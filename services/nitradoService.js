@@ -9,6 +9,40 @@ const { normalizeProviderServerName } = require('../utils/serverNames');
 const DEFAULT_API_BASE_URL = 'https://api.nitrado.net';
 const DEFAULT_CACHE_TTL_MS = 10000;
 const DEFAULT_CACHE_MAX_ENTRIES = 500;
+// The OAuth token-info/identity endpoint lives on a different origin than the
+// game API, so it cannot go through the shared external client whose safeUrl()
+// enforces same-origin. It is reached through the bounded direct fetch below.
+const DEFAULT_OAUTH_BASE_URL = 'https://oauth.nitrado.net';
+const DEFAULT_TOKEN_INFO_TIMEOUT_MS = 15000;
+// Scopes the bot needs to resolve identity (GET /user) and to list the
+// guild's services (GET /services) during registration.
+const REQUIRED_REGISTRATION_SCOPES = ['user_info', 'service'];
+
+// Default transport for the OAuth token-info endpoint: the centralized
+// nitradoFetch timeout client (no raw axios/fetch in this file). It returns
+// the native response; the caller adapts it to { status, ok, headers, body }.
+async function defaultTokenInfoTransport(url, init, timeoutMs, reliability) {
+  const { nitradoFetch, DEFAULT_NITRADO_API_URL } = require('../utils/nitradoHttp');
+  const response = await nitradoFetch(url, {
+    ...init,
+    timeout: timeoutMs,
+  }, globalThis.fetch, timeoutMs, {
+    // The OAuth origin is not the game API origin, so rewriteApiUrl() leaves
+    // the URL untouched; pass the documented origin so the base-URL validation
+    // runs against the same allowlist as every other Nitrado request.
+    apiBaseUrl: DEFAULT_NITRADO_API_URL,
+    maxRetries: 0, // 401/403 are deterministic; the caller classifies the body
+    ...reliability,
+  });
+  return response;
+}
+
+function isTransientProviderError(error) {
+  // A 5xx from the provider (category "upstream") is the only error that
+  // warrants a bounded backoff retry; timeouts/network/4xx are either already
+  // retried by the external client or are deterministic for this token.
+  return error?.category === 'upstream';
+}
 
 function invalidResponse(operation) {
   return new ExternalApiError('Nitrado', operation, 'invalid_response', 502);
@@ -188,6 +222,17 @@ function createNitradoService(options = {}) {
     });
   const cache = new Map();
   const inflight = new Map();
+  const oauthBaseUrl = options.oauthBaseUrl || process.env.NITRADO_OAUTH_BASE_URL || DEFAULT_OAUTH_BASE_URL;
+  const tokenInfoTimeoutMs = positiveInteger(
+    options.tokenInfoTimeoutMs ?? process.env.NITRADO_TOKEN_INFO_TIMEOUT_MS,
+    DEFAULT_TOKEN_INFO_TIMEOUT_MS,
+  );
+  const maxRegistrationRetries = positiveInteger(
+    options.maxRegistrationRetries ?? process.env.NITRADO_REGISTRATION_RETRIES,
+    2,
+  );
+  const registrationSleep = options.registrationSleep || (ms => new Promise(resolve => setTimeout(resolve, ms)));
+  const tokenInfoFetcher = options.tokenInfoFetcher || null;
 
   function authHeaders(token) {
     return { Authorization: 'Bearer ' + requireToken(token), Accept: 'application/json' };
@@ -245,6 +290,94 @@ function createNitradoService(options = {}) {
     const id = user?.id ?? user?.user_id ?? user?.customer_id;
     if (id === undefined || id === null) throw invalidResponse('get authenticated user');
     return { id: String(id), username: user.username || user.name || null };
+  }
+
+  // The transport returns either a native fetch Response (default transport,
+  // via nitradoFetch) or a test stub with { status, ok, headers, json() }.
+  async function tokenInfoResult(url, init) {
+    const response = tokenInfoFetcher
+      ? await tokenInfoFetcher(url, init)
+      : await defaultTokenInfoTransport(url, init, tokenInfoTimeoutMs, { sleep: registrationSleep });
+    const status = Number(response?.status) || null;
+    let body = null;
+    if (response && typeof response.json === 'function') {
+      try { body = await response.json(); } catch (_) { body = null; }
+    } else if (response?.body !== undefined) {
+      body = response.body;
+    }
+    return { status, body };
+  }
+
+  async function getTokenInfo(token) {
+    // Different origin from the game API; routed through the centralized
+    // nitradoFetch timeout client (or an injected test transport).
+    const url = new URL('/token', oauthBaseUrl).toString();
+    try {
+      const result = await tokenInfoResult(url, { method: 'GET', headers: authHeaders(token) });
+      const status = Number(result?.status) || null;
+      const body = result?.body;
+      if (status !== null && status >= 200 && status < 300) {
+        const tokenInfo = body?.data?.token || body?.token || null;
+        const rawScopes = tokenInfo?.scopes ?? tokenInfo?.scope;
+        const scopes = Array.isArray(rawScopes)
+          ? rawScopes.filter(scope => typeof scope === 'string')
+          : typeof rawScopes === 'string'
+            ? rawScopes.split(/\s+/).filter(Boolean)
+            : null;
+        const userId = tokenInfo?.user?.id ?? null;
+        const username = tokenInfo?.user?.username || null;
+        if (!Array.isArray(scopes) || (userId === null && !username)) {
+          console.warn('⚠️ Nitrado token-info returned an unexpected shape; falling back to /user + /services');
+          return { status: 'unavailable', reason: 'invalid token-info response' };
+        }
+        return { status: 'valid', userId: userId !== null ? String(userId) : null, username, scopes };
+      }
+      const errorCode = body?.error_code || body?.error?.code || null;
+      if (status === 401 || status === 403) {
+        if (errorCode) return { status: 'invalid', errorCode };
+        // A WAF or intermediary (e.g. Cloudflare 1010) rejection is not a
+        // definitive token decision; fall back to the standard checks.
+        console.warn(`⚠️ Nitrado token-info rejected with ${status} without an error code; falling back to /user + /services`);
+        return { status: 'unavailable', reason: `token-info HTTP ${status}` };
+      }
+      console.warn(`⚠️ Nitrado token-info failed with HTTP ${status}; falling back to /user + /services`);
+      return { status: 'unavailable', reason: `token-info HTTP ${status}` };
+    } catch (error) {
+      const timedOut = error?.name === 'AbortError' || ['ECONNABORTED', 'ETIMEDOUT', 'UND_ERR_ABORTED'].includes(error?.code);
+      console.warn(`⚠️ Nitrado token-info ${timedOut ? 'timed out' : 'failed'} (${error?.message}); falling back to /user + /services`);
+      return { status: 'unavailable', reason: timedOut ? 'timeout' : 'network' };
+    }
+  }
+
+  async function validateRegistrationToken(token) {
+    const info = await getTokenInfo(token);
+    if (info.status === 'unavailable') return { status: 'unavailable', reason: info.reason };
+    if (info.status === 'invalid') return { status: 'invalid', errorCode: info.errorCode };
+    const present = new Set(info.scopes);
+    const missingScopes = REQUIRED_REGISTRATION_SCOPES.filter(scope => !present.has(scope));
+    return { status: 'valid', userId: info.userId, username: info.username, scopes: info.scopes, missingScopes };
+  }
+
+  // Bounded backoff around the initial /user + /services calls. Retries only
+  // transient provider failures (5xx, timeouts, network) — never 4xx — up to
+  // maxRegistrationRetries times, honoring any Retry-After up to a short cap.
+  async function getRegistrationData(token) {
+    let attempt = 0;
+    for (;;) {
+      try {
+        const [dayzServers, user] = await Promise.all([
+          listGameServers(token),
+          getAuthenticatedUser(token),
+        ]);
+        return { dayzServers, user };
+      } catch (error) {
+        if (!isTransientProviderError(error) || attempt >= maxRegistrationRetries) throw error;
+        attempt += 1;
+        const backoff = 250 * (2 ** (attempt - 1));
+        const delay = Math.min(Math.max(error?.retryAfterMs || 0, backoff), 5000);
+        await registrationSleep(delay);
+      }
+    }
   }
 
   async function listGameServers(token) {
@@ -527,6 +660,7 @@ function createNitradoService(options = {}) {
 
   return {
     getAuthenticatedUser, listServices, listGameServers, getRawGameserver, getRawGameserverFresh,
+    getTokenInfo, validateRegistrationToken, getRegistrationData,
     getServerStatus, getServiceDetails, listPlayers,
     getSettings, updateSetting, controlServer, getNotifications, getStats, getLogs, command,
     availableTasks, listTasks, createTask, updateTask, deleteTask, invalidate,
@@ -538,6 +672,8 @@ function createNitradoService(options = {}) {
 const nitradoService = createNitradoService();
 module.exports = Object.assign(nitradoService, {
   DEFAULT_API_BASE_URL,
+  DEFAULT_OAUTH_BASE_URL,
+  REQUIRED_REGISTRATION_SCOPES,
   createNitradoService,
   detectPlatform: detectDayzPlatform,
   normalizePlayer,

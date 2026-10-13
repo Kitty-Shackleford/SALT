@@ -78,7 +78,7 @@ function displayServers() {
   });
   const container = document.getElementById('servers-container');
   if (!filtered.length) {
-    container.innerHTML = '<p class="text-gray-400 text-center py-4">No servers found</p>';
+    container.innerHTML = '<div class="dzc-empty"><div class="dzc-empty-title">No servers found</div></div>';
     return;
   }
   container.innerHTML = `<div class="overflow-x-auto"><table class="w-full"><thead class="bg-gray-700"><tr>

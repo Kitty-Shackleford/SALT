@@ -19,6 +19,7 @@ async function main() {
     getLinkSettings,
     validateGuildRoleSettings,
     saveLinkSettings,
+    pruneStaleRoleSettings,
   } = require(path.join(__dirname, '..', 'bot', 'utils', 'linkSettings.js'));
   const { applyGuildJoinRoles } = require(path.join(__dirname, '..', 'bot', 'events', 'guildMemberAdd.js'));
   const joinAdds = [];
@@ -133,6 +134,24 @@ async function main() {
     'a disabled player_linking feature must fail closed to administrator approval');
   assert.deepStrictEqual(disabledSettings.roles.assignOnLink, [],
     'a disabled player_linking feature must not expose active role settings');
+
+  const prunedRoleSettings = pruneStaleRoleSettings({
+    verificationMode: 'open',
+    roles: {
+      assignOnJoin: ['live-join', 'deleted-role'],
+      assignOnLink: ['deleted-role', 'live-link'],
+      removeOnLink: ['deleted-role'],
+      removeOnLeave: ['live-leave', 'deleted-role'],
+    },
+  }, new Set(['live-join', 'live-link', 'live-leave']));
+  assert.deepStrictEqual(prunedRoleSettings.settings.roles, {
+    assignOnJoin: ['live-join'],
+    assignOnLink: ['live-link'],
+    removeOnLink: [],
+    removeOnLeave: ['live-leave'],
+  }, 'stale role pruning must remove deleted Discord roles from every lifecycle rule');
+  assert.deepStrictEqual(prunedRoleSettings.removedRoleIds, ['deleted-role'],
+    'stale role pruning must report each removed Discord role once');
 
   const deniedQueries = [];
   const deniedPool = {
@@ -362,6 +381,70 @@ async function main() {
   });
   assert.deepStrictEqual(memberAdds, ['live-role'],
     'interactive reconciliation must omit configured roles deleted from the guild');
+
+  const partialRequests = [];
+  const partialCurrentRoles = new Set(['freshies-role']);
+  let freshiesRemovalAttempts = 0;
+  const partialDb = {
+    async query(sql) {
+      if (/SELECT sf\.enabled/.test(sql)) {
+        return {
+          rows: [{
+            enabled: 1,
+            active: true,
+            managed_role_ids: [],
+            config: JSON.stringify({
+              roles: {
+                assignOnLink: ['verified-player-role'],
+                removeOnLink: ['freshies-role'],
+              },
+            }),
+          }],
+        };
+      }
+      throw new Error(`Unexpected partial-role query: ${sql}`);
+    },
+  };
+  await reconcileDiscordMemberRoles({
+    db: partialDb,
+    discordGuildId: 'guild-partial-role',
+    discordUserId: 'member-partial-role',
+    userId: 92,
+    botToken: 'test-token',
+    fetchImpl: async (url, options = {}) => {
+      const method = options.method || 'GET';
+      partialRequests.push([url, method]);
+      if (method === 'GET') {
+        return {
+          ok: true,
+          status: 200,
+          async json() { return { roles: [...partialCurrentRoles] }; },
+        };
+      }
+      if (method === 'PUT' && url.endsWith('/verified-player-role')) {
+        partialCurrentRoles.add('verified-player-role');
+        return { ok: true, status: 204, async json() { return {}; } };
+      }
+      if (method === 'DELETE' && url.endsWith('/freshies-role')) {
+        freshiesRemovalAttempts += 1;
+        if (freshiesRemovalAttempts === 1) {
+          return { ok: false, status: 503, async json() { return {}; } };
+        }
+        partialCurrentRoles.delete('freshies-role');
+        return { ok: true, status: 204, async json() { return {}; } };
+      }
+      throw new Error(`Unexpected partial-role request: ${method} ${url}`);
+    },
+  });
+  assert.deepStrictEqual([...partialCurrentRoles], ['verified-player-role'],
+    'a partial Discord failure must retry toward verified-present and freshies-absent desired state');
+  assert.strictEqual(
+    partialRequests.filter(([url, method]) => method === 'PUT' && url.endsWith('/verified-player-role')).length,
+    1,
+    'a retry after successful verified-role assignment must not add it a second time'
+  );
+  assert.strictEqual(freshiesRemovalAttempts, 2,
+    'a transient Freshies removal failure must be retried');
 
   const botEntrySource = fs.readFileSync(path.join(__dirname, '..', 'bot', 'index.js'), 'utf8');
   assert.doesNotMatch(botEntrySource, /global\.fetch\s*=/,

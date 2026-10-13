@@ -32,7 +32,7 @@ async function loadServers() {
 
 async function loadList(listType) {
   const container = document.getElementById(`list-${listType}`);
-  container.innerHTML = '<p class="text-gray-400">Loading...</p>';
+  container.innerHTML = '<div class="dzc-skeleton" style="height:1.25rem;width:220px"></div>';
   try {
     const res = await fetch(`/api/owner/servers/${currentServerId}/list/${listType}`);
     const data = await res.json();

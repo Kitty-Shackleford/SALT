@@ -59,8 +59,8 @@ async function testSettingsMutationUsesLockedCurrentStateAndAudits() {
 
   await mutateBotLinkSettings(db, {
     serverId: 7,
-    discordGuildId: '900000000000000002',
-    actor: { discordId: '900000000000000003', username: 'actor', avatar: null },
+    discordGuildId: '123456789012345678',
+    actor: { discordId: '223456789012345678', username: 'actor', avatar: null },
     resolveNativePermissions: async () => ({ administrator: false, manageRoles: true }),
     change: { type: 'verification', mode: 'admin_approval' },
     runRoleJob: async () => {},
@@ -78,6 +78,144 @@ async function testSettingsMutationUsesLockedCurrentStateAndAudits() {
   assert.ok(scopeLock > events.indexOf('BEGIN'));
   assert.ok(guildLock > scopeLock && currentLock > guildLock && write > currentLock && audit > write,
     'scope, guild policy, current row, write, and audit must be ordered inside one transaction');
+}
+
+async function testRoleSettingsMutationPrunesDeletedGuildRoles() {
+  const liveRole = '333333333333333333';
+  const staleRole = '444444444444444444';
+  const freshieRole = '555555555555555555';
+  let savedConfig;
+  let deletedHistoryRoleIds = [];
+  const client = {
+    async query(sql, params = []) {
+      if (sql === 'BEGIN' || sql === 'COMMIT' || sql === 'ROLLBACK') return result();
+      if (sql.includes('SELECT id FROM users WHERE discord_id')) return result([{ id: 41 }]);
+      if (sql.includes('INSERT INTO users')) return result([{ id: 41 }]);
+      if (sql.includes('FROM servers s') && sql.includes('FOR UPDATE OF s, g')) {
+        return result([{ server_id: 7, guild_id: 3 }]);
+      }
+      if (sql.includes('pg_advisory_xact_lock')) return result();
+      if (sql.includes('FROM guild_roles')) return result([{ role: 'admin' }]);
+      if (sql.includes('FROM server_role_assignments')) return result([]);
+      if (sql.includes('FROM server_features') && sql.includes("feature_name = 'player_linking'") &&
+          sql.includes('FOR UPDATE')) {
+        return result([{
+          enabled: true,
+          config: {
+            verificationMode: 'open',
+            roles: {
+              assignOnJoin: [staleRole],
+              assignOnLink: [staleRole, liveRole],
+              removeOnLink: [],
+              removeOnLeave: [staleRole],
+            },
+          },
+        }]);
+      }
+      if (sql.includes('sf.server_id <>')) return result([]);
+      if (sql.includes('INSERT INTO server_features')) {
+        savedConfig = JSON.parse(params[1]);
+        return result();
+      }
+      if (sql.includes('INSERT INTO discord_role_reconciliation_jobs')) return result([]);
+      if (sql.includes('INSERT INTO security_audit_events')) return result();
+      if (sql.includes('INSERT INTO discord_link_role_policy_history')) return result();
+      if (sql.includes('DELETE FROM discord_link_role_policy_history')) {
+        deletedHistoryRoleIds = params[1] || [];
+        return result();
+      }
+      throw new Error(`Unexpected SQL: ${sql}`);
+    },
+    release() {},
+  };
+
+  await mutateBotLinkSettings({ async connect() { return client; } }, {
+    serverId: 7,
+    discordGuildId: '123456789012345678',
+    actor: { discordId: '223456789012345678', username: 'actor', avatar: null },
+    resolveNativePermissions: async () => ({ administrator: false, manageRoles: true }),
+    availableRoleIds: new Set([liveRole, freshieRole]),
+    change: {
+      type: 'role',
+      operation: 'add',
+      roleKey: 'removeOnLink',
+      roleId: freshieRole,
+    },
+    runRoleJob: async () => {},
+  });
+
+  assert.deepStrictEqual(savedConfig.roles, {
+    assignOnJoin: [],
+    assignOnLink: [liveRole],
+    removeOnLink: [freshieRole],
+    removeOnLeave: [],
+  }, 'a role settings mutation must remove deleted guild-role references before saving');
+  assert.deepStrictEqual(deletedHistoryRoleIds, [staleRole],
+    'stale assignment history must be removed so reconciliation does not keep retrying a deleted role');
+}
+
+async function testLinkSettingsRoleMutationUsesCurrentGuildRoleInventory() {
+  const linkSettingsPath = require.resolve('../bot/utils/linkSettings');
+  const botDbPath = require.resolve('../bot/db');
+  const commandPath = require.resolve('../bot/commands/link-settings');
+  const originalLinkSettings = require.cache[linkSettingsPath];
+  const originalBotDb = require.cache[botDbPath];
+  const originalCommand = require.cache[commandPath];
+  let mutationOptions;
+  let fetchedRoles = false;
+  const roles = new Map([
+    ['333333333333333333', { id: '333333333333333333', managed: false, editable: true }],
+    ['555555555555555555', { id: '555555555555555555', managed: false, editable: true }],
+  ]);
+
+  require.cache[linkSettingsPath] = {
+    id: linkSettingsPath,
+    filename: linkSettingsPath,
+    loaded: true,
+    exports: {
+      async mutateBotLinkSettings(_db, options) { mutationOptions = options; },
+      async getLinkSettings() { throw new Error('status path must not run'); },
+    },
+  };
+  require.cache[botDbPath] = { id: botDbPath, filename: botDbPath, loaded: true, exports: {} };
+  delete require.cache[commandPath];
+
+  try {
+    const command = require(commandPath);
+    const replies = [];
+    await command.execute({
+      authorizedServerId: 7,
+      guild: {
+        id: '123456789012345678',
+        roles: {
+          async fetch() {
+            fetchedRoles = true;
+            return roles;
+          },
+        },
+      },
+      user: { id: '223456789012345678', username: 'actor', avatar: null },
+      options: {
+        getSubcommand() { return 'role-add'; },
+        getRole() { return roles.get('555555555555555555'); },
+        getString(name) { return name === 'action' ? 'remove_on_link' : null; },
+      },
+      async deferReply() {},
+      async editReply(reply) { replies.push(reply); },
+    });
+    assert.equal(fetchedRoles, true,
+      'role settings mutations must refresh the guild role inventory before saving');
+    assert.deepStrictEqual([...mutationOptions.availableRoleIds].sort(), [...roles.keys()].sort(),
+      'role settings mutations must pass the current guild role inventory into the locked mutation');
+    assert.ok(replies.some(reply => String(reply).includes('Added')));
+  } finally {
+    delete require.cache[commandPath];
+    if (originalCommand) require.cache[commandPath] = originalCommand;
+    if (originalLinkSettings) require.cache[linkSettingsPath] = originalLinkSettings;
+    else delete require.cache[linkSettingsPath];
+    if (originalBotDb) require.cache[botDbPath] = originalBotDb;
+    else delete require.cache[botDbPath];
+  }
 }
 
 async function testSettingsMutationFailsClosedAfterAuthorityRevocation() {
@@ -100,8 +238,8 @@ async function testSettingsMutationFailsClosedAfterAuthorityRevocation() {
   await assert.rejects(
     mutateBotLinkSettings({ async connect() { return client; } }, {
       serverId: 7,
-      discordGuildId: '900000000000000002',
-      actor: { discordId: '900000000000000003', username: 'actor', avatar: null },
+      discordGuildId: '123456789012345678',
+      actor: { discordId: '223456789012345678', username: 'actor', avatar: null },
       resolveNativePermissions: async () => ({ administrator: false, manageRoles: false }),
       change: { type: 'verification', mode: 'open' },
       runRoleJob: async () => {},
@@ -155,7 +293,7 @@ async function testModeratorAuthorityIgnoresStaleInteractionAdministratorSnapsho
     user: { id: 'actor' },
     memberPermissions: { has() { return true; } },
     guild: {
-      id: '900000000000000002',
+      id: '123456789012345678',
       members: {
         async fetch() {
           return { permissions: { has() { return false; } } };
@@ -200,7 +338,7 @@ function forceLinkFixture(memberFetch) {
     interaction: {
       user: { id: 'actor', username: 'actor', avatar: null },
       guild: {
-        id: '900000000000000002',
+        id: '123456789012345678',
         members: { fetch: memberFetch },
       },
     },
@@ -294,7 +432,7 @@ async function testSuccessfulForceLinkTransactionExecutesCompleteMutationPath() 
       if (sql.includes('INSERT INTO discord_role_reconciliation_jobs')) {
         return result([{
           id: 88,
-          discord_guild_id: '900000000000000002',
+          discord_guild_id: '123456789012345678',
           discord_user_id: 'target',
           user_id: 42,
           generation: 1,
@@ -307,7 +445,7 @@ async function testSuccessfulForceLinkTransactionExecutesCompleteMutationPath() 
   const interaction = {
     user: { id: 'actor', username: 'actor', avatar: null },
     guild: {
-      id: '900000000000000002',
+      id: '123456789012345678',
       members: {
         async fetch(options) {
           fetched.push(options);
@@ -392,16 +530,18 @@ async function testMissingForceMutationUsersResolveInDeterministicOrder() {
   };
   await ensureUsersAndLockRoleMutations(client, [
     { discordId: '900000000000000002', username: 'later' },
-    { discordId: '900000000000000001', username: 'earlier' },
+    { discordId: '100000000000000001', username: 'earlier' },
   ]);
   assert.deepStrictEqual(inserts, [
-    '900000000000000001',
+    '100000000000000001',
     '900000000000000002',
   ], 'missing identities must be inserted in a caller-independent order');
 }
 
 async function main() {
   await testSettingsMutationUsesLockedCurrentStateAndAudits();
+  await testRoleSettingsMutationPrunesDeletedGuildRoles();
+  await testLinkSettingsRoleMutationUsesCurrentGuildRoleInventory();
   await testSettingsMutationFailsClosedAfterAuthorityRevocation();
   await testCurrentDiscordMemberFetchRejectsDepartureAndRefreshesAdministrator();
   await testModeratorAuthorityIgnoresStaleInteractionAdministratorSnapshot();

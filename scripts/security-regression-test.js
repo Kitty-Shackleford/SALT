@@ -1,6 +1,13 @@
 #!/usr/bin/env node
 'use strict';
 
+// Seed a test-only ENCRYPTION_KEY when the environment has none, so this
+// security suite is hermetic. Children inherit process.env, which covers
+// every sub-test that loads modules reading the key (utils/encryption,
+// utils/discordAPI) regardless of how deep the require chain is.
+const { ensureTestEncryptionKey } = require('./lib/test-env');
+ensureTestEncryptionKey();
+
 const { spawnSync } = require('child_process');
 const path = require('path');
 
@@ -25,6 +32,7 @@ const TESTS = Object.freeze([
   'scripts/server-id-confusion-test.js',
   'scripts/shop-idor-test.js',
   'scripts/tenant-bypass-test.js',
+  'scripts/xss-sink-regression-test.js',
 ]);
 
 let failed = 0;

@@ -181,6 +181,21 @@
     },
     {
       "method": "GET",
+      "path": "/admin/theme",
+      "kind": "page",
+      "pageTargets": [
+        "public/admin/theme.html"
+      ],
+      "redirectTargets": [],
+      "declaredMiddleware": [],
+      "inheritedMiddleware": [
+        "apiLimiter",
+        "ensureAuthenticated",
+        "ensureAdmin"
+      ]
+    },
+    {
+      "method": "GET",
       "path": "/admin/users",
       "kind": "page",
       "pageTargets": [
@@ -810,16 +825,6 @@
       ]
     },
     {
-      "file": "public/admin/feeds.html",
-      "routes": [],
-      "scripts": [
-        "/js/instance-config.js",
-        "/js/api.js",
-        "/js/csrf-helper.js",
-        "/js/admin-feeds.js"
-      ]
-    },
-    {
       "file": "public/admin/guilds-approval.html",
       "routes": [
         "/admin/guilds-approval"
@@ -892,6 +897,16 @@
       ]
     },
     {
+      "file": "public/admin/theme.html",
+      "routes": [
+        "/admin/theme"
+      ],
+      "scripts": [
+        "/js/instance-config.js",
+        "/js/admin-theme.js"
+      ]
+    },
+    {
       "file": "public/admin/users.html",
       "routes": [
         "/admin/roles",
@@ -906,16 +921,6 @@
       ]
     },
     {
-      "file": "public/automation.html",
-      "routes": [],
-      "scripts": [
-        "/js/instance-config.js",
-        "/js/api.js",
-        "/js/csrf-helper.js",
-        "/js/automation.js"
-      ]
-    },
-    {
       "file": "public/dashboard.html",
       "routes": [
         "/dashboard"
@@ -924,6 +929,8 @@
         "/js/instance-config.js",
         "/js/api.js",
         "/js/csrf-helper.js",
+        "/js/dashboard-poll.js",
+        "/js/dashboard-ops.js",
         "/js/dashboard.js"
       ]
     },
@@ -1147,43 +1154,6 @@
       ]
     },
     {
-      "file": "public/economy-dashboard.html",
-      "routes": [],
-      "scripts": [
-        "/js/instance-config.js",
-        "https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js",
-        "/js/api.js",
-        "/js/csrf-helper.js",
-        "/js/components/economyDashboard.js",
-        "/js/economy-dashboard-init.js"
-      ]
-    },
-    {
-      "file": "public/economy-leaderboard.html",
-      "routes": [],
-      "scripts": [
-        "/js/instance-config.js",
-        "/js/components/leaderboardTable.js",
-        "/js/economy-leaderboard-init.js"
-      ]
-    },
-    {
-      "file": "public/economy-transactions.html",
-      "routes": [],
-      "scripts": [
-        "/js/instance-config.js",
-        "/js/components/transactionList.js",
-        "/js/economy-transactions-init.js"
-      ]
-    },
-    {
-      "file": "public/index.html",
-      "routes": [],
-      "scripts": [
-        "/js/instance-config.js"
-      ]
-    },
-    {
       "file": "public/logout-confirm.html",
       "routes": [
         "/logout"
@@ -1228,7 +1198,11 @@
         "/js/api.js",
         "/js/csrf-helper.js",
         "/js/dayz-map-coordinates.js",
+        "/js/destination-preview.js",
+        "/js/map-layer-catalog.js",
         "/js/dayz-map-tiles.js",
+        "/js/online-player-admin-state.js",
+        "/js/map-url-state.js",
         "/js/map.js"
       ]
     },
@@ -1246,25 +1220,6 @@
       ]
     },
     {
-      "file": "public/nitrado-settings.html",
-      "routes": [],
-      "scripts": [
-        "/js/instance-config.js",
-        "/js/api.js",
-        "/js/csrf-helper.js",
-        "/js/dayz-time.js",
-        "/js/nitrado-settings.js"
-      ]
-    },
-    {
-      "file": "public/onboarding.html",
-      "routes": [],
-      "scripts": [
-        "/js/instance-config.js",
-        "/js/onboarding.js"
-      ]
-    },
-    {
       "file": "public/player-map.html",
       "routes": [
         "/player-map"
@@ -1276,6 +1231,7 @@
         "/js/api.js",
         "/js/csrf-helper.js",
         "/js/dayz-map-coordinates.js",
+        "/js/map-layer-catalog.js",
         "/js/dayz-map-tiles.js",
         "/js/player-map-standalone.js"
       ]
@@ -1384,41 +1340,6 @@
       "targetKind": "literal"
     },
     {
-      "script": "public/js/admin-feeds.js",
-      "transport": "fetch",
-      "method": "GET",
-      "target": "/api/admin/guilds",
-      "targetKind": "literal"
-    },
-    {
-      "script": "public/js/admin-feeds.js",
-      "transport": "fetch",
-      "method": "GET",
-      "target": "/api/discord/guilds/{dynamic}/channels",
-      "targetKind": "template"
-    },
-    {
-      "script": "public/js/admin-feeds.js",
-      "transport": "fetch",
-      "method": "GET",
-      "target": "/api/feeds/{dynamic}/{dynamic}",
-      "targetKind": "template"
-    },
-    {
-      "script": "public/js/admin-feeds.js",
-      "transport": "fetch",
-      "method": "GET",
-      "target": "/api/feeds/{dynamic}/{dynamic}/templates",
-      "targetKind": "template"
-    },
-    {
-      "script": "public/js/admin-feeds.js",
-      "transport": "fetch",
-      "method": "GET",
-      "target": "/api/guilds/{dynamic}/servers",
-      "targetKind": "template"
-    },
-    {
       "script": "public/js/admin-guilds-approval.js",
       "transport": "fetch",
       "method": "GET",
@@ -1473,6 +1394,13 @@
       "method": "GET",
       "target": "/api/user/guilds",
       "targetKind": "literal"
+    },
+    {
+      "script": "public/js/admin-theme.js",
+      "transport": "fetch",
+      "method": "DYNAMIC",
+      "target": "{dynamic}",
+      "targetKind": "unresolved"
     },
     {
       "script": "public/js/admin/economy-analytics.js",
@@ -1604,6 +1532,13 @@
       "script": "public/js/ai-assistant.js",
       "transport": "fetch",
       "method": "GET",
+      "target": "/api/ai/log-summary/{dynamic}",
+      "targetKind": "template"
+    },
+    {
+      "script": "public/js/ai-assistant.js",
+      "transport": "fetch",
+      "method": "GET",
       "target": "/api/ai/provider/status",
       "targetKind": "literal"
     },
@@ -1646,6 +1581,13 @@
       "script": "public/js/ai-assistant.js",
       "transport": "fetch",
       "method": "GET",
+      "target": "/api/ai/suggestion-groups/{dynamic}?limit=10",
+      "targetKind": "template"
+    },
+    {
+      "script": "public/js/ai-assistant.js",
+      "transport": "fetch",
+      "method": "GET",
       "target": "/api/ai/suggestions/{dynamic}",
       "targetKind": "template"
     },
@@ -1673,6 +1615,13 @@
     {
       "script": "public/js/ai-assistant.js",
       "transport": "fetch",
+      "method": "GET",
+      "target": "/api/mission-files/list/{dynamic}",
+      "targetKind": "template"
+    },
+    {
+      "script": "public/js/ai-assistant.js",
+      "transport": "fetch",
       "method": "PATCH",
       "target": "/api/ai/github/settings",
       "targetKind": "literal"
@@ -1695,7 +1644,28 @@
       "script": "public/js/ai-assistant.js",
       "transport": "fetch",
       "method": "POST",
+      "target": "/api/ai/balance-pass",
+      "targetKind": "literal"
+    },
+    {
+      "script": "public/js/ai-assistant.js",
+      "transport": "fetch",
+      "method": "POST",
       "target": "/api/ai/chat",
+      "targetKind": "literal"
+    },
+    {
+      "script": "public/js/ai-assistant.js",
+      "transport": "fetch",
+      "method": "POST",
+      "target": "/api/ai/config-edit",
+      "targetKind": "literal"
+    },
+    {
+      "script": "public/js/ai-assistant.js",
+      "transport": "fetch",
+      "method": "POST",
+      "target": "/api/ai/config-validate",
       "targetKind": "literal"
     },
     {
@@ -1709,6 +1679,20 @@
       "script": "public/js/ai-assistant.js",
       "transport": "fetch",
       "method": "POST",
+      "target": "/api/ai/log-summary/{dynamic}/explain",
+      "targetKind": "template"
+    },
+    {
+      "script": "public/js/ai-assistant.js",
+      "transport": "fetch",
+      "method": "POST",
+      "target": "/api/ai/log-why/{dynamic}",
+      "targetKind": "template"
+    },
+    {
+      "script": "public/js/ai-assistant.js",
+      "transport": "fetch",
+      "method": "POST",
       "target": "/api/ai/server/{dynamic}/repo",
       "targetKind": "template"
     },
@@ -1717,6 +1701,13 @@
       "transport": "fetch",
       "method": "POST",
       "target": "/api/ai/suggestions/{dynamic}/apply",
+      "targetKind": "template"
+    },
+    {
+      "script": "public/js/ai-assistant.js",
+      "transport": "fetch",
+      "method": "POST",
+      "target": "/api/ai/suggestions/{dynamic}/diff-explain",
       "targetKind": "template"
     },
     {
@@ -1895,27 +1886,6 @@
       "targetKind": "template"
     },
     {
-      "script": "public/js/components/economyDashboard.js",
-      "transport": "fetch",
-      "method": "GET",
-      "target": "/api/economy/player/{dynamic}?serverId={dynamic}",
-      "targetKind": "template"
-    },
-    {
-      "script": "public/js/components/economyDashboard.js",
-      "transport": "fetch",
-      "method": "GET",
-      "target": "/api/economy/player/{dynamic}/stats?serverId={dynamic}",
-      "targetKind": "template"
-    },
-    {
-      "script": "public/js/components/economyDashboard.js",
-      "transport": "fetch",
-      "method": "GET",
-      "target": "/api/economy/player/{dynamic}/transactions?serverId={dynamic}&limit=10",
-      "targetKind": "template"
-    },
-    {
       "script": "public/js/components/leaderboardTable.js",
       "transport": "fetch",
       "method": "GET",
@@ -1990,6 +1960,20 @@
       "transport": "fetch",
       "method": "GET",
       "target": "/api/user/guilds",
+      "targetKind": "literal"
+    },
+    {
+      "script": "public/js/dashboard.js",
+      "transport": "fetch",
+      "method": "DYNAMIC",
+      "target": "{dynamic}",
+      "targetKind": "unresolved"
+    },
+    {
+      "script": "public/js/dashboard.js",
+      "transport": "fetch",
+      "method": "GET",
+      "target": "/api/csrf-token",
       "targetKind": "literal"
     },
     {
@@ -2075,27 +2059,6 @@
       "method": "GET",
       "target": "/api/user/guilds",
       "targetKind": "literal"
-    },
-    {
-      "script": "public/js/economy-dashboard-init.js",
-      "transport": "fetch",
-      "method": "GET",
-      "target": "/api/accounts/linked",
-      "targetKind": "literal"
-    },
-    {
-      "script": "public/js/economy-dashboard-init.js",
-      "transport": "fetch",
-      "method": "GET",
-      "target": "/api/economy/player/{dynamic}?serverId={dynamic}",
-      "targetKind": "template"
-    },
-    {
-      "script": "public/js/economy-dashboard-init.js",
-      "transport": "fetch",
-      "method": "GET",
-      "target": "/api/economy/search-players?query={dynamic}&serverId={dynamic}&limit=10",
-      "targetKind": "template"
     },
     {
       "script": "public/js/economy-leaderboard-init.js",
@@ -2838,6 +2801,20 @@
       "method": "GET",
       "target": "/api/support/channels",
       "targetKind": "literal"
+    },
+    {
+      "script": "public/js/supportHub.js",
+      "transport": "fetch",
+      "method": "GET",
+      "target": "/api/support/server/{dynamic}/tickets",
+      "targetKind": "template"
+    },
+    {
+      "script": "public/js/supportHub.js",
+      "transport": "fetch",
+      "method": "GET",
+      "target": "/api/support/server/{dynamic}/tickets/{dynamic}",
+      "targetKind": "template"
     },
     {
       "script": "public/js/supportHub.js",

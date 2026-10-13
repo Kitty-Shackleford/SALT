@@ -137,7 +137,9 @@ function createExternalApiClient(options = {}) {
     throw new Error(`${serviceName} base URL must be a valid HTTP(S) URL`);
   }
   const loopbackHosts = new Set(['localhost', '127.0.0.1', '::1']);
-  if (parsedBase.protocol !== 'https:' && !loopbackHosts.has(parsedBase.hostname)) {
+  const explicitInsecure = options.allowInsecure === true
+    && !loopbackHosts.has(parsedBase.hostname); // loopback is always allowed; the flag is for trusted private networks
+  if (parsedBase.protocol !== 'https:' && !(loopbackHosts.has(parsedBase.hostname) || explicitInsecure)) {
     throw new Error(`${serviceName} base URL must use HTTPS unless it targets local loopback`);
   }
   if (options.timeoutMs !== undefined && (!Number.isFinite(Number(options.timeoutMs)) || Number(options.timeoutMs) <= 0)) {

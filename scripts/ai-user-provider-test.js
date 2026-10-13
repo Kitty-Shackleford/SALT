@@ -348,6 +348,124 @@ async function main() {
   );
   assert(!routeSource.includes('res.json({ token'));
 
+  // ── Shared free router (FreeLLMAPI fallback) ────────────────────────────
+  const sharedRouter = require('../services/aiSharedRouterService');
+
+  // Provider priority: shared router beats the operator paid key, but loses
+  // to a user's own connection.
+  const shared = await providerService.resolveUserProvider({ async get() { return null; } }, 7, {
+    AI_SHARED_ROUTER_BASE_URL: 'http://freellmapi:3001/v1/',
+    AI_SHARED_ROUTER_API_KEY: 'shared-router-key',
+    AI_API_KEY: 'operator-secret',
+    AI_API_BASE_URL: 'https://operator.example/v1/',
+    AI_MODEL: 'operator-model',
+  });
+  assert.deepEqual(shared, {
+    type: 'openai-compatible',
+    source: 'shared-router',
+    apiKey: 'shared-router-key',
+    baseURL: 'http://freellmapi:3001/v1/',
+    model: 'auto',
+    enforcePublicAddress: false,
+    allowInsecure: true,
+  });
+
+  // No shared router configured -> operator tier still wins, then null.
+  const operatorNoShared = await providerService.resolveUserProvider(
+    { async get() { return null; } }, 7, { AI_API_KEY: 'operator-secret' });
+  assert.equal(operatorNoShared.source, 'operator');
+  assert.equal(await providerService.resolveUserProvider({ async get() { return null; } }, 7, {}), null);
+
+  // Router enabled requires BOTH url and key.
+  assert.equal(sharedRouter.isEnabled({ AI_SHARED_ROUTER_BASE_URL: 'http://x/v1/' }), false);
+  assert.equal(sharedRouter.isEnabled({ AI_SHARED_ROUTER_API_KEY: 'k' }), false);
+  assert.equal(sharedRouter.isEnabled({}), false);
+  assert.equal(sharedRouter.isEnabled({ AI_SHARED_ROUTER_BASE_URL: 'http://x/v1/', AI_SHARED_ROUTER_API_KEY: 'k' }), true);
+  assert.equal(sharedRouter.dailyLimit({ AI_SHARED_DAILY_LIMIT: 'bogus' }), 50);
+  assert.equal(sharedRouter.dailyLimit({ AI_SHARED_DAILY_LIMIT: '3' }), 3);
+
+  // Quota: atomic upsert increments, over-limit rolls back + throws 429-coded.
+  const quotaState = { calls: 0, decrement: 0 };
+  const quotaDb = {
+    async query(sql) {
+      if (sql.includes('INSERT INTO ai_shared_usage')) {
+        quotaState.calls += 1;
+        return [{ calls: quotaState.calls }];
+      }
+      if (sql.includes('UPDATE ai_shared_usage')) {
+        quotaState.decrement += 1;
+        quotaState.calls -= 1;
+        return [];
+      }
+      throw new Error(`Unexpected quota query: ${sql}`);
+    },
+    async get() { return null; },
+  };
+  const sharedEnv = {
+    AI_SHARED_ROUTER_BASE_URL: 'http://freellmapi:3001/v1/',
+    AI_SHARED_ROUTER_API_KEY: 'shared-router-key',
+    AI_SHARED_DAILY_LIMIT: '2',
+  };
+  const first = await sharedRouter.consumeCall(quotaDb, 7, sharedEnv);
+  assert.equal(first.count, 1);
+  assert.equal(first.remaining, 1);
+  const second = await sharedRouter.consumeCall(quotaDb, 7, sharedEnv);
+  assert.equal(second.count, 2);
+  assert.equal(second.remaining, 0);
+  await assert.rejects(
+    () => sharedRouter.consumeCall(quotaDb, 7, sharedEnv),
+    error => error.code === 'AI_SHARED_RATE_LIMITED'
+      && error.status === 429
+      && error.category === 'rate_limited'
+      && /Daily shared-AI limit reached \(2\/day\)/.test(error.message),
+    'over-limit shared router calls must be rejected without burning budget',
+  );
+  assert.equal(quotaState.decrement, 1, 'over-limit increment must be rolled back');
+  assert.equal(quotaState.calls, 2, 'budget must remain intact after rejection');
+
+  // remaining() reports budget without incrementing; null when router off.
+  const remainingProbe = await sharedRouter.remaining({
+    async get(sql) {
+      assert(sql.includes('SELECT calls FROM ai_shared_usage'));
+      return { calls: 1 };
+    },
+    async query() { throw new Error('remaining must not write'); },
+  }, 7, sharedEnv);
+  assert.deepEqual(remainingProbe, { limit: 2, used: 1, remaining: 1 });
+  assert.equal(await sharedRouter.remaining(quotaDb, 7, {}), null);
+
+  // Status route data: shared router surfaces as a configured provider.
+  const sharedStatus = await providerService.getUserProviderStatus(
+    { async get() { return null; } }, 7, sharedEnv);
+  assert.equal(sharedStatus.configured, true);
+  assert.equal(sharedStatus.source, 'shared-router');
+
+  // A user with their own key is unaffected by the shared router being on.
+  const userKeepsKey = await providerService.resolveUserProvider(openAiDb, 7, sharedEnv);
+  assert.equal(userKeepsKey.source, 'user');
+
+  // allowInsecure is an explicit opt-in: a non-loopback HTTP client without
+  // the flag must still be rejected, with the flag it must construct.
+  const { createExternalApiClient } = require('../utils/externalApiClient');
+  assert.throws(
+    () => createExternalApiClient({ serviceName: 'AI', baseURL: 'http://freellmapi:3001/v1/' }),
+    /HTTPS/i,
+    'plain-HTTP provider base URLs must be rejected unless explicitly trusted',
+  );
+  const insecureClient = createExternalApiClient({
+    serviceName: 'AI',
+    baseURL: 'http://freellmapi:3001/v1/',
+    allowInsecure: true,
+  });
+  assert.equal(typeof insecureClient.request, 'function');
+  // User-supplied openai-compatible providers (enforcePublicAddress: true)
+  // never receive allowInsecure, so their client stays TLS-only.
+  assert.throws(
+    () => createExternalApiClient({ serviceName: 'AI', baseURL: 'http://198.51.100.7:11434/v1/' }),
+    /HTTPS/i,
+    'user-facing provider clients must not accept a non-loopback plain-HTTP URL',
+  );
+
   console.log('✅ Per-user AI provider and Copilot tests passed');
 }
 

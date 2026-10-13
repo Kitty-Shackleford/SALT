@@ -26,7 +26,7 @@ jobs:
 
       - name: Start static server and run Dopey smoke tests
         env:
-          BASE_URL: http://localhost:8080
+          BASE_URL: http://127.0.0.1:8080
           PAGES: "/,/admin"
         run: |
           python3 -m http.server 8080 --directory public >/tmp/dopey-http.log 2>&1 &
@@ -34,7 +34,7 @@ jobs:
           trap 'kill "$server_pid" 2>/dev/null || true' EXIT
           ready=false
           for attempt in {1..10}; do
-            if curl --fail --silent --show-error http://localhost:8080/ >/dev/null; then
+            if curl --fail --silent --show-error http://127.0.0.1:8080/ >/dev/null; then
               ready=true
               break
             fi

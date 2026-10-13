@@ -2,7 +2,9 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Automation - DayZ Dashboard</title>
+  <link rel="stylesheet" href="/css/theme.css">
   <link rel="stylesheet" href="/css/tailwind.css">
   <script src="/js/instance-config.js" defer></script>
 </head>
@@ -13,29 +15,6 @@
       <a href="/dashboard" class="bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded">← Back</a>
     </div>
 
-    <!-- Dashboard Navigation -->
-    <nav class="bg-gray-800 rounded-lg p-3 mb-6 border border-gray-700">
-      <div class="flex gap-2 flex-wrap">
-        <a href="/dashboard" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">🎮 Servers</a>
-        <a href="/dashboard/economy" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">💰 Economy</a>
-        <a href="/map" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">🗺️ Map</a>
-        <a href="/dashboard/feeds" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">📢 Feeds</a>
-        <a href="/dashboard/automation" class="bg-blue-600 px-4 py-2 rounded font-semibold">⚙️ Automation</a>
-        <a href="/dashboard/tasks" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">🕒 Tasks</a>
-        <a href="/dashboard/server-control" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">🎮 Control</a>
-        <a href="/dashboard/backups" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">💾 Backups</a>
-        <a href="/dashboard/rotation" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">🔄 Rotation</a>
-        <a href="/dashboard/ai-assistant" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">🤖 AI</a>
-        <a href="/dashboard/server-stats" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">📊 Stats</a>
-        <a href="/dashboard/activity-log" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">📋 Activity</a>
-        <a href="/dashboard/console" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">🖥️ Console</a>
-        <a href="/dashboard/boost" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">🚀 Boost</a>
-        <a href="/dashboard/support" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">🎫 Support</a>
-        <a href="/dashboard/settings" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">🔧 Settings</a>
-        <a href="/player-portal" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">👤 Player Portal</a>
-        <a href="/dashboard/shop-admin" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">🛒 Shop</a>
-      </div>
-    </nav>
 
     <!-- Auto Log Sync -->
     <div class="bg-gray-800 p-6 rounded-lg shadow-lg mb-6">
@@ -87,7 +66,7 @@
           <div class="mt-4 pt-4 border-t border-gray-600">
             <div class="flex justify-between items-center mb-2">
               <span class="text-sm text-gray-400">Status:</span>
-              <span id="syncStatus" class="text-sm">Idle</span>
+              <span id="syncStatus" class="text-sm" aria-live="polite">Idle</span>
             </div>
             <div class="flex justify-between items-center">
               <span class="text-sm text-gray-400">Last Sync:</span>
@@ -136,7 +115,7 @@
           <div class="mt-4 pt-4 border-t border-gray-600">
             <div class="flex justify-between items-center mb-2">
               <span class="text-sm text-gray-400">Status:</span>
-              <span id="trackingStatus" class="text-sm">Idle</span>
+              <span id="trackingStatus" class="text-sm" aria-live="polite">Idle</span>
             </div>
             <div class="flex justify-between items-center">
               <span class="text-sm text-gray-400">Last Scan:</span>

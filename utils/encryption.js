@@ -21,7 +21,7 @@ if (key.length !== 32) {
  */
 function encryptToken(token) {
   if (!token) return null;
-
+  
   const iv = crypto.randomBytes(16);
   const cipher = crypto.createCipheriv(algorithm, key, iv);
   let encrypted = cipher.update(token, 'utf8', 'hex');
@@ -36,13 +36,13 @@ function encryptToken(token) {
  */
 function decryptToken(encryptedToken) {
   if (!encryptedToken) return null;
-
+  
   try {
     const parts = encryptedToken.split(':');
     if (parts.length !== 2) {
       throw new Error('Invalid encrypted token format');
     }
-
+    
     const iv = Buffer.from(parts[0], 'hex');
     const encrypted = parts[1];
     const decipher = crypto.createDecipheriv(algorithm, key, iv);

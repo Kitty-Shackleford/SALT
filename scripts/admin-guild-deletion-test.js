@@ -11,8 +11,8 @@ const adminRoutes = require('../routes/admin');
 const { ensureAuthenticated, ensureAdmin } = require('../middleware/auth');
 const { validateGuildId } = require('../middleware/validators');
 
-const GUILD_ID = '900000000000000001';
-const OTHER_GUILD_ID = '900000000000000002';
+const GUILD_ID = '1234567890123456789';
+const OTHER_GUILD_ID = '9876543210987654321';
 const ADMIN = { id: 7, username: 'Test admin', platform_role: 'dashboard_admin', is_admin: 0 };
 
 function fixture({ user = ADMIN, found = true } = {}) {
@@ -155,8 +155,8 @@ test('DELETE ignores conflicting body and query IDs when targeting a valid URL',
   assertSoftDisable(calls);
 });
 
-for (const guildId of ['invalid', '900000000000000', '900000000000000000000',
-  '+900000000000000001', '900000000000000.01', ` ${GUILD_ID}`, `${GUILD_ID}\n`]) {
+for (const guildId of ['invalid', '1234567890123456', '12345678901234567890',
+  '+12345678901234567', '123456789012345.67', ` ${GUILD_ID}`, `${GUILD_ID}\n`]) {
   test(`malformed URL guild ID ${JSON.stringify(guildId)} cannot be rescued by body/query`, async () => {
     const { app, calls } = fixture();
     const result = await request(app, 'DELETE',

@@ -322,6 +322,7 @@ async function nitradoFetch(url, options = {}, fetchImpl = globalThis.fetch, tim
 module.exports = Object.assign(nitradoHttp, {
   DEFAULT_NITRADO_HTTP_TIMEOUT_MS,
   DEFAULT_NITRADO_HTTP_MAX_RETRIES,
+  DEFAULT_NITRADO_API_URL,
   configuredTimeoutMs,
   createNitradoHttpClient,
   nitradoFetch,

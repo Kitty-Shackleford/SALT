@@ -1,0 +1,41 @@
+# CodeQL — real SAST alongside the lightweight Shady scanner.
+name: CodeQL
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    # The defaults for this filter mean that only PRs against the default
+    # branch will be analyzed, so this block can be omitted for most repos.
+    branches: [main]
+  schedule:
+    - cron: '0 6 * * 1' # weekly on Mondays at 06:00 UTC
+
+permissions:
+  contents: read # explicit — setting any permissions key drops the others
+  security-events: write # required to upload CodeQL results
+  actions: read # required on private repos: analyze calls get-a-workflow-run for SARIF fingerprints
+
+jobs:
+  analyze:
+    name: Analyze
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: javascript
+          source-root: src
+
+      # CodeQL's JavaScript extractor also picks up the bot/ and scripts/
+      # trees from the repository root; no extra build step is needed for
+      # plain Node code (no compilation).
+
+      - name: Perform CodeQL analysis
+        uses: github/codeql-action/analyze@v3
+        with:
+          category: "/language/javascript"

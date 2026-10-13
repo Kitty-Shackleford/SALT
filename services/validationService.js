@@ -167,7 +167,7 @@ class ValidationService {
 
     // Step 5: File-specific validation
     const rules = resolvedType ? this.rules[resolvedType] : null;
-
+    
     if (rules) {
       this.validateStructure(parsedXML, rules, { errors, warnings, info });
     } else {
@@ -316,7 +316,7 @@ class ValidationService {
           } else {
             const x = this.parseFiniteNumber(pos.$.x);
             const z = this.parseFiniteNumber(pos.$.z);
-
+            
             if (x === null || z === null) {
               errors.push({
                 message: `<event> "${attrs.name}" position ${posIndex} has invalid coordinates`,
@@ -450,7 +450,7 @@ class ValidationService {
     // Check for tabs vs spaces (consistency warning)
     const hasTabs = content.includes('\t');
     const hasSpaces = /^ {2,}/m.test(content);
-
+    
     if (hasTabs && hasSpaces) {
       warnings.push({
         message: 'Mixed tabs and spaces detected for indentation',
@@ -534,7 +534,7 @@ class ValidationService {
       // Extract line/column from error message
       const match = error.message.match(/position (\d+)/);
       const position = match ? parseInt(match[1]) : 0;
-
+      
       const lines = content.substring(0, position).split('\n');
       const line = lines.length;
       const column = lines[lines.length - 1].length;
@@ -550,7 +550,7 @@ class ValidationService {
     }
 
     // Check for common JSON issues
-
+    
     // Check for trailing commas (will be caught by parse, but good to mention)
     if (/,\s*[}\]]/.test(content)) {
       warnings.push({
@@ -705,8 +705,8 @@ class ValidationService {
       errorCount: result.errors.length,
       warningCount: result.warnings.length,
       infoCount: result.info.length,
-      status: result.errors.length === 0
-        ? (result.warnings.length === 0 ? 'excellent' : 'good')
+      status: result.errors.length === 0 
+        ? (result.warnings.length === 0 ? 'excellent' : 'good') 
         : 'invalid'
     };
   }

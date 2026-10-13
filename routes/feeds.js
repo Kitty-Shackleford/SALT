@@ -187,7 +187,7 @@ router.post('/:guildId/:serverId/test', ensureAuthenticated, async (req, res) =>
 
     // Get template
     const template = await db.get(
-      `SELECT template, embed_enabled, embed_color FROM feed_templates
+      `SELECT template, embed_enabled, embed_color FROM feed_templates 
        WHERE guild_id = ? AND server_id = ? AND feed_type = ? AND event_type = 'player_kill'`,
       [scope.guildId, scope.serverId, feedType]
     );

@@ -2,7 +2,9 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Nitrado Settings - DayZ Dashboard</title>
+  <link rel="stylesheet" href="/css/theme.css">
   <link rel="stylesheet" href="/css/tailwind.css">
   <script src="/js/instance-config.js" defer></script>
 </head>
@@ -12,30 +14,6 @@
       <h1 class="text-4xl font-bold">⚙️ Nitrado Server Settings</h1>
       <a href="/dashboard" class="bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded">← Back</a>
     </div>
-
-    <!-- Dashboard Navigation -->
-    <nav class="bg-gray-800 rounded-lg p-3 mb-6 border border-gray-700">
-      <div class="flex gap-2 flex-wrap">
-        <a href="/dashboard" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">🎮 Servers</a>
-        <a href="/dashboard/economy" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">💰 Economy</a>
-        <a href="/map" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">🗺️ Map</a>
-        <a href="/dashboard/feeds" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">📢 Feeds</a>
-        <a href="/dashboard/automation" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">⚙️ Automation</a>
-        <a href="/dashboard/tasks" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">🕒 Tasks</a>
-        <a href="/dashboard/server-control" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">🎮 Control</a>
-        <a href="/dashboard/backups" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">💾 Backups</a>
-        <a href="/dashboard/rotation" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">🔄 Rotation</a>
-        <a href="/dashboard/ai-assistant" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">🤖 AI</a>
-        <a href="/dashboard/server-stats" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">📊 Stats</a>
-        <a href="/dashboard/activity-log" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">📋 Activity</a>
-        <a href="/dashboard/console" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">🖥️ Console</a>
-        <a href="/dashboard/boost" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">🚀 Boost</a>
-        <a href="/dashboard/support" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">🎫 Support</a>
-        <a href="/dashboard/settings" class="bg-blue-600 px-4 py-2 rounded font-semibold">🔧 Settings</a>
-        <a href="/player-portal" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">👤 Player Portal</a>
-        <a href="/dashboard/shop-admin" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">🛒 Shop</a>
-      </div>
-    </nav>
 
     <!-- Server Selection -->
     <div class="bg-gray-800 p-6 rounded-lg shadow-lg mb-6">
@@ -79,6 +57,7 @@
           <label class="flex gap-2"><input type="checkbox" value="lastPosition"> Own last position</label>
           <label class="flex gap-2"><input type="checkbox" value="factionMembers"> Faction teammate positions</label>
           <label class="flex gap-2"><input type="checkbox" value="factionMarkers"> Faction markers and placement</label>
+          <label class="flex gap-2"><input type="checkbox" value="factionTerritories"> Approved faction territory and flag radius</label>
         </div>
         <button id="savePlayerMapSettingsBtn" class="bg-green-600 hover:bg-green-700 px-5 py-2 rounded font-semibold">
           Save Player Map Features
@@ -124,7 +103,7 @@
              target="_blank" rel="noopener noreferrer" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">Installation kit ↗</a>
         </div>
       </div>
-
+      
       <!-- Approximate day/night preview -->
       <section id="timePreviewCard" class="hidden bg-gray-800 p-6 rounded-lg shadow-lg mb-6" aria-labelledby="timePreviewHeading">
         <h2 id="timePreviewHeading" class="text-2xl mb-2 font-bold">Day / Night Preview</h2>

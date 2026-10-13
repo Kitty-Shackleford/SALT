@@ -77,7 +77,7 @@ function createHarness({ failUpdate = false } = {}) {
       events.push(`load:${operationId}:${serverId}`);
       return {
         id: operationId,
-        providerServiceId: '90000002',
+        providerServiceId: '19811740',
         filePath: FILE_PATH,
         originalContent: SOURCE,
         expectedCandidateHash: files.has(FILE_PATH) ? hash(files.get(FILE_PATH)) : null,
@@ -112,7 +112,7 @@ async function testDeploysOnlyTheRecomputedReviewedCandidateUnderLock() {
     allowedItemClasses: new Set(['BandageDressing']),
     resolveProviderContext: async () => {
       harness.events.push('resolve');
-      return { platformServerId: '90000002', token: 'secret', filePath: FILE_PATH };
+      return { platformServerId: '19811740', token: 'secret', filePath: FILE_PATH };
     },
   });
 
@@ -128,8 +128,8 @@ async function testDeploysOnlyTheRecomputedReviewedCandidateUnderLock() {
   assert.deepStrictEqual(harness.events.slice(0, 4), [
     'lock',
     'resolve',
-    `download:90000002:${FILE_PATH}:true`,
-    'prepare:mission_init:90000002:deploy',
+    `download:19811740:${FILE_PATH}:true`,
+    'prepare:mission_init:19811740:deploy',
   ]);
   assert(harness.events.includes('update:42:completed'));
 }
@@ -151,7 +151,7 @@ async function testRestoresExactOriginalThroughANewDurableOperation() {
     deploymentOperationId: 41,
     expectedCurrentHash: preview.candidateHash,
     resolveProviderContext: async () => ({
-      platformServerId: '90000002', token: 'secret', filePath: FILE_PATH,
+      platformServerId: '19811740', token: 'secret', filePath: FILE_PATH,
     }),
   });
 
@@ -164,7 +164,7 @@ async function testRestoresExactOriginalThroughANewDurableOperation() {
     restoredFromOperationId: 41,
   });
   assert(harness.events.includes('load:41:7'));
-  assert(harness.events.includes('prepare:mission_init:90000002:restore'));
+  assert(harness.events.includes('prepare:mission_init:19811740:restore'));
 }
 
 async function testRollbackRestoresExactOriginalAfterPostUploadFailure() {
@@ -186,7 +186,7 @@ async function testRollbackRestoresExactOriginalAfterPostUploadFailure() {
       configuration: configuration(),
       allowedItemClasses: new Set(['BandageDressing']),
       resolveProviderContext: async () => ({
-        platformServerId: '90000002', token: 'secret', filePath: FILE_PATH,
+        platformServerId: '19811740', token: 'secret', filePath: FILE_PATH,
       }),
     }),
     /injected completion failure/
@@ -215,7 +215,7 @@ async function testSourceDriftStopsBeforeDurablePreparationOrUpload() {
       configuration: configuration(),
       allowedItemClasses: new Set(['BandageDressing']),
       resolveProviderContext: async () => ({
-        platformServerId: '90000002', token: 'secret', filePath: FILE_PATH,
+        platformServerId: '19811740', token: 'secret', filePath: FILE_PATH,
       }),
     }),
     /changed after approval/
@@ -240,7 +240,7 @@ async function testRejectsPrivateSignedUploadUrlBeforeSendingContent() {
   const service = createMissionInitFileService({ http });
 
   await assert.rejects(
-    service.uploadFileToServer('90000002', '/ftproot/dayz/mpmissions/test', 'init.c', SOURCE, 'secret'),
+    service.uploadFileToServer('19811740', '/ftproot/dayz/mpmissions/test', 'init.c', SOURCE, 'secret'),
     /invalid.*transfer|public/i
   );
   assert.strictEqual(requests, 1);
@@ -262,7 +262,7 @@ async function testRejectsTraversalBeforeProviderRequests() {
   });
 
   await assert.rejects(
-    service.downloadFileFromServer('90000002', '/ftproot/dayz/../init.c', 'secret'),
+    service.downloadFileFromServer('19811740', '/ftproot/dayz/../init.c', 'secret'),
     /path/i
   );
   assert.strictEqual(requests, 0);
@@ -284,7 +284,7 @@ function testRejectsInvalidTransferLimits() {
 async function testRejectsDeploymentWithAmbiguousDurableSnapshots() {
   const row = {
     id: 41,
-    provider_service_id: '90000002',
+    provider_service_id: '19811740',
     plan_json: {
       filePaths: [FILE_PATH],
       expectedCandidateHash: 'a'.repeat(64),

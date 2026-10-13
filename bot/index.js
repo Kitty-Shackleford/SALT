@@ -1,4 +1,4 @@
-const { Client, GatewayIntentBits, Collection, PermissionFlagsBits } = require('discord.js');
+const { Client, GatewayIntentBits, Collection, Partials, PermissionFlagsBits } = require('discord.js');
 const fs = require('fs');
 const path = require('path');
 // Load .env from parent directory to share configuration with main application
@@ -10,14 +10,24 @@ const {
   commandAuthorizationKey,
 } = require('./utils/commandAuthorization');
 const { handleServerAutocomplete } = require('./utils/serverAutocomplete');
+const { handleDestinationAutocomplete } = require('./utils/destinationAutocomplete');
+const { isSignUpButton, onSignUpInteraction } = require('./utils/interactionButtons');
+const { buildSignUpHandlers } = require('./services/teleportEventButtonService');
+const { isTicketOpenButton, handleTicketOpen, handleTicketClose, CLOSE_BUTTON_ID } = require('./services/ticketButtonService');
+const { isPickerButton, handlePickerClick } = require('./services/pickerButtonService');
+const { isSuggestionButton, handleSuggestionClick } = require('./services/suggestionButtonService');
 validateEnv('bot');
 
 const client = new Client({
   intents: [
     GatewayIntentBits.Guilds,
     GatewayIntentBits.GuildMessages,
-    GatewayIntentBits.GuildMembers
-  ]
+    GatewayIntentBits.GuildMembers,
+    GatewayIntentBits.GuildMessageReactions
+  ],
+  // Reaction-role + welcome/goodbye handlers may encounter deleted channels or
+  // uncached members before they resolve.
+  partials: [Partials.Message, Partials.Channel, Partials.GuildMember, Partials.Reaction]
 });
 
 // Load commands
@@ -38,6 +48,9 @@ const eventFiles = fs.readdirSync(eventsPath).filter(file => file.endsWith('.js'
 for (const file of eventFiles) {
   const filePath = path.join(eventsPath, file);
   const event = require(filePath);
+  // Expose the client to event handlers (e.g. guildMemberAdd posts a welcome
+  // message; the GuildMemberAdd event only receives the member).
+  event.client = client;
   if (event.once) {
     client.once(event.name, (...args) => event.execute(...args));
   } else {
@@ -49,10 +62,74 @@ for (const file of eventFiles) {
 client.on('interactionCreate', async interaction => {
   if (interaction.isAutocomplete()) {
     try {
-      await handleServerAutocomplete(interaction, pool);
+      const handled = await handleDestinationAutocomplete(interaction, pool);
+      if (!handled) {
+        await handleServerAutocomplete(interaction, pool);
+      }
     } catch (error) {
-      console.error('Server autocomplete failed:', error && error.message || error);
+      console.error('Autocomplete failed:', error && error.message || error);
       if (!interaction.responded) await interaction.respond([]).catch(() => {});
+    }
+    return;
+  }
+  // Sign-up event buttons (Join / Leave) — must run before the chat-command
+  // early return, matching the ticket button handling.
+  if (isSignUpButton(interaction)) {
+    try {
+      await onSignUpInteraction(interaction, buildSignUpHandlers());
+    } catch (error) {
+      console.error('Sign-up button failed:', error && error.message || error);
+      if (!interaction.responded) {
+        await interaction.deferReply({ flags: 64 }).catch(() => {});
+      }
+    }
+    return;
+  }
+  // Ticket "Open" button — must run before the chat-command early return.
+  if (isTicketOpenButton(interaction)) {
+    try {
+      await handleTicketOpen(interaction);
+    } catch (error) {
+      console.error('Ticket button failed:', error && error.message || error);
+      if (!interaction.responded) {
+        await interaction.deferReply({ flags: 64 }).catch(() => {});
+      }
+    }
+    return;
+  }
+  // Ticket "Close" button.
+  if (interaction.isButton?.() && interaction.customId === CLOSE_BUTTON_ID) {
+    try {
+      await handleTicketClose(interaction);
+    } catch (error) {
+      console.error('Ticket close failed:', error && error.message || error);
+      if (!interaction.responded) {
+        await interaction.deferReply({ flags: 64 }).catch(() => {});
+      }
+    }
+    return;
+  }
+  // Reaction-role picker buttons (rr_btn:<emoji>:<roleId>).
+  if (isPickerButton(interaction)) {
+    try {
+      await handlePickerClick(interaction);
+    } catch (error) {
+      console.error('Picker button failed:', error && error.message || error);
+      if (!interaction.responded) {
+        await interaction.deferReply({ flags: 64 }).catch(() => {});
+      }
+    }
+    return;
+  }
+  // Suggestion Accept/Deny buttons (sugg_accept / sugg_deny).
+  if (isSuggestionButton(interaction)) {
+    try {
+      await handleSuggestionClick(interaction);
+    } catch (error) {
+      console.error('Suggestion button failed:', error && error.message || error);
+      if (!interaction.responded) {
+        await interaction.deferReply({ flags: 64 }).catch(() => {});
+      }
     }
     return;
   }
@@ -68,7 +145,7 @@ client.on('interactionCreate', async interaction => {
     } catch {
       // This command has no server selector.
     }
-    const hasClassifiedSubcommands = ['report', 'wipe-info'].includes(interaction.commandName);
+    const hasClassifiedSubcommands = ['report', 'wipe-info', 'birthday', 'suggestions'].includes(interaction.commandName);
     const authorizationCommand = commandAuthorizationKey(
       interaction.commandName,
       hasClassifiedSubcommands ? interaction.options.getSubcommand() : null,

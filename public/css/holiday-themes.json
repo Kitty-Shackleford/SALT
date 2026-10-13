@@ -1,0 +1,217 @@
+{
+  "version": 2,
+  "note": "Holiday theme packs (card 2/9). Each pack is a pure CSS-variable override applied on :root while the guild has the pack opted in AND the current date falls in one of the pack's windows. No pack contains selectors, URLs, or script — only token names and literal values. Packs re-declare only the tokens that tint the season; every other token (surface-3, text-faint, spacing, radius, typography) inherits from the active base theme, so each pack layers cleanly over all 5 base themes. Window format: 'window' is a single {month: 1-12, startDay, endDay} (inclusive day-of-month bounds, no New Year span); 'windows' is an array of such objects — a pack is active when ANY window matches (used by easter to approximate the movable spring window). KNOWN LIMITATION: the month+day mechanism cannot track the movable date of Easter itself; the easter pack approximates Mar 25 - Apr 24 as two fixed windows and may be off by up to a week in a given year. Opt-in: packs are NOT auto-active for everyone — a guild must enable the pack via the theme picker (guild_theme_settings.holiday_theme). Backward compat: 'winter' remains an alias of 'xmas'.",
+  "themes": {
+    "none": {
+      "label": "None",
+      "vars": {}
+    },
+    "halloween": {
+      "label": "Halloween",
+      "window": { "month": 10, "startDay": 20, "endDay": 31 },
+      "vars": {
+        "--dzc-bg": "#150b06",
+        "--dzc-bg-tint": "#1a0e07",
+        "--dzc-surface": "#1d0f08",
+        "--dzc-surface-2": "#271509",
+        "--dzc-surface-3": "#331d0c",
+        "--dzc-border": "#4a2e17",
+        "--dzc-border-strong": "#6b4520",
+        "--dzc-text": "#f3e6d5",
+        "--dzc-text-muted": "#b99a76",
+        "--dzc-text-faint": "#8a6b4d",
+        "--dzc-accent": "#e2762d",
+        "--dzc-accent-contrast": "#150b06",
+        "--dzc-stat": "#a3e635",
+        "--dzc-danger": "#f87171",
+        "--dzc-shadow-md": "0 4px 12px rgba(20, 6, 0, 0.5)",
+        "--dzc-shadow-lg": "0 8px 24px rgba(20, 6, 0, 0.6)"
+      }
+    },
+    "xmas": {
+      "label": "Christmas",
+      "window": { "month": 12, "startDay": 20, "endDay": 25 },
+      "vars": {
+        "--dzc-bg": "#0a1220",
+        "--dzc-bg-tint": "#0d1626",
+        "--dzc-surface": "#0e1a2b",
+        "--dzc-surface-2": "#14233a",
+        "--dzc-surface-3": "#1b2f4d",
+        "--dzc-border": "#2c4460",
+        "--dzc-border-strong": "#3f5d80",
+        "--dzc-text": "#eef5ff",
+        "--dzc-text-muted": "#9db4cf",
+        "--dzc-text-faint": "#6b85a5",
+        "--dzc-accent": "#67c7e8",
+        "--dzc-accent-contrast": "#0a1220",
+        "--dzc-stat": "#7ee787",
+        "--dzc-info": "#8fd3ff",
+        "--dzc-shadow-md": "0 4px 12px rgba(4, 12, 24, 0.4)",
+        "--dzc-shadow-lg": "0 8px 24px rgba(4, 12, 24, 0.5)"
+      }
+    },
+    "winter": {
+      "label": "Winter (alias of xmas)",
+      "window": { "month": 12, "startDay": 20, "endDay": 25 },
+      "vars": {
+        "--dzc-bg": "#0a1220",
+        "--dzc-bg-tint": "#0d1626",
+        "--dzc-surface": "#0e1a2b",
+        "--dzc-surface-2": "#14233a",
+        "--dzc-surface-3": "#1b2f4d",
+        "--dzc-border": "#2c4460",
+        "--dzc-border-strong": "#3f5d80",
+        "--dzc-text": "#eef5ff",
+        "--dzc-text-muted": "#9db4cf",
+        "--dzc-text-faint": "#6b85a5",
+        "--dzc-accent": "#67c7e8",
+        "--dzc-accent-contrast": "#0a1220",
+        "--dzc-stat": "#7ee787",
+        "--dzc-info": "#8fd3ff",
+        "--dzc-shadow-md": "0 4px 12px rgba(4, 12, 24, 0.4)",
+        "--dzc-shadow-lg": "0 8px 24px rgba(4, 12, 24, 0.5)"
+      }
+    },
+    "valentine": {
+      "label": "Valentine",
+      "window": { "month": 2, "startDay": 12, "endDay": 14 },
+      "vars": {
+        "--dzc-bg": "#180d12",
+        "--dzc-bg-tint": "#1c0e15",
+        "--dzc-surface": "#211019",
+        "--dzc-surface-2": "#2c1622",
+        "--dzc-surface-3": "#3a1e2e",
+        "--dzc-border": "#4a2534",
+        "--dzc-border-strong": "#6d3a50",
+        "--dzc-text": "#f6e9ef",
+        "--dzc-text-muted": "#bd95a8",
+        "--dzc-text-faint": "#8a5f72",
+        "--dzc-accent": "#e86a92",
+        "--dzc-accent-contrast": "#180d12",
+        "--dzc-danger": "#ef6a6a",
+        "--dzc-shadow-md": "0 4px 12px rgba(24, 6, 14, 0.45)",
+        "--dzc-shadow-lg": "0 8px 24px rgba(24, 6, 14, 0.55)"
+      }
+    },
+    "thanksgiving": {
+      "label": "Thanksgiving",
+      "window": { "month": 11, "startDay": 26, "endDay": 30 },
+      "vars": {
+        "--dzc-bg": "#170f08",
+        "--dzc-bg-tint": "#1c130a",
+        "--dzc-surface": "#1e140b",
+        "--dzc-surface-2": "#271b0f",
+        "--dzc-surface-3": "#332413",
+        "--dzc-border": "#4a3a20",
+        "--dzc-border-strong": "#6d5631",
+        "--dzc-text": "#f2e3ce",
+        "--dzc-text-muted": "#c2a988",
+        "--dzc-text-faint": "#8f7a5c",
+        "--dzc-accent": "#c26e2a",
+        "--dzc-accent-contrast": "#170f08",
+        "--dzc-stat": "#d9a441",
+        "--dzc-warning": "#e6b23a",
+        "--dzc-shadow-md": "0 4px 12px rgba(15, 8, 2, 0.5)",
+        "--dzc-shadow-lg": "0 8px 24px rgba(15, 8, 2, 0.6)"
+      }
+    },
+    "420": {
+      "label": "420",
+      "window": { "month": 4, "startDay": 19, "endDay": 22 },
+      "vars": {
+        "--dzc-bg": "#0c0a14",
+        "--dzc-bg-tint": "#100d1a",
+        "--dzc-surface": "#12101d",
+        "--dzc-surface-2": "#171425",
+        "--dzc-surface-3": "#1e1a2f",
+        "--dzc-border": "#31294a",
+        "--dzc-border-strong": "#4a3f6b",
+        "--dzc-text": "#ece6f7",
+        "--dzc-text-muted": "#b3a8cc",
+        "--dzc-text-faint": "#7d7396",
+        "--dzc-accent": "#9b5de5",
+        "--dzc-accent-contrast": "#0c0a14",
+        "--dzc-stat": "#7ed957",
+        "--dzc-info": "#8f7ae0",
+        "--dzc-danger": "#e05252",
+        "--dzc-shadow-md": "0 4px 12px rgba(6, 4, 12, 0.5)",
+        "--dzc-shadow-lg": "0 8px 24px rgba(6, 4, 12, 0.6)"
+      }
+    },
+    "easter": {
+      "label": "Easter (approximate — see note)",
+      "windows": [
+        { "month": 3, "startDay": 25, "endDay": 31 },
+        { "month": 4, "startDay": 1, "endDay": 24 }
+      ],
+      "vars": {
+        "--dzc-bg": "#0f120c",
+        "--dzc-bg-tint": "#12160e",
+        "--dzc-surface": "#151911",
+        "--dzc-surface-2": "#1a2016",
+        "--dzc-surface-3": "#232b1e",
+        "--dzc-border": "#3d4a2e",
+        "--dzc-border-strong": "#5a6d44",
+        "--dzc-text": "#eef4e8",
+        "--dzc-text-muted": "#b5c4a8",
+        "--dzc-text-faint": "#7f9273",
+        "--dzc-accent": "#90c25c",
+        "--dzc-accent-contrast": "#0f120c",
+        "--dzc-stat": "#7ed957",
+        "--dzc-warning": "#e6b23a",
+        "--dzc-danger": "#e05252",
+        "--dzc-info": "#7aa8d6",
+        "--dzc-shadow-md": "0 4px 12px rgba(6, 9, 4, 0.45)",
+        "--dzc-shadow-lg": "0 8px 24px rgba(6, 9, 4, 0.55)"
+      }
+    },
+    "4th-of-july": {
+      "label": "4th of July",
+      "window": { "month": 7, "startDay": 3, "endDay": 5 },
+      "vars": {
+        "--dzc-bg": "#0a0d1a",
+        "--dzc-bg-tint": "#0d1120",
+        "--dzc-surface": "#0f1322",
+        "--dzc-surface-2": "#141a2e",
+        "--dzc-surface-3": "#1c2440",
+        "--dzc-border": "#2c3a5e",
+        "--dzc-border-strong": "#40527d",
+        "--dzc-text": "#f0f3fa",
+        "--dzc-text-muted": "#b8c2d9",
+        "--dzc-text-faint": "#7e8aa5",
+        "--dzc-accent": "#e04141",
+        "--dzc-accent-contrast": "#0a0d1a",
+        "--dzc-stat": "#4ea1ff",
+        "--dzc-warning": "#e6b23a",
+        "--dzc-danger": "#e05252",
+        "--dzc-info": "#4ea1ff",
+        "--dzc-shadow-md": "0 4px 12px rgba(3, 5, 12, 0.5)",
+        "--dzc-shadow-lg": "0 8px 24px rgba(3, 5, 12, 0.6)"
+      }
+    },
+    "cinco-de-mayo": {
+      "label": "Cinco de Mayo",
+      "window": { "month": 5, "startDay": 3, "endDay": 5 },
+      "vars": {
+        "--dzc-bg": "#120a0d",
+        "--dzc-bg-tint": "#150c10",
+        "--dzc-surface": "#190e12",
+        "--dzc-surface-2": "#211218",
+        "--dzc-surface-3": "#2c1820",
+        "--dzc-border": "#4a2830",
+        "--dzc-border-strong": "#6d3d49",
+        "--dzc-text": "#f6e8ec",
+        "--dzc-text-muted": "#c9a3ad",
+        "--dzc-text-faint": "#92707b",
+        "--dzc-accent": "#d64550",
+        "--dzc-accent-contrast": "#120a0d",
+        "--dzc-stat": "#4ecb71",
+        "--dzc-warning": "#e6b23a",
+        "--dzc-danger": "#e05252",
+        "--dzc-info": "#6ab0e8",
+        "--dzc-shadow-md": "0 4px 12px rgba(10, 4, 6, 0.5)",
+        "--dzc-shadow-lg": "0 8px 24px rgba(10, 4, 6, 0.6)"
+      }
+    }
+  }
+}

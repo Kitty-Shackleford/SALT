@@ -51,6 +51,8 @@ const DEFAULT_EDITABLE_CONFIG = Object.freeze({
   fixedSupplyEnabled: false,
   maxMoneySupply: null,
   currentMoneySupply: 0,
+  teleportCostEnabled: false,
+  teleportCost: 0,
   version: 1,
   prospective: true,
 });
@@ -75,6 +77,7 @@ const EDITABLE_COLUMNS = Object.freeze({
   inactivity_threshold_days: 'inactivityThresholdDays', inactivity_tax_percentage: 'inactivityTaxPercentage',
   fixed_supply_enabled: 'fixedSupplyEnabled', max_money_supply: 'maxMoneySupply',
   current_money_supply: 'currentMoneySupply',
+  teleport_cost_enabled: 'teleportCostEnabled', teleport_cost: 'teleportCost',
 });
 
 function suppressUnsupportedTerritoryRewardConfig(config) {

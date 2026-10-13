@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Mission File Editor - TSB Dashboard</title>
 
+  <link rel="stylesheet" href="/css/theme.css">
     <style>
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
@@ -433,7 +434,7 @@
                     📁 Files
                     <button id="refreshFilesBtn" style="background: transparent; border: none; cursor: pointer; font-size: 18px;" title="Refresh file list">🔄</button>
                 </h3>
-                <p id="fileListStatus" style="padding: 0 10px; font-size: 12px;"></p>
+                <p id="fileListStatus" style="padding: 0 10px; font-size: 12px;" aria-live="polite"></p>
                 <div id="fileTree" class="file-tree">
                     <div class="loading">
                         <div class="spinner"></div>
@@ -482,7 +483,7 @@
                 </div>
 
                 <div class="status-bar">
-                    <span id="statusText">Ready</span>
+                    <span id="statusText" aria-live="polite">Ready</span>
                     <span id="fileSize">-</span>
                 </div>
             </div>

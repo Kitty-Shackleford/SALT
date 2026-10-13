@@ -163,55 +163,55 @@ async function createFixture(pool) {
       metadata JSONB NOT NULL DEFAULT '{}'::jsonb
     );
     INSERT INTO guilds (id, discord_guild_id, status)
-      VALUES (1, '900000000000000002', 'approved');
+      VALUES (1, '123456789012345678', 'approved');
     INSERT INTO servers (id, guild_id, status)
       VALUES (1, 1, 'active'), (2, 1, 'active');
     INSERT INTO users (discord_id, username)
       VALUES
-        ('900000000000000003', 'operator-one'),
-        ('900000000000000001', 'operator-two'),
-        ('900000000000000004', 'link-deletion-target');
+        ('223456789012345678', 'operator-one'),
+        ('323456789012345678', 'operator-two'),
+        ('423456789012345678', 'link-deletion-target');
     INSERT INTO guild_roles (guild_id, user_id, role)
       SELECT 1, id, 'admin' FROM users
-       WHERE discord_id IN ('900000000000000003', '900000000000000001');
+       WHERE discord_id IN ('223456789012345678', '323456789012345678');
     INSERT INTO linked_accounts
       (id, user_id, identity_id, verified_by_guild_id, verification_method)
       SELECT 1, id, 1, 1, 'emote_challenge'
-        FROM users WHERE discord_id = '900000000000000003';
+        FROM users WHERE discord_id = '223456789012345678';
     INSERT INTO linked_accounts
       (id, user_id, identity_id, verified_by_guild_id, verification_method)
       SELECT 700, id, 700, 1, 'emote_challenge'
-        FROM users WHERE discord_id = '900000000000000003';
+        FROM users WHERE discord_id = '223456789012345678';
     INSERT INTO server_player_memberships
       (server_id, guild_id, identity_id, user_id, source_link_id, verification_method, status)
       SELECT 1, 1, 700, id, 700, 'emote_challenge', 'active'
-        FROM users WHERE discord_id = '900000000000000003';
+        FROM users WHERE discord_id = '223456789012345678';
     INSERT INTO linked_accounts
       (id, user_id, identity_id, verified_by_guild_id, verification_method)
       SELECT 701, id, 701, 1, 'emote_challenge'
-        FROM users WHERE discord_id = '900000000000000004';
+        FROM users WHERE discord_id = '423456789012345678';
     INSERT INTO server_player_memberships
       (server_id, guild_id, identity_id, user_id, source_link_id, verification_method, status)
       SELECT 1, 1, 701, id, 701, 'emote_challenge', 'active'
-        FROM users WHERE discord_id = '900000000000000004';
+        FROM users WHERE discord_id = '423456789012345678';
     INSERT INTO discord_role_reconciliation_jobs
       (discord_guild_id, discord_user_id, user_id, status, attempts, generation)
-      SELECT '900000000000000002', discord_id, id, 'pending', 0, 1
-        FROM users WHERE discord_id = '900000000000000004';
+      SELECT '123456789012345678', discord_id, id, 'pending', 0, 1
+        FROM users WHERE discord_id = '423456789012345678';
     INSERT INTO server_features (server_id, feature_name, enabled, config)
       VALUES
-        (1, 'player_linking', 1, '{"verificationMode":"open","roles":{"assignOnJoin":[],"assignOnLink":["900000000000000010"],"removeOnLink":[],"removeOnLeave":[]}}'),
+        (1, 'player_linking', 1, '{"verificationMode":"open","roles":{"assignOnJoin":[],"assignOnLink":["123456789012345670"],"removeOnLink":[],"removeOnLeave":[]}}'),
         (2, 'player_linking', 1, '{"verificationMode":"open","roles":{"assignOnJoin":[],"assignOnLink":[],"removeOnLink":[],"removeOnLeave":[]}}');
   `);
 }
 
-function mutation(pool, serverId, change, resolver, actorDiscordId = '900000000000000003') {
+function mutation(pool, serverId, change, resolver, actorDiscordId = '223456789012345678') {
   return mutateBotLinkSettings(pool, {
     serverId,
-    discordGuildId: '900000000000000002',
+    discordGuildId: '123456789012345678',
     actor: {
       discordId: actorDiscordId,
-      username: actorDiscordId === '900000000000000003' ? 'operator-one' : 'operator-two',
+      username: actorDiscordId === '223456789012345678' ? 'operator-one' : 'operator-two',
       avatar: null,
     },
     resolveNativePermissions: resolver || (async () => ({ administrator: false, manageRoles: true })),
@@ -230,8 +230,8 @@ async function testConcurrentSettings(pool) {
   });
   await entered.promise;
   const roleUpdate = mutation(pool, 1, {
-    type: 'role', operation: 'add', roleKey: 'assignOnLink', roleId: '900000000000000011',
-  }, undefined, '900000000000000001');
+    type: 'role', operation: 'add', roleKey: 'assignOnLink', roleId: '123456789012345671',
+  }, undefined, '323456789012345678');
   const blocked = await Promise.race([
     roleUpdate.then(() => false),
     new Promise(resolve => setTimeout(() => resolve(true), 100)),
@@ -246,7 +246,7 @@ async function testConcurrentSettings(pool) {
     'later role mutation must preserve the restrictive mode from its locked current row');
   assert.deepStrictEqual(
     [...state.rows[0].config.roles.assignOnLink].sort(),
-    ['900000000000000010', '900000000000000011']
+    ['123456789012345670', '123456789012345671']
   );
 }
 
@@ -262,7 +262,7 @@ async function testAuthorityRevocation(pool) {
   await pool.query(
     `DELETE FROM guild_roles
       WHERE guild_id = 1 AND user_id = (
-        SELECT id FROM users WHERE discord_id = '900000000000000003'
+        SELECT id FROM users WHERE discord_id = '223456789012345678'
       )`
   );
   release.resolve();
@@ -273,7 +273,7 @@ async function testAuthorityRevocation(pool) {
   assert.equal(state.rows[0].config.verificationMode, 'admin_approval');
   await pool.query(
     `INSERT INTO guild_roles (guild_id, user_id, role)
-     SELECT 1, id, 'admin' FROM users WHERE discord_id = '900000000000000003'`
+     SELECT 1, id, 'admin' FROM users WHERE discord_id = '223456789012345678'`
   );
 }
 
@@ -281,7 +281,7 @@ async function testSiblingPolicySerialization(pool) {
   const entered = deferred();
   const release = deferred();
   const assign = mutation(pool, 1, {
-    type: 'role', operation: 'add', roleKey: 'assignOnLink', roleId: '900000000000000012',
+    type: 'role', operation: 'add', roleKey: 'assignOnLink', roleId: '123456789012345672',
   }, async () => {
     entered.resolve();
     await release.promise;
@@ -289,8 +289,8 @@ async function testSiblingPolicySerialization(pool) {
   });
   await entered.promise;
   const remove = mutation(pool, 2, {
-    type: 'role', operation: 'add', roleKey: 'removeOnLink', roleId: '900000000000000012',
-  }, undefined, '900000000000000001');
+    type: 'role', operation: 'add', roleKey: 'removeOnLink', roleId: '123456789012345672',
+  }, undefined, '323456789012345678');
   const blocked = await Promise.race([
     remove.then(() => false, () => false),
     new Promise(resolve => setTimeout(() => resolve(true), 100)),
@@ -310,8 +310,8 @@ async function testSiblingPolicySerialization(pool) {
 }
 
 async function testReversedMissingUserResolutionDoesNotDeadlock(pool) {
-  const actor = { discordId: '900000000000000005', username: 'new-actor' };
-  const target = { discordId: '900000000000000006', username: 'new-target' };
+  const actor = { discordId: '923456789012345678', username: 'new-actor' };
+  const target = { discordId: '123456789012345679', username: 'new-target' };
   async function resolve(profiles) {
     const client = await pool.connect();
     try {
@@ -339,7 +339,7 @@ async function testReversedMissingUserResolutionDoesNotDeadlock(pool) {
 
 async function testDashboardSettingsSerializesWithRoleRevocation(pool) {
   const actor = await pool.query(
-    "SELECT id FROM users WHERE discord_id = '900000000000000003'"
+    "SELECT id FROM users WHERE discord_id = '223456789012345678'"
   );
   const actorUserId = actor.rows[0].id;
   const entered = deferred();
@@ -395,7 +395,7 @@ async function testDashboardSettingsSerializesWithRoleRevocation(pool) {
 
 async function testShopAndPlayerLinkUseParentFirstLockOrder(pool) {
   const userResult = await pool.query(
-    "SELECT id FROM users WHERE discord_id = '900000000000000003'"
+    "SELECT id FROM users WHERE discord_id = '223456789012345678'"
   );
   const userId = userResult.rows[0].id;
   const shopClient = await pool.connect();
@@ -450,7 +450,7 @@ async function testShopAndPlayerLinkUseParentFirstLockOrder(pool) {
 
 async function testPlayerLinkSerializesWithGlobalUserDeletion(pool) {
   const targetResult = await pool.query(
-    "SELECT id FROM users WHERE discord_id = '900000000000000004'"
+    "SELECT id FROM users WHERE discord_id = '423456789012345678'"
   );
   const targetUserId = targetResult.rows[0].id;
   const deletionClient = await pool.connect();

@@ -114,9 +114,9 @@ router.post('/sync-now', async (req, res) => {
     );
 
     if (!settingsRow || !settingsRow.auto_log_sync) {
-      return res.status(400).json({
-        success: false,
-        error: 'No auto-sync settings found. Please enable and configure auto-sync first.'
+      return res.status(400).json({ 
+        success: false, 
+        error: 'No auto-sync settings found. Please enable and configure auto-sync first.' 
       });
     }
 
@@ -124,9 +124,9 @@ router.post('/sync-now', async (req, res) => {
     const requestedServerIds = Array.isArray(settings.servers) ? settings.servers : [];
 
     if (requestedServerIds.length === 0) {
-      return res.status(400).json({
-        success: false,
-        error: 'No servers selected for sync. Please select servers in the settings.'
+      return res.status(400).json({ 
+        success: false, 
+        error: 'No servers selected for sync. Please select servers in the settings.' 
       });
     }
 
@@ -157,9 +157,9 @@ router.post('/sync-now', async (req, res) => {
     try {
       const token = await getDecryptedToken(db, req.user.id, serverIds);
     if (!token) {
-      return res.status(400).json({
-        success: false,
-        error: 'No Nitrado token found'
+      return res.status(400).json({ 
+        success: false, 
+        error: 'No Nitrado token found' 
       });
     }
 
@@ -222,7 +222,7 @@ router.post('/sync-now', async (req, res) => {
     }
 
     const runSuccessful = isLogSyncRunSuccessful({
-      syncErrors: result.errors,
+      syncErrors: result.blockingErrors,
       parseErrors,
       requiredParseCount: serverIds.length,
       parsedCount: parsedServers,
@@ -266,9 +266,9 @@ router.post('/sync-now', async (req, res) => {
 
   } catch (err) {
     console.error('Sync error:', err);
-    res.status(500).json({
-      success: false,
-      error: 'Sync failed: ' + err.message
+    res.status(500).json({ 
+      success: false, 
+      error: 'Sync failed: ' + err.message 
     });
   }
 });

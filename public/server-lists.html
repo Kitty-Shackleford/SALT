@@ -2,11 +2,13 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Server List Management - DayZ Dashboard</title>
+  <link rel="stylesheet" href="/css/theme.css">
   <link rel="stylesheet" href="/css/tailwind.css">
   <script src="/js/instance-config.js" defer></script>
 </head>
-<body class="bg-gray-900 text-white">
+<body>
   <div class="container mx-auto p-6 max-w-4xl">
     <!-- Header -->
     <div class="flex justify-between items-center mb-6">
@@ -22,7 +24,7 @@
       </select>
     </div>
 
-    <div id="toastArea" class="mb-4"></div>
+    <div id="toastArea" class="mb-4" role="status" aria-live="polite"></div>
 
     <!-- List Management Tabs -->
     <div id="listSection" class="hidden">

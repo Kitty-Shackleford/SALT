@@ -470,7 +470,7 @@ async function createSchemaV2(db) {
   console.log('  ✓ player_achievements');
 
   // Create index for faster lookups
-  await db.run(`CREATE INDEX IF NOT EXISTS idx_player_achievements_identity
+  await db.run(`CREATE INDEX IF NOT EXISTS idx_player_achievements_identity 
     ON player_achievements(identity_id)`);
   console.log('  ✓ player_achievements indexes');
 
@@ -488,7 +488,7 @@ async function createSchemaV2(db) {
   )`);
   console.log('  ✓ player_wallets');
 
-  await db.run(`CREATE INDEX IF NOT EXISTS idx_player_wallets_identity
+  await db.run(`CREATE INDEX IF NOT EXISTS idx_player_wallets_identity 
     ON player_wallets(identity_id)`);
 
   // Player bank accounts
@@ -501,7 +501,7 @@ async function createSchemaV2(db) {
   )`);
   console.log('  ✓ player_bank_accounts');
 
-  await db.run(`CREATE INDEX IF NOT EXISTS idx_player_bank_accounts_identity
+  await db.run(`CREATE INDEX IF NOT EXISTS idx_player_bank_accounts_identity 
     ON player_bank_accounts(identity_id)`);
 
   // Economy transactions (audit trail)
@@ -524,11 +524,11 @@ async function createSchemaV2(db) {
   )`);
   console.log('  ✓ economy_transactions');
 
-  await db.run(`CREATE INDEX IF NOT EXISTS idx_economy_transactions_identity
+  await db.run(`CREATE INDEX IF NOT EXISTS idx_economy_transactions_identity 
     ON economy_transactions(identity_id)`);
-  await db.run(`CREATE INDEX IF NOT EXISTS idx_economy_transactions_timestamp
+  await db.run(`CREATE INDEX IF NOT EXISTS idx_economy_transactions_timestamp 
     ON economy_transactions(timestamp DESC)`);
-  await db.run(`CREATE INDEX IF NOT EXISTS idx_economy_transactions_type
+  await db.run(`CREATE INDEX IF NOT EXISTS idx_economy_transactions_type 
     ON economy_transactions(transaction_type)`);
 
   // Guild economy configuration
@@ -581,9 +581,9 @@ async function createSchemaV2(db) {
   )`);
   console.log('  ✓ guild_economy_config');
 
-  await db.run(`CREATE INDEX IF NOT EXISTS idx_guild_economy_config_guild
+  await db.run(`CREATE INDEX IF NOT EXISTS idx_guild_economy_config_guild 
     ON guild_economy_config(guild_id)`);
-  await db.run(`CREATE INDEX IF NOT EXISTS idx_guild_economy_config_enabled
+  await db.run(`CREATE INDEX IF NOT EXISTS idx_guild_economy_config_enabled 
     ON guild_economy_config(enabled)`);
 
   // Supply audit log. It is intentionally created in the legacy nullable form;
@@ -666,20 +666,20 @@ async function createSchemaV2(db) {
   // 6. SYSTEM TABLES
   // ============================================
 
-  // Web sessions
-  await db.run(`CREATE TABLE IF NOT EXISTS sessions (
-    sid TEXT PRIMARY KEY,
-    sess TEXT NOT NULL,
-    expire BIGINT NOT NULL
-  )`);
-  console.log('  ✓ sessions');
+  // Web sessions: owned by connect-pg-simple (createTableIfMissing in
+  // registerMiddleware.js). NOTE: the store's default table name is
+  // `session` (SINGULAR) — not `sessions`. An old version of this file
+  // also created a dead `sessions` (expire BIGINT) table the store never
+  // uses, which made DB probing/QA misleading (2026-10-13: QA rows
+  // inserted into the dead table looked like "sessions broken" while the
+  // real `session` table was fine). Do not recreate it.
 
   /**
    * Automation Settings
    * Stores per-user automation preferences for:
    * - Auto log sync (background download of server logs)
    * - Auto player tracking (scheduled stats updates)
-   *
+   * 
    * JSON fields allow flexible settings without schema changes
    */
   await db.run(`CREATE TABLE IF NOT EXISTS automation_settings (
@@ -696,7 +696,7 @@ async function createSchemaV2(db) {
    * Sync Jobs
    * Tracks background file sync operations from Nitrado servers
    * Used by /api/sync-server and /api/sync-jobs endpoints
-   *
+   * 
    * NOTE: server_id stores the Nitrado platform ID (NOT a database ID!)
    * This is intentional - sync operations target external platform servers
    * and the platform ID is what the Nitrado API uses.
@@ -721,7 +721,7 @@ async function createSchemaV2(db) {
    * Downloads
    * Tracks individual file downloads from sync jobs
    * Allows users to see what files they've downloaded
-   *
+   * 
    * NOTE: server_id stores the Nitrado platform ID (NOT a database ID!)
    * This is intentional - download operations are tied to external platform servers
    * and the platform ID is what the Nitrado API uses.
@@ -911,41 +911,41 @@ async function createSchemaV2(db) {
   // Guild indexes
   await db.run('CREATE INDEX IF NOT EXISTS idx_guilds_discord ON guilds(discord_guild_id)');
   await db.run('CREATE INDEX IF NOT EXISTS idx_guilds_status ON guilds(status)');
-
+  
   // Server indexes
   await db.run('CREATE INDEX IF NOT EXISTS idx_servers_guild ON servers(guild_id)');
   await db.run('CREATE INDEX IF NOT EXISTS idx_servers_platform ON servers(platform, platform_server_id)');
   await db.run('CREATE UNIQUE INDEX IF NOT EXISTS idx_servers_unique ON servers(guild_id, platform_server_id)');
-
+  
   // Player identity indexes
   await db.run('CREATE INDEX IF NOT EXISTS idx_player_identities_player ON player_identities(player_id)');
   await db.run('CREATE INDEX IF NOT EXISTS idx_player_identities_platform ON player_identities(platform, platform_user_id)');
-
+  
   // Gamertag indexes (for search)
   await db.run('CREATE INDEX IF NOT EXISTS idx_gamertags_search ON player_gamertags(LOWER(gamertag), server_id)');
   await db.run('CREATE INDEX IF NOT EXISTS idx_gamertags_current ON player_gamertags(server_id, is_current_gamertag)');
-
+  
   // Activity indexes
   await db.run('CREATE INDEX IF NOT EXISTS idx_player_server_activity_identity ON player_server_activity(identity_id)');
   await db.run('CREATE INDEX IF NOT EXISTS idx_player_server_activity_server ON player_server_activity(server_id)');
-
+  
   // Session indexes
   await db.run('CREATE INDEX IF NOT EXISTS idx_sessions_expire ON sessions(expire)');
   await db.run('CREATE INDEX IF NOT EXISTS idx_player_sessions_identity ON player_sessions(identity_id)');
   await db.run('CREATE INDEX IF NOT EXISTS idx_player_sessions_server ON player_sessions(server_id)');
   await db.run('CREATE INDEX IF NOT EXISTS idx_player_sessions_login ON player_sessions(login_at DESC)');
   await db.run('CREATE INDEX IF NOT EXISTS idx_online_cache_server ON server_online_cache(server_id)');
-
+  
   // Stats indexes
   await db.run('CREATE INDEX IF NOT EXISTS idx_player_stats_identity ON player_stats(identity_id)');
   await db.run('CREATE INDEX IF NOT EXISTS idx_player_stats_server ON player_stats(server_id)');
-
+  
   // Kill events indexes
   await db.run('CREATE INDEX IF NOT EXISTS idx_kill_events_server ON kill_events(server_id)');
   await db.run('CREATE INDEX IF NOT EXISTS idx_kill_events_killer ON kill_events(killer_identity_id)');
   await db.run('CREATE INDEX IF NOT EXISTS idx_kill_events_victim ON kill_events(victim_identity_id)');
   await db.run('CREATE INDEX IF NOT EXISTS idx_kill_events_timestamp ON kill_events(timestamp)');
-
+  
   // Damage events indexes
   await db.run('CREATE INDEX IF NOT EXISTS idx_damage_events_server ON damage_events(server_id)');
   await db.run('CREATE INDEX IF NOT EXISTS idx_damage_events_victim ON damage_events(victim_identity_id)');
@@ -985,18 +985,18 @@ async function createSchemaV2(db) {
   await db.run('CREATE INDEX IF NOT EXISTS idx_health_server ON player_health_status(server_id)');
   await db.run('CREATE INDEX IF NOT EXISTS idx_health_status ON player_health_status(status)');
   await db.run('CREATE INDEX IF NOT EXISTS idx_health_updated ON player_health_status(last_updated DESC)');
-
+  
   // User indexes
   await db.run('CREATE INDEX IF NOT EXISTS idx_users_discord ON users(discord_id)');
-
+  
   // Linked accounts indexes
   await db.run('CREATE INDEX IF NOT EXISTS idx_linked_accounts_user ON linked_accounts(user_id)');
   await db.run('CREATE INDEX IF NOT EXISTS idx_linked_accounts_identity ON linked_accounts(identity_id)');
-
+  
   // Audit log indexes
   await db.run('CREATE INDEX IF NOT EXISTS idx_audit_user ON audit_log(user_id)');
   await db.run('CREATE INDEX IF NOT EXISTS idx_audit_timestamp ON audit_log(timestamp)');
-
+  
   // Automation settings indexes
   await db.run('CREATE INDEX IF NOT EXISTS idx_automation_userid ON automation_settings(user_id)');
 

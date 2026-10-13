@@ -102,7 +102,7 @@ function loadActivity() {
     .then(data => {
       const container = document.getElementById('activity-feed');
       if (!data.success || data.activities.length === 0) {
-        container.innerHTML = '<p class="text-gray-400 text-center py-4">No recent activity</p>';
+        container.innerHTML = '<div class="dzc-empty"><div class="dzc-empty-title">No recent activity</div></div>';
         return;
       }
 
@@ -167,7 +167,7 @@ function loadGuildHealth() {
       const container = document.getElementById('guild-health-summary');
       const guilds = data.guilds || [];
       if (!guilds.length) {
-        container.innerHTML = '<p class="text-gray-400">No authorized active servers.</p>';
+        container.innerHTML = '<div class="dzc-empty"><div class="dzc-empty-title">No authorized active servers.</div></div>';
         return;
       }
       const icons = { healthy: '🟢', degraded: '🟡', offline: '🔴', unknown: '⚪' };

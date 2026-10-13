@@ -1,5 +1,8 @@
 'use strict';
 
+const { ensureTestEncryptionKey } = require('./lib/test-env');
+ensureTestEncryptionKey();
+
 const assert = require('assert');
 const crypto = require('crypto');
 const migration = require('../db/migrations/076_rotation_provider_recovery');

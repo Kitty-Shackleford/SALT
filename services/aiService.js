@@ -47,6 +47,7 @@ async function callAiApi(messages, temperature = 0.3, options = {}) {
     maxRetries: 0,
     logger: options.logger,
     transport: options.transport,
+    allowInsecure: options.allowInsecure,
     defaultHeaders: {
       Authorization: `Bearer ${apiKey}`,
       'Content-Type': 'application/json',
@@ -346,7 +347,8 @@ async function chat(messages, context, provider) {
  */
 async function analyzeFile(db, serverId, filename, fileContent, provider) {
   const context = await buildServerContext(db, serverId);
-  const completeContent = assertCompleteFileContent(fileContent);
+  // No input cap: the complete working copy is passed to the provider.
+  const completeContent = fileContent;
 
   const prompt = `Based on the server data provided, analyze this ${filename} file and suggest up to 3 specific improvements.
 

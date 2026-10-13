@@ -10,6 +10,8 @@ const healthInFlight = new Map();
 const CACHE_TTL_MS = 30 * 1000;
 const WORKER_TIMEOUT_MS = 30 * 1000;
 const MAX_RPT_BYTES = 64 * 1024 * 1024;
+const MAX_RPT_FALLBACK_CANDIDATES = 4;
+const MAX_RPT_FALLBACK_BYTES = 96 * 1024 * 1024;
 const MAX_RPT_LINE_BYTES = 256 * 1024;
 const MAX_MISSION_XML_BYTES = 8 * 1024 * 1024;
 const MAX_MISSION_EVENTS = 512;
@@ -474,15 +476,15 @@ function getEventSpawnLocations(serverPath, requestedMapName, options = {}) {
   };
 }
 
-function findNewestRpt(serverPath) {
+function findRptCandidates(serverPath) {
   const configPath = path.join(serverPath, 'config');
   let entries;
   try {
     const stat = fs.lstatSync(configPath);
-    if (!stat.isDirectory() || stat.isSymbolicLink()) return null;
+    if (!stat.isDirectory() || stat.isSymbolicLink()) return [];
     entries = fs.readdirSync(configPath);
   } catch {
-    return null;
+    return [];
   }
   return entries.filter(name => /\.RPT$/i.test(name)).map(name => {
     const fullPath = path.join(configPath, name);
@@ -498,7 +500,7 @@ function findNewestRpt(serverPath) {
     const aTime = a.start === null ? a.stat.mtimeMs : a.start;
     const bTime = b.start === null ? b.stat.mtimeMs : b.start;
     return bTime - aTime || b.name.localeCompare(a.name);
-  })[0] || null;
+  });
 }
 
 function parseRptInWorker(rpt, configuredEvents, sessionStartedAtMs = null) {
@@ -548,18 +550,13 @@ async function getEventHealth(serverPath, requestedMapName, options = {}) {
   const eventSpawnsPath = missionConfiguration.filePath;
   const eventSpawnsStat = eventSpawnsPath ? regularFileStat(eventSpawnsPath) : null;
   const configuredEvents = readConfiguredEvents(eventSpawnsPath, eventSpawnsStat, safeServerPath);
-  const rpt = findNewestRpt(safeServerPath);
+  const rptCandidates = findRptCandidates(safeServerPath);
+  const newestRpt = rptCandidates[0] || null;
   const expectedSourceFile = options.expectedSourceFile
     ? path.basename(String(options.expectedSourceFile))
     : null;
-  const sourceMatchesRestart = rpt && expectedSourceFile
-    ? rpt.name === expectedSourceFile
-    : true;
-  const sessionStartedAtMs = rpt && sourceMatchesRestart
-    ? resolveAuthoritativeRptStartMs(rpt.name, options.sessionStartedAt)
-    : null;
 
-  if (!rpt) {
+  if (!newestRpt) {
     return {
       sourceFile: null,
       sourceUpdatedAt: null,
@@ -570,15 +567,15 @@ async function getEventHealth(serverPath, requestedMapName, options = {}) {
       error: 'No retained RPT log is available for this server.',
       configurationError: missionConfiguration.error,
       presenceLimitation: 'DayZ logs do not prove that a spawned event is still present.',
-      runtimeEvidenceLimitation: 'The newest retained RPT does not prove which mission/map produced it; runtime and selected-map configuration evidence are shown separately.',
+      runtimeEvidenceLimitation: 'Retained RPT evidence does not prove which mission/map produced it; runtime and selected-map configuration evidence are shown separately.',
     };
   }
 
   const signature = [
-    rpt.fullPath, rpt.stat.dev, rpt.stat.ino, rpt.stat.size, rpt.stat.mtimeMs,
-    eventSpawnsPath || '', eventSpawnsStat?.dev || 0, eventSpawnsStat?.ino || 0,
-    eventSpawnsStat?.size || 0, eventSpawnsStat?.mtimeMs || 0,
-    missionConfiguration.error || '', sessionStartedAtMs || 0,
+    newestRpt.fullPath, newestRpt.stat.dev, newestRpt.stat.ino, newestRpt.stat.size,
+    newestRpt.stat.mtimeMs, eventSpawnsPath || '', eventSpawnsStat?.dev || 0,
+    eventSpawnsStat?.ino || 0, eventSpawnsStat?.size || 0, eventSpawnsStat?.mtimeMs || 0,
+    missionConfiguration.error || '', options.sessionStartedAt || '', expectedSourceFile || '',
   ].join(':');
   const cacheKey = `${safeServerPath}:${signature}`;
   const cached = healthCache.get(cacheKey);
@@ -586,28 +583,70 @@ async function getEventHealth(serverPath, requestedMapName, options = {}) {
     return cached.data;
   }
   if (healthInFlight.has(cacheKey)) return healthInFlight.get(cacheKey);
-  if (rpt.stat.size > MAX_RPT_BYTES) {
-    throw new Error(`Newest retained RPT exceeds the ${MAX_RPT_BYTES} byte event-health limit`);
-  }
   if (healthInFlight.size >= MAX_CONCURRENT_WORKERS) {
     throw new Error('Event health parsing is busy; retry shortly');
   }
 
-  rpt.expectedRoot = safeServerPath;
+  const pending = (async () => {
+    let selected = null;
+    let selectedResult = null;
+    let scannedBytes = 0;
+    for (const candidate of rptCandidates.slice(0, MAX_RPT_FALLBACK_CANDIDATES)) {
+      if (candidate.stat.size > MAX_RPT_BYTES) {
+        if (!selected) {
+          throw new Error(`Retained RPT exceeds the ${MAX_RPT_BYTES} byte event-health limit`);
+        }
+        continue;
+      }
+      if (scannedBytes + candidate.stat.size > MAX_RPT_FALLBACK_BYTES) break;
+      scannedBytes += candidate.stat.size;
+      candidate.expectedRoot = safeServerPath;
+      const sourceMatchesRestart = expectedSourceFile
+        ? candidate.name === expectedSourceFile
+        : true;
+      const sessionStartedAtMs = sourceMatchesRestart
+        ? resolveAuthoritativeRptStartMs(candidate.name, options.sessionStartedAt)
+        : null;
+      let candidateResult;
+      try {
+        candidateResult = await parseRptInWorker(
+          candidate,
+          configuredEvents,
+          sessionStartedAtMs
+        );
+      } catch (error) {
+        if (!selected) throw error;
+        continue;
+      }
+      if (!selected) {
+        selected = candidate;
+        selectedResult = candidateResult;
+      }
+      if (candidateResult.startupComplete) {
+        selected = candidate;
+        selectedResult = candidateResult;
+        break;
+      }
+    }
 
-  const pending = parseRptInWorker(rpt, configuredEvents, sessionStartedAtMs).then(result => {
-    result.sourceUpdatedAt = rpt.stat.mtime.toISOString();
-    result.chronologyVerified = sessionStartedAtMs !== null;
-    result.eventSpawnsFileFound = Boolean(eventSpawnsPath);
-    result.configurationError = missionConfiguration.error;
-    result.presenceLimitation = 'DayZ logs do not prove that a spawned event is still present.';
-    result.runtimeEvidenceLimitation = 'The newest retained RPT does not prove which mission/map produced it; runtime and selected-map configuration evidence are shown separately.';
-    healthCache.set(cacheKey, { signature, cachedAt: Date.now(), data: result });
+    const sourceMatchesRestart = expectedSourceFile
+      ? selected.name === expectedSourceFile
+      : true;
+    const sessionStartedAtMs = sourceMatchesRestart
+      ? resolveAuthoritativeRptStartMs(selected.name, options.sessionStartedAt)
+      : null;
+    selectedResult.sourceUpdatedAt = selected.stat.mtime.toISOString();
+    selectedResult.chronologyVerified = sessionStartedAtMs !== null;
+    selectedResult.eventSpawnsFileFound = Boolean(eventSpawnsPath);
+    selectedResult.configurationError = missionConfiguration.error;
+    selectedResult.presenceLimitation = 'DayZ logs do not prove that a spawned event is still present.';
+    selectedResult.runtimeEvidenceLimitation = 'Retained RPT evidence does not prove which mission/map produced it; runtime and selected-map configuration evidence are shown separately.';
+    healthCache.set(cacheKey, { signature, cachedAt: Date.now(), data: selectedResult });
     while (healthCache.size > MAX_CACHE_ENTRIES) {
       healthCache.delete(healthCache.keys().next().value);
     }
-    return result;
-  }).finally(() => {
+    return selectedResult;
+  })().finally(() => {
     healthInFlight.delete(cacheKey);
   });
   healthInFlight.set(cacheKey, pending);

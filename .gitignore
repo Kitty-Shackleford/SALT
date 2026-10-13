@@ -30,15 +30,6 @@ data/sessions.db
 # Downloads
 downloads/
 
-# Private/internal release material
-.hermes/
-reports/
-agents/
-
-# Map tile binaries are intentionally distributed separately.
-public/maps/**
-!public/maps/README.md
-
 #bin
 bin/
 
@@ -73,3 +64,5 @@ coverage/
 # Misc
 .AppleDouble
 .LSOverride
+shady.sarif
+.hermes/

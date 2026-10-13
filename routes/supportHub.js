@@ -45,4 +45,57 @@ router.get('/service-id/:serverId', ensureServerAccess, async (req, res) => {
   }
 });
 
+/**
+ * GET /server/:serverId/tickets
+ * Discord tickets for the server's guild (open + closed, newest first).
+ */
+router.get('/server/:serverId/tickets', ensureServerAccess, async (req, res) => {
+  try {
+    const db = req.app.locals.db;
+    const guildId = req.authorization?.guild?.id;
+    if (!guildId) return res.status(404).json({ error: 'Guild not found' });
+    const tickets = await db.all(
+      `SELECT id, channel_id, subject, opened_by_discord_id, opened_by_username,
+              closed_at, close_reason, message_count, created_at
+       FROM tickets
+       WHERE guild_id = ?
+       ORDER BY created_at DESC
+       LIMIT 100`,
+      [guildId]
+    );
+    res.json({ data: tickets });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
+ * GET /server/:serverId/tickets/:ticketId
+ * Full archived transcript for one ticket (membership-checked via guild).
+ */
+router.get('/server/:serverId/tickets/:ticketId', ensureServerAccess, async (req, res) => {
+  try {
+    const db = req.app.locals.db;
+    const guildId = req.authorization?.guild?.id;
+    if (!guildId) return res.status(404).json({ error: 'Guild not found' });
+    const ticket = await db.get(
+      `SELECT id, channel_id, subject, opened_by_username, opened_by_discord_id,
+              closed_at, close_reason, created_at
+       FROM tickets WHERE id = ? AND guild_id = ?`,
+      [req.params.ticketId, guildId]
+    );
+    if (!ticket) return res.status(404).json({ error: 'Ticket not found' });
+    const messages = await db.all(
+      `SELECT author_id, author_name, content, created_at
+       FROM ticket_messages
+       WHERE ticket_id = ?
+       ORDER BY created_at ASC`,
+      [req.params.ticketId]
+    );
+    res.json({ ticket, messages });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 module.exports = router;

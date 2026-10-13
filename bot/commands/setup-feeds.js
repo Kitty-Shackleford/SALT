@@ -6,16 +6,16 @@
  * Subcommands:
  *   /setup-feeds killfeed enable [channel]
  *     Enable the killfeed and post to the specified channel
- *
+ *   
  *   /setup-feeds killfeed disable
  *     Disable the killfeed
- *
+ *   
  *   /setup-feeds killfeed status
  *     Show current killfeed configuration
- *
+ *   
  *   /setup-feeds faction enable [channel]
  *     Enable faction war feed
- *
+ *   
  *   /setup-feeds faction disable
  *     Disable faction war feed
  */

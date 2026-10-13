@@ -548,8 +548,13 @@ async function testFactionPositionsShopAndAiStayOnActiveExactServerCapabilities(
   const mapStart = factions.indexOf("router.get('/:guildId/:factionId/map'");
   const mapRoute = factions.slice(mapStart, factions.indexOf('\n});', mapStart) + 4);
   assert.match(mapRoute, /player_position_snapshots[\s\S]*server_id\s*=\s*\?/);
-  assert.match(mapRoute, /servers[\s\S]*status\s*=\s*'active'/);
-  assert.match(mapRoute, /guilds[\s\S]*status\s*=\s*'approved'/);
+  assert.match(mapRoute, /lockActiveServer\(tx,/);
+  const activeServerHelper = factions.slice(
+    factions.indexOf('async function lockActiveServer'),
+    factions.indexOf('async function lockPlayerMapPolicy')
+  );
+  assert.match(activeServerHelper, /servers[\s\S]*status\s*=\s*'active'/);
+  assert.match(activeServerHelper, /guilds[\s\S]*status\s*=\s*'approved'/);
 
   const shop = fs.readFileSync(path.join(root, 'routes/shop.js'), 'utf8');
   assert.match(shop, /authorizeServer/);

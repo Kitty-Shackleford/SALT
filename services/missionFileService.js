@@ -33,7 +33,7 @@ class MissionFileService {
 
     if (existingLock) {
       const now = Date.now();
-
+      
       if (existingLock.expiresAt > now) {
         if (existingLock.holder === lockHolder) {
           existingLock.expiresAt = now + (timeoutMs || this.lockTimeout);
@@ -165,15 +165,15 @@ class MissionFileService {
   async readMissionFile(serverId, fileName, nitradoToken) {
     try {
       console.log('📖 Reading mission file:', fileName, 'from server:', serverId);
-
+      
       const missionData = await this.getActiveMission(serverId, nitradoToken);
       if (!missionData) return { success: false, error: 'No active mission found' };
 
       const filePath = `${missionData.missionPath}/${fileName}`;
       console.log('   File path:', filePath);
-
+      
       const content = await this.downloadFileFromServer(serverId, filePath, nitradoToken);
-
+      
       if (!content) return { success: false, error: 'File not found' };
 
       const fileConfig = this.getEditableFiles()[fileName];
@@ -214,7 +214,7 @@ class MissionFileService {
   async writeMissionFile(serverId, fileName, content, lockId, nitradoToken, createBackup = true) {
     try {
       const lockCheck = this.checkLock(serverId, fileName);
-
+      
       if (!lockCheck.locked) return { success: false, error: 'File is not locked. Acquire a lock before writing.' };
       if (!this.ownsLock(serverId, fileName, lockId)) {
         return { success: false, error: 'Invalid lock ID. You do not own this lock.' };
@@ -299,7 +299,7 @@ class MissionFileService {
     try {
       const backupDir = path.join(__dirname, '..', 'data', 'backups', serverId.toString(), mapName);
       const files = await fs.readdir(backupDir);
-
+      
       const backups = files.filter(file => file.startsWith(fileName)).map(file => {
         const match = file.match(/\.(\d+)\.backup$/);
         const timestamp = match ? parseInt(match[1]) : 0;
@@ -380,19 +380,19 @@ class MissionFileService {
     try {
       console.log('🔍 Checking for conflicts on:', fileName);
       console.log('   Expected hash:', expectedHash);
-
+      
       const currentFile = await this.readMissionFile(serverId, fileName, nitradoToken);
-
+      
       if (!currentFile.success) {
-        return {
-          success: false,
-          error: 'Could not read current file from server'
+        return { 
+          success: false, 
+          error: 'Could not read current file from server' 
         };
       }
 
       const currentHash = currentFile.hash;
       console.log('   Current hash:', currentHash);
-
+      
       const hasConflict = expectedHash !== currentHash;
 
       if (hasConflict) {
@@ -433,19 +433,19 @@ class MissionFileService {
       console.log('   🔍 Upload parameters:');
       console.log('      path:', fullDirPath);
       console.log('      file:', fileName);
-
+      
       const FormData = require('form-data');
       const formData = new FormData();
       formData.append('path', fullDirPath);
       formData.append('file', fileName);
-
+      
       console.log('   📡 Requesting upload token from Nitrado API...');
-
+      
       const response = await axios.post(
         `https://api.nitrado.net/services/${serverId}/gameservers/file_server/upload`,
         formData,
         {
-          headers: {
+          headers: { 
             'Authorization': `Bearer ${nitradoToken}`,
             ...formData.getHeaders()
           }
@@ -453,13 +453,13 @@ class MissionFileService {
       );
 
       console.log('   ✅ Upload token received');
-
+      
       const { url: uploadUrl, token: uploadToken } = getNitradoTransferToken(response, { requireToken: true });
-
+      
       // Step 2: Upload RAW file content with token header (NOT form-data!)
       console.log('   📤 Uploading file content...');
       console.log('   📦 Content size:', content.length, 'bytes');
-
+      
       await axios.post(uploadUrl, content, {
         headers: {
           'token': uploadToken,
@@ -468,7 +468,7 @@ class MissionFileService {
         maxContentLength: Infinity,
         maxBodyLength: Infinity
       });
-
+      
       console.log('   ✅ Uploaded:', fileName, 'to', fullDirPath);
     } catch (error) {
       console.error('Failed to upload:', error.message);
@@ -526,7 +526,7 @@ class MissionFileService {
       const fileResponse = await axios.get(downloadUrl, {
         responseType: 'text'
       });
-
+      
       return getNitradoTextBody(fileResponse);
     } catch (error) {
       if (error.response?.status === 404) return null;
@@ -559,16 +559,16 @@ class MissionFileService {
   async getActiveMission(serverId, nitradoToken) {
     try {
       console.log('📡 Getting active mission for server:', serverId);
-
+      
       const gameserver = await nitradoService.getRawGameserver(nitradoToken, serverId);
-
+      
       if (!gameserver) {
         console.error('   ❌ No gameserver data found');
         return null;
       }
 
       const mission = gameserver.settings?.config?.mission || gameserver.query?.map;
-
+      
       if (!mission) {
         console.error('   ❌ No mission found in gameserver data');
         return null;

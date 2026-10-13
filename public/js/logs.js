@@ -25,7 +25,7 @@ async function uploadLogs() {
   const statusEl = document.getElementById('uploadStatus');
 
   const serverId = serverIdInput.value.trim();
-
+  
   if (!serverId) {
     statusEl.innerHTML = '<span class="text-red-400">❌ Please enter a server ID</span>';
     return;
@@ -56,7 +56,7 @@ async function uploadLogs() {
 
     if (data.success) {
       statusEl.innerHTML = `<span class="text-green-400">✅ Successfully tracked ${escapeHtml(String(data.totalPlayers))} players!</span>`;
-
+      
       // Show details of tracked players
       if (data.players.length > 0) {
         let details = '<div class="mt-3 text-sm bg-gray-700 p-3 rounded"><strong>Tracked:</strong><ul class="list-disc list-inside mt-2">';
@@ -70,7 +70,7 @@ async function uploadLogs() {
         details += '</ul></div>';
         statusEl.innerHTML += details;
       }
-
+      
       loadPlayers();
     } else {
       statusEl.innerHTML = `<span class="text-red-400">❌ ${escapeHtml(data.error || 'Log parsing failed')}</span>`;
@@ -83,7 +83,7 @@ async function uploadLogs() {
 
 async function detectAlts() {
   console.log('🔘 [DETECT-ALTS] Button clicked');
-
+  
   const container = document.getElementById('altsContainer');
   container.innerHTML = '<p class="text-gray-400 pulse">⏳ Scanning for alts...</p>';
 
@@ -92,22 +92,22 @@ async function detectAlts() {
     if (!serverId) throw new Error('Select a server before detecting alternate accounts');
     const url = `/api/detect-alts?serverId=${encodeURIComponent(serverId)}`;
     console.log('📡 [DETECT-ALTS] Fetching', url);
-
+    
     const response = await fetch(url);
     console.log('📡 [DETECT-ALTS] Response status:', response.status);
-
+    
     const data = await response.json();
     console.log('📦 [DETECT-ALTS] Response data:', data);
 
     if (data.success && data.alts.length > 0) {
       console.log('✅ [DETECT-ALTS] Found', data.alts.length, 'potential alt group(s)');
-
+      
       let html = '<div class="space-y-4">';
 
       data.alts.forEach((alt, index) => {
         console.log(`   Group ${index + 1}:`, alt);
         const lastSeen = new Date(alt.lastSeen).toLocaleString();
-
+        
         html += `
           <div class="bg-red-900/30 border-2 border-red-700 p-4 rounded-lg">
             <div class="flex justify-between items-start mb-3">
@@ -158,42 +158,42 @@ async function detectAlts() {
 async function loadPlayers(page = 1) {
   console.log(`🔍 [LOGS-PAGE] Loading players - Page ${page}`);
   console.log('   Current state:', { currentPage, currentLimit, currentSortBy, currentSortOrder });
-
+  
   currentPage = page;
   const container = document.getElementById('playersContainer');
   const serverId = document.getElementById('serverSelect').value;
-
+  
   if (!serverId) {
     console.warn('⚠️ [LOGS-PAGE] No server selected, skipping player load');
     container.innerHTML = '<p class="text-gray-400">Select a server and scan logs to start tracking players</p>';
     return;
   }
-
+  
   console.log('   Server ID:', serverId);
-
+  
   try {
     const url = `/api/tracked-players?serverId=${serverId}&page=${page}&limit=${currentLimit}&sortBy=${currentSortBy}&sortOrder=${currentSortOrder}`;
     console.log('📡 [LOGS-PAGE] Fetching:', url);
-
+    
     const response = await fetch(url);
     console.log('📡 [LOGS-PAGE] Players response status:', response.status);
-
+    
     if (!response.ok) {
       console.error('❌ [LOGS-PAGE] Response not OK:', response.status, response.statusText);
       throw new Error(`HTTP ${response.status}: ${response.statusText}`);
     }
-
+    
     const data = await response.json();
     console.log('📦 [LOGS-PAGE] Players data received:', data);
 
     if (data.success) {
       totalPages = data.pagination ? data.pagination.totalPages : 1;
-
+      
       console.log('✅ [LOGS-PAGE] Loaded', data.players?.length || 0, 'players');
       console.log('   Total players:', data.pagination?.totalPlayers);
       console.log('   Total pages:', totalPages);
       console.log('   Current page:', currentPage);
-
+      
       // Update pagination info
       if (data.pagination) {
         const startIdx = (currentPage - 1) * currentLimit + 1;
@@ -207,10 +207,10 @@ async function loadPlayers(page = 1) {
       // Display players
       if (data.players.length === 0) {
         console.log('ℹ️ [LOGS-PAGE] No players found');
-        container.innerHTML = '<p class="text-gray-400">No players tracked yet</p>';
+        container.innerHTML = '<div class="dzc-empty"><div class="dzc-empty-title">No players tracked yet</div></div>';
       } else {
         console.log('🎨 [LOGS-PAGE] Rendering', data.players.length, 'player(s)');
-
+        
         const html = `
           <div class="overflow-x-auto">
             <table class="w-full">
@@ -247,7 +247,7 @@ async function loadPlayers(page = 1) {
 
       // Update pagination controls
       updatePaginationControls();
-
+      
     } else {
       console.error('❌ [LOGS-PAGE] API returned success: false', data.error);
       container.innerHTML = '<p class="text-red-400">Failed to load players</p>';
@@ -267,12 +267,12 @@ function updatePaginationControls() {
   }
 
   document.getElementById('paginationControls').style.display = 'flex';
-
+  
   // Generate page numbers (show max 5 pages)
   const pageNumbersHtml = [];
   const startPage = Math.max(1, currentPage - 2);
   const endPage = Math.min(totalPages, currentPage + 2);
-
+  
   for (let i = startPage; i <= endPage; i++) {
     const active = i === currentPage ? 'bg-blue-600' : 'bg-gray-700 hover:bg-gray-600';
     pageNumbersHtml.push(`
@@ -281,26 +281,26 @@ function updatePaginationControls() {
       </button>
     `);
   }
-
+  
   document.getElementById('pageNumbers').innerHTML = pageNumbersHtml.join('');
 }
 
 function goToPage(page) {
   console.log('📄 [PAGINATION] Navigate to page:', page);
   console.log('   Valid range: 1 to', totalPages);
-
+  
   if (page < 1 || page > totalPages) {
     console.warn('⚠️ [PAGINATION] Page out of range, ignoring');
     return;
   }
-
+  
   loadPlayers(page);
 }
 
 function changeLimit() {
   const newLimit = parseInt(document.getElementById('limitSelect').value);
   console.log('🔢 [LIMIT] Changing limit from', currentLimit, 'to', newLimit);
-
+  
   currentLimit = newLimit;
   currentPage = 1;
   loadPlayers(1);
@@ -309,11 +309,11 @@ function changeLimit() {
 function changeSort() {
   const newSortBy = document.getElementById('sortBySelect').value;
   const newSortOrder = document.getElementById('sortOrderSelect').value;
-
+  
   console.log('🔀 [SORT] Changing sort:');
   console.log('   From:', currentSortBy, currentSortOrder);
   console.log('   To:', newSortBy, newSortOrder);
-
+  
   currentSortBy = newSortBy;
   currentSortOrder = newSortOrder;
   currentPage = 1;
@@ -335,22 +335,22 @@ function escapeHtml(text) {
 // Load user's servers on page load
 async function loadServers() {
   console.log('🔍 [LOGS-PAGE] Loading servers...');
-
+  
   try {
     // Step 1: Get user's guilds
     const guildsResponse = await fetch('/api/user/guilds');
     console.log('📡 [LOGS-PAGE] Guilds response status:', guildsResponse.status);
-
+    
     const guildsData = await guildsResponse.json();
     console.log('📦 [LOGS-PAGE] Guilds data:', guildsData);
-
+    
     if (!guildsData.success || !guildsData.guilds || guildsData.guilds.length === 0) {
       console.warn('⚠️ [LOGS-PAGE] No guilds available');
       document.getElementById('serverSelect').innerHTML = '<option value="">No guilds available</option>';
       serversLoaded = false;
       return;
     }
-
+    
     // Step 2: Get servers for every authorized guild. Preserve the guild ID
     // on each option so subsequent exact-server requests keep their tenant context.
     const guilds = guildsData.guilds;
@@ -387,10 +387,10 @@ async function loadServers() {
       select.appendChild(option);
     });
     currentGuildId = serverOptions[0].guildId;
-
+    
     serversLoaded = true;
     console.log('✅ [LOGS-PAGE] Servers loaded successfully');
-
+    
   } catch (err) {
     console.error('❌ [LOGS-PAGE] Error loading servers:', err);
     console.error('   Stack:', err.stack);
@@ -401,53 +401,53 @@ async function loadServers() {
 
 async function scanLocalLogs() {
   console.log('🔘 [SCAN-LOCAL] Button clicked');
-
+  
   const serverSelect = document.getElementById('serverSelect');
   const serverId = serverSelect.value;
   const statusEl = document.getElementById('scanStatus');
-
+  
   console.log('   Server ID:', serverId);
   console.log('   Servers loaded:', serversLoaded);
-
+  
   if (!serversLoaded) {
     console.log('⏳ [SCAN-LOCAL] Servers not loaded, loading now...');
     statusEl.innerHTML = '<span class="text-yellow-400">⏳ Loading servers, please wait...</span>';
     await loadServers();
   }
-
+  
   if (!serverId) {
     console.error('❌ [SCAN-LOCAL] No server selected!');
     statusEl.innerHTML = '<span class="text-red-400">❌ Please select a server</span>';
     return;
   }
-
+  
   // Get guildId from selected option or use current
   const selectedOption = serverSelect.options[serverSelect.selectedIndex];
   const guildId = selectedOption.dataset.guildId || currentGuildId;
-
+  
   console.log('🚀 [SCAN-LOCAL] Starting scan for server:', serverId, 'guild:', guildId);
   statusEl.innerHTML = '<span class="text-blue-400">⏳ Scanning local logs...</span>';
-
+  
   try {
     console.log('📡 [SCAN-LOCAL] Sending POST to /api/scan-local-logs');
-
+    
     const response = await fetchWithCsrf('/api/scan-local-logs', {
       method: 'POST',
       body: JSON.stringify({ serverId, guildId })
     });
-
+    
     console.log('📡 [SCAN-LOCAL] Response status:', response.status);
-
+    
     const data = await response.json();
     console.log('📦 [SCAN-LOCAL] Response data:', data);
-
+    
     if (data.success) {
       console.log('✅ [SCAN-LOCAL] Scan successful!');
       console.log('   Total players:', data.totalPlayers);
       console.log('   Files scanned:', data.filesScanned);
-
+      
       statusEl.innerHTML = `<span class="text-green-400">✅ Successfully tracked ${escapeHtml(String(data.totalPlayers))} players from local logs!</span>`;
-
+      
       if (data.players && data.players.length > 0) {
         let details = '<div class="mt-3 text-sm bg-gray-700 p-3 rounded"><strong>Tracked:</strong><ul class="list-disc list-inside mt-2">';
         data.players.slice(0, 5).forEach(p => {
@@ -460,7 +460,7 @@ async function scanLocalLogs() {
         details += '</ul></div>';
         statusEl.innerHTML += details;
       }
-
+      
       loadPlayers();
     } else {
       console.error('❌ [SCAN-LOCAL] Scan failed:', data.error);
@@ -477,12 +477,12 @@ async function scanLocalLogs() {
 // Scan ALL downloaded logs
 async function scanAllLogs() {
   console.log('🔘 [SCAN-ALL] Button clicked');
-
+  
   const serverSelect = document.getElementById('serverSelect');
   const serverId = serverSelect.value;
-
+  
   console.log('   Server ID:', serverId);
-
+  
   if (!serverId) {
     console.error('❌ [SCAN-ALL] No server selected!');
     alert('Please select a server first');
@@ -496,19 +496,19 @@ async function scanAllLogs() {
   const btn = event.target;
   btn.disabled = true;
   btn.textContent = '⏳ Scanning all logs...';
-
+  
   console.log('🚀 [SCAN-ALL] Starting full scan for server:', serverId, 'guild:', guildId);
 
   try {
     console.log('📡 [SCAN-ALL] Sending POST to /api/scan-all-logs');
-
+    
     const response = await fetchWithCsrf('/api/scan-all-logs', {
       method: 'POST',
       body: JSON.stringify({ serverId, guildId })
     });
 
     console.log('📡 [SCAN-ALL] Response status:', response.status);
-
+    
     const data = await response.json();
     console.log('📦 [SCAN-ALL] Response data:', data);
 
@@ -517,7 +517,7 @@ async function scanAllLogs() {
       console.log('   ADM files:', data.filesScanned?.admCount);
       console.log('   RPT files:', data.filesScanned?.rptCount);
       console.log('   Total players:', data.totalPlayers);
-
+      
       alert(`✅ Successfully scanned ${data.filesScanned.admCount} ADM logs and ${data.filesScanned.rptCount} RPT logs!\n\nFound ${data.totalPlayers} unique players.`);
       loadPlayers();
     } else {

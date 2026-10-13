@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Theme — S.A.L.T. Admin</title>
+  <link rel="stylesheet" href="/css/theme.css">
+  <link rel="stylesheet" href="/css/tailwind.css">
+  <style>
+    body { background: var(--dzc-bg, #071023); color: var(--dzc-text, #e6eef8); font-family: var(--dzc-font-body, Inter, system-ui, sans-serif); }
+    .panel { background: var(--dzc-surface, #0b1526); border: 1px solid var(--dzc-border, #233042); border-radius: var(--dzc-radius-lg, 12px); }
+    .field { display: flex; flex-direction: column; gap: 4px; margin-bottom: 1rem; }
+    .field label { font-size: 0.85rem; color: var(--dzc-text-muted, #a8b3c7); }
+    .field input, .field select {
+      background: var(--dzc-surface-2, #172019); color: var(--dzc-text, #eaf2e9);
+      border: 1px solid var(--dzc-border, #24331f); border-radius: var(--dzc-radius-md, 8px);
+      padding: 8px 10px; font-size: 0.95rem;
+    }
+    .swatch { display: inline-block; width: 22px; height: 22px; border-radius: 6px; vertical-align: middle; border: 1px solid var(--dzc-border-strong, #31435c); }
+    .presets { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 0.5rem; }
+    .preset { width: 26px; height: 26px; border-radius: 6px; cursor: pointer; border: 2px solid transparent; }
+    .preset.selected { border-color: var(--dzc-accent, #8a9a5b); }
+    .muted { color: var(--dzc-text-faint, #6b7a90); font-size: 0.85rem; }
+    .save-btn { background: var(--dzc-accent, #6f9a3d); color: var(--dzc-accent-contrast, #0c120d); border: none; border-radius: var(--dzc-radius-md, 8px); padding: 8px 18px; font-weight: 600; cursor: pointer; }
+    .save-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+    .pack-toggle { display: flex; align-items: center; gap: 8px; font-size: 0.92rem; color: var(--dzc-text, #eaf2e9); }
+    .pack-toggle input { accent-color: var(--dzc-accent, #6f9a3d); }
+    .preview { min-height: 90px; display: flex; align-items: center; justify-content: center; font-size: 1.05rem; }
+  </style>
+  <script src="/js/instance-config.js" defer></script>
+</head>
+<body>
+  <div class="container mx-auto p-6 max-w-4xl">
+    <div class="flex justify-between items-center mb-6">
+      <h1 class="text-3xl font-bold dzc-display">Theme</h1>
+      <div class="flex gap-2">
+        <a href="/admin" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">Admin</a>
+        <a href="/logout" class="bg-red-600 hover:bg-red-700 px-4 py-2 rounded">Logout</a>
+      </div>
+    </div>
+
+
+    <div class="panel p-6">
+      <div class="field" style="max-width:340px">
+        <label for="guildSelect">Discord server</label>
+        <select id="guildSelect"><option value="">Loading servers…</option></select>
+      </div>
+      <div id="themeBody">
+        <p class="muted">Select a server to load its theme settings.</p>
+      </div>
+    </div>
+
+    <div class="panel p-6 mt-6">
+      <h2 class="text-xl font-semibold mb-2">Live preview</h2>
+      <p class="muted mb-3">What this server's pages look like with the settings above (base theme + accent + active holiday pack).</p>
+      <div id="themePreview" class="preview panel" style="border:none">
+        <span class="dzc-display dzc-stat">Chernarus — sample stat 1337</span>
+      </div>
+    </div>
+  </div>
+
+  <script src="/js/admin-theme.js" defer></script>
+</body>
+</html>

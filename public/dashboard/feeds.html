@@ -4,6 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Discord Feeds - DayZ Dashboard</title>
+  <link rel="stylesheet" href="/css/theme.css">
   <link rel="stylesheet" href="/css/tailwind.css">
   <style>
     .feed-card {
@@ -70,41 +71,10 @@
 </head>
 <body class="bg-gray-900 text-white">
 
-  <nav class="bg-gray-800 p-4 shadow-lg">
-    <div class="container mx-auto flex items-center justify-between">
-      <h1 class="text-2xl font-bold">🔔 Discord Feeds</h1>
-      <div class="flex gap-4">
-        <a href="/dashboard" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">← Dashboard</a>
-        <button id="logoutBtn" class="bg-red-600 hover:bg-red-700 px-4 py-2 rounded">Logout</button>
-      </div>
-    </div>
-  </nav>
+  <h1 class="text-2xl font-bold p-4">🔔 Discord Feeds</h1>
 
   <div class="container mx-auto p-6 max-w-6xl">
 
-    <!-- Dashboard Navigation -->
-    <nav class="bg-gray-800 rounded-lg p-3 mb-6 border border-gray-700">
-      <div class="flex gap-2 flex-wrap">
-        <a href="/dashboard" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">🎮 Servers</a>
-        <a href="/dashboard/economy" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">💰 Economy</a>
-        <a href="/map" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">🗺️ Map</a>
-        <a href="/dashboard/feeds" class="bg-blue-600 px-4 py-2 rounded font-semibold">📢 Feeds</a>
-        <a href="/dashboard/automation" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">⚙️ Automation</a>
-        <a href="/dashboard/tasks" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">🕒 Tasks</a>
-        <a href="/dashboard/server-control" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">🎮 Control</a>
-        <a href="/dashboard/backups" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">💾 Backups</a>
-        <a href="/dashboard/rotation" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">🔄 Rotation</a>
-        <a href="/dashboard/ai-assistant" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">🤖 AI</a>
-        <a href="/dashboard/server-stats" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">📊 Stats</a>
-        <a href="/dashboard/activity-log" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">📋 Activity</a>
-        <a href="/dashboard/console" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">🖥️ Console</a>
-        <a href="/dashboard/boost" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">🚀 Boost</a>
-        <a href="/dashboard/support" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">🎫 Support</a>
-        <a href="/dashboard/settings" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">🔧 Settings</a>
-        <a href="/player-portal" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">👤 Player Portal</a>
-        <a href="/dashboard/shop-admin" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">🛒 Shop</a>
-      </div>
-    </nav>
 
     <!-- Guild Selector -->
     <div class="bg-gray-800 p-6 rounded-lg shadow-lg mb-6">
@@ -358,8 +328,8 @@
   </div>
 
   <!-- Success/Error Messages -->
-  <div id="alertSuccess" class="fixed top-4 right-4 bg-green-600 text-white px-6 py-3 rounded shadow-lg" style="display: none;"></div>
-  <div id="alertError" class="fixed top-4 right-4 bg-red-600 text-white px-6 py-3 rounded shadow-lg" style="display: none;"></div>
+  <div id="alertSuccess" class="fixed top-4 right-4 bg-green-600 text-white px-6 py-3 rounded shadow-lg" role="status" aria-live="polite" style="display: none;"></div>
+  <div id="alertError" class="fixed top-4 right-4 bg-red-600 text-white px-6 py-3 rounded shadow-lg" role="status" aria-live="polite" style="display: none;"></div>
 
   <script src="/js/api.js"></script>
   <script src="/js/csrf-helper.js"></script>

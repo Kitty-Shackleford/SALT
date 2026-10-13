@@ -9,15 +9,17 @@ const policyPath = path.join(root, 'utils', 'playerMapPolicy.js');
 assert.ok(fs.existsSync(policyPath), 'player-map policy module is missing');
 
 const {
-  PLAYER_MAP_FEATURES,
+  LEGACY_PLAYER_MAP_FEATURES,
   parsePlayerMapSettings,
   projectPlayerMapPayload,
   projectPlayerHealthPayload,
 } = require(policyPath);
 
 const defaults = parsePlayerMapSettings(null);
-assert.deepStrictEqual(defaults.enabledFeatures, [...PLAYER_MAP_FEATURES],
-  'an absent legacy policy must preserve existing player-map features');
+assert.deepStrictEqual(defaults.enabledFeatures, [...LEGACY_PLAYER_MAP_FEATURES],
+  'an absent legacy policy must preserve existing layers without enabling new private layers');
+assert(!defaults.enabledFeatures.includes('factionTerritories'),
+  'legacy policies must fail closed for faction territories');
 assert.deepStrictEqual(parsePlayerMapSettings('{malformed').enabledFeatures, [],
   'a present malformed policy must fail closed');
 assert.deepStrictEqual(parsePlayerMapSettings({}).enabledFeatures, [],
@@ -81,10 +83,10 @@ assert.match(mapRoute,
 const factionRoute = fs.readFileSync(path.join(root, 'routes', 'factions.js'), 'utf8');
 assert.match(factionRoute, /feature_name = 'player_map'/,
   'faction map must enforce the exact-server player-map policy server-side');
-assert.match(factionRoute, /factionMembers'\)[\s\S]*\? await db\.all\([\s\S]*\) : \[\]/,
-  'disabled teammate locations must be omitted at the server boundary');
-assert.match(factionRoute, /factionMarkers'\)[\s\S]*\? await db\.all\([\s\S]*\) : \[\]/,
-  'disabled faction markers must be omitted at the server boundary');
+assert.match(factionRoute, /factionMembers'\)[\s\S]*\? await tx\.all\([\s\S]*\) : \[\]/,
+  'disabled teammate locations must be omitted transactionally at the server boundary');
+assert.match(factionRoute, /factionMarkers'\)[\s\S]*\? await tx\.all\([\s\S]*\) : \[\]/,
+  'disabled faction markers must be omitted transactionally at the server boundary');
 
 assert.match(factionRoute, /JOIN server_player_memberships spm[\s\S]*spm\.identity_id = fmem\.identity_id[\s\S]*spm\.server_id = \?[\s\S]*spm\.status = 'active'/,
   'teammate locations must be limited to active exact-server members');

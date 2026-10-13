@@ -117,7 +117,7 @@
     function renderSnippets() {
       const container = document.getElementById('snippetList');
       if (!allSnippets.length) {
-        container.innerHTML = '<p class="text-gray-400">No snippets yet. Create one with the button above.</p>';
+        container.innerHTML = '<div class="dzc-empty"><div class="dzc-empty-title">No snippets yet. Create one with the button above.</div></div>';
         return;
       }
       container.innerHTML = allSnippets.map(s => `
@@ -231,7 +231,7 @@
     function renderPresets(presets) {
       const container = document.getElementById('presetList');
       if (!presets.length) {
-        container.innerHTML = '<p class="text-gray-400">No presets yet. Create one with the button above.</p>';
+        container.innerHTML = '<div class="dzc-empty"><div class="dzc-empty-title">No presets yet. Create one with the button above.</div></div>';
         return;
       }
       container.innerHTML = presets.map(p => {
@@ -438,7 +438,7 @@
       const history = d.history || [];
       const recovery = d.recovery || [];
       if (!history.length && !recovery.length) {
-        container.innerHTML = '<p class="text-gray-400">No activation history yet.</p>';
+        container.innerHTML = '<div class="dzc-empty"><div class="dzc-empty-title">No activation history yet.</div></div>';
         return;
       }
       const recoveryHtml = recovery.map(operation => `

@@ -1,0 +1,49 @@
+name: Shady — Vulnerability & Secret Scanner
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+  schedule:
+    - cron: '0 4 * * 1' # weekly on Mondays at 04:00 UTC
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+  security-events: write # required by the SARIF upload step (Code Scanning)
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install dependencies (ci)
+        run: |
+          if [ -f package-lock.json ]; then
+            npm ci --no-audit --no-fund --silent
+          else
+            echo "No package-lock.json; skipping npm ci"
+          fi
+
+      - name: Run Shady scanner
+        env:
+          GITHUB_BASE_REF: ${{ github.event.pull_request.base.ref }}
+          GITHUB_HEAD_REF: ${{ github.event.pull_request.head.ref }}
+        run: |
+          node scripts/shady-scan.js
+        continue-on-error: true
+
+      - name: Upload Shady SARIF (Code Scanning)
+        if: always() && hashFiles('shady.sarif') != ''
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: shady.sarif
+          category: shady

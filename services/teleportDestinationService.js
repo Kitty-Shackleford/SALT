@@ -2,7 +2,7 @@
 
 const { lockUserRoleMutations } = require('../utils/roleMutationLocks');
 const { normalizeDestination } = require('../utils/teleportPolicy');
-const { teleportError } = require('./teleportService');
+const { teleportError, lockModeratorAuthorization } = require('./teleportService');
 
 function positiveId(value, label) {
   const valid = typeof value === 'number'
@@ -63,11 +63,12 @@ async function recordDestinationAudit(db, scope, action, destinationId, metadata
 async function listTeleportDestinations(db, input) {
   const serverId = positiveId(input.serverId, 'Canonical server ID');
   const guildId = positiveId(input.guildId, 'Canonical guild ID');
+  const activeClause = input.activeOnly === true ? ' AND is_active = TRUE' : '';
   return db.all(
     `SELECT id, server_id, guild_id, name, map_name, destination_type,
             pos_x, pos_y, pos_z, is_private, is_active, created_at, updated_at
      FROM teleport_destinations
-     WHERE server_id = ? AND guild_id = ?
+     WHERE server_id = ? AND guild_id = ?${activeClause}
      ORDER BY is_active DESC, lower(name), id`,
     [serverId, guildId]
   );
@@ -91,6 +92,39 @@ async function createTeleportDestination(db, input) {
     destinationType: destination.destinationType,
     isPrivate: destination.isPrivate,
   });
+  return created;
+}
+
+/**
+ * Create a 'coords' destination with moderator (server_moderate) authority —
+ * the permission level the /tp-coord command is classified under. Uses
+ * lockModeratorAuthorization (mod/admin) rather than lockDestinationManager
+ * (admin-only), and enforces the 'coords' type so a caller can't smuggle a
+ * different destination_type through this entry point.
+ */
+async function createCoordinateDestination(db, input) {
+  const destination = normalizeDestination(input);
+  if (destination.destinationType !== 'coords') {
+    throw new Error('Coordinate destinations must be of type coords');
+  }
+  const serverId = positiveId(input.serverId, 'Canonical server ID');
+  const actorUserId = positiveId(input.actorUserId, 'Actor user ID');
+  const scope = await lockModeratorAuthorization(db, { serverId, actorUserId });
+  const rows = await db.query(
+    `INSERT INTO teleport_destinations
+       (guild_id, server_id, name, map_name, destination_type,
+        pos_x, pos_y, pos_z, is_private, created_by_user_id)
+     VALUES (?, ?, ?, ?, 'coords', ?, ?, ?, ?, ?)
+     RETURNING *`,
+    [scope.guildId, scope.serverId, destination.name, destination.mapName,
+      ...destination.position, destination.isPrivate, scope.actorUserId]
+  );
+  const created = rows[0];
+  await recordDestinationAudit(db, { serverId, guildId: scope.guildId, actorUserId },
+    'teleport_destination.coords_created', created.id, {
+      destinationType: 'coords',
+      isPrivate: destination.isPrivate,
+    });
   return created;
 }
 
@@ -143,6 +177,7 @@ async function deactivateTeleportDestination(db, input) {
 
 module.exports = {
   createTeleportDestination,
+  createCoordinateDestination,
   deactivateTeleportDestination,
   listTeleportDestinations,
 };

@@ -172,7 +172,7 @@ router.post('/parse-logs', ensurePlatformServerOwner, async (req, res) => {
   const serverId = req.platformServerAccess.platformServerId;
   const platform = req.platformServerAccess.platform;
   const { admLog, rptLog } = req.body;
-
+  
   if (!admLog && !rptLog) {
     return res.status(400).json({ error: 'No log content provided' });
   }
@@ -261,15 +261,15 @@ router.post('/scan-all-logs', ensurePlatformServerOwner, async (req, res) => {
   console.log('\n📨 [API] POST /api/scan-all-logs');
   console.log('   User:', req.user?.username);
   console.log('   Body:', req.body);
-
+  
   const serverId = req.platformServerAccess.platformServerId;
   const guildId = req.platformServerAccess.discordGuildId;
-
+  
   if (!serverId) {
     console.error('❌ [API] No serverId provided');
     return res.status(400).json({ error: 'Server ID required' });
   }
-
+  
   if (!guildId) {
     console.error('❌ [API] No guildId provided');
     return res.status(400).json({ error: 'Guild ID required' });
@@ -284,9 +284,9 @@ router.post('/scan-all-logs', ensurePlatformServerOwner, async (req, res) => {
     const { baseDir, triedPaths } = await resolveDownloadedLogDir(db, req.user, serverId);
     console.log(`🔍 Scanning ALL logs for server ${serverId}`);
     if (baseDir) console.log(`  ✓ Found logs directory: ${baseDir}`);
-
+    
     if (!baseDir) {
-      return res.status(404).json({
+      return res.status(404).json({ 
         error: 'No logs found for this server. Please download logs first using the file browser.',
         debug: { serverId, triedPaths }
       });
@@ -308,7 +308,7 @@ router.post('/scan-all-logs', ensurePlatformServerOwner, async (req, res) => {
     }).catch(err => {
       console.error('  ⚠️ Failed to update server platform:', err.message);
     });
-
+    
     console.log(`  🎮 Platform: ${platform}`);
 
     const scanResult = await scanLogsForServer(
@@ -342,9 +342,9 @@ async function fetchServerPlatform(token, nitradoServerId) {
   try {
     const gameserver = await nitradoService.getRawGameserver(token, nitradoServerId);
     const game = gameserver?.game?.toLowerCase() || '';
-
+    
     console.log(`  📡 Nitrado API game type: ${game}`);
-
+    
     const platform = detectDayzPlatform(gameserver);
     return platform === 'pc' ? 'steam' : platform;
   } catch (err) {
@@ -2016,7 +2016,7 @@ async function savePlayersToDatabase(db, userId, serverId, players, platform, in
 
       if (existingGamertag) {
         await db.run(
-          `UPDATE player_gamertags
+          `UPDATE player_gamertags 
            SET gamertag = ?, last_seen = CURRENT_TIMESTAMP, is_current_gamertag = 1
            WHERE identity_id = ? AND server_id = ?`,
           [player.playerName, identityId, dbServerId]
@@ -3579,33 +3579,33 @@ router.get('/tracked-players', ensureAuthenticated, ensurePlatformServerOwner, v
   console.log('\n📨 [API] GET /api/tracked-players');
   console.log('   User:', req.user?.username);
   console.log('   Query params:', req.query);
-
+  
   const db = req.app.locals.db;
   const page = parseInt(req.query.page) || 1;
   const limit = parseInt(req.query.limit) || 100;
   const sortBy = req.query.sortBy || 'lastSeenAt';
   const sortOrder = req.query.sortOrder || 'DESC';
-
+  
   console.log('   Parsed:', { page, limit, sortBy, sortOrder });
-
+  
   // ENSURE all sort fields are whitelisted
   const ALLOWED_SORT_FIELDS = ['currentName', 'platformUserId', 'platform', 'deviceId', 'firstSeenAt', 'lastSeenAt'];
   const ALLOWED_SORT_ORDER = ['ASC', 'DESC'];
-
+  
   // Strict validation
   let validSortBy = sortBy;
   if (!ALLOWED_SORT_FIELDS.includes(sortBy)) {
     validSortBy = 'lastSeenAt';
   }
-
+  
   let validSortOrder = sortOrder.toUpperCase();
   if (!ALLOWED_SORT_ORDER.includes(validSortOrder)) {
     validSortOrder = 'DESC';
   }
-
+  
   const offset = (page - 1) * limit;
   console.log('   SQL offset:', offset);
-
+  
   try {
     const dbServerId = req.platformServerAccess.serverId;
     // Count only identities observed on the exact authorized server.
@@ -3616,16 +3616,18 @@ router.get('/tracked-players', ensureAuthenticated, ensurePlatformServerOwner, v
        WHERE psa.server_id = ?`,
       [dbServerId]
     );
-
+    
     const totalPlayers = countRow.total;
     const totalPages = limit === -1 ? 1 : Math.ceil(totalPlayers / limit);
-
+    
     console.log('   Total players in DB:', totalPlayers);
-
+    
     // Map sort field from old to new schema
     let sortField = validSortBy;
     if (validSortBy === 'currentName') {
-      sortField = 'COALESCE(pg.gamertag, pi.platform_username)';
+      // pg.gamertag is joined per identity (is_current_gamertag=1) and is not in
+      // the GROUP BY, so it must be aggregated — same as the SELECT alias below.
+      sortField = 'COALESCE(MAX(pg.gamertag), pi.platform_username)';
     } else if (validSortBy === 'platformUserId') {
       sortField = 'pi.platform_user_id';
     } else if (validSortBy === 'platform') {
@@ -3637,16 +3639,16 @@ router.get('/tracked-players', ensureAuthenticated, ensurePlatformServerOwner, v
     } else if (validSortBy === 'lastSeenAt') {
       sortField = 'psa.last_seen';
     }
-
+    
     console.log('🔍 [API] Querying database...');
-
+    
     // Build query using Schema V2
     let query = `
-      SELECT
+      SELECT 
         pi.id,
         pi.platform_user_id as "platformUserId",
         pi.platform,
-        COALESCE(pg.gamertag, pi.platform_username) as "currentName",
+        COALESCE(MAX(pg.gamertag), pi.platform_username) as "currentName",
         pi.device_id as "deviceId",
         psa.first_seen as "firstSeenAt",
         psa.last_seen as "lastSeenAt",
@@ -3658,22 +3660,22 @@ router.get('/tracked-players', ensureAuthenticated, ensurePlatformServerOwner, v
        AND pg.server_id = psa.server_id
        AND pg.is_current_gamertag = 1
       WHERE psa.server_id = ?
-      GROUP BY pi.id, psa.first_seen, psa.last_seen
+      GROUP BY pi.id, pi.platform_user_id, pi.platform, pi.platform_username, psa.first_seen, psa.last_seen
       ORDER BY ${sortField} ${validSortOrder}
     `;
-
+    
     if (limit !== -1) {
       query += ` LIMIT ? OFFSET ?`;
     }
-
+    
     const params = limit === -1 ? [dbServerId] : [dbServerId, limit, offset];
-
+    
     const rows = await db.query(query, params);
-
+    
     console.log('✅ [API] Query successful');
     console.log('   Players returned:', rows.length);
     console.log('   Total count:', totalPlayers);
-
+    
     res.json({
       success: true,
       players: rows,
@@ -3699,7 +3701,7 @@ router.get('/detect-alts', ensureAuthenticated, ensurePlatformServerOwner, async
 
   // Restrict identity/device correlation to players observed on the selected server.
   const query = `
-    SELECT
+    SELECT 
       pi.device_id,
       STRING_AGG(COALESCE(pg.gamertag, 'Unknown'), '|||') as "playerNames",
       STRING_AGG(pi.platform_user_id, '|||') as "platformUserIds",
@@ -3718,14 +3720,14 @@ router.get('/detect-alts', ensureAuthenticated, ensurePlatformServerOwner, async
     HAVING COUNT(DISTINCT pi.id) > 1
     ORDER BY COUNT(DISTINCT pi.id) DESC, MAX(psa.last_seen) DESC
   `;
-
+  
   try {
     const rows = await db.query(query, [dbServerId]);
-
+    
     if (!rows || rows.length === 0) {
       return res.json({ success: true, alts: [], totalDevices: 0 });
     }
-
+    
     const dedup = val => val ? [...new Set(val.split('|||').filter(Boolean))] : [];
 
     const alts = rows.map(row => ({
@@ -3736,7 +3738,7 @@ router.get('/detect-alts', ensureAuthenticated, ensurePlatformServerOwner, async
       accountCount: row.accountCount,
       lastSeen: row.last_seen
     }));
-
+    
     res.json({ success: true, alts, totalDevices: alts.length });
   } catch (err) {
     console.error('❌ Error detecting alts:', err);

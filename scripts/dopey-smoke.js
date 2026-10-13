@@ -1,88 +1,73 @@
 #!/usr/bin/env node
-// Dopey — public Playwright smoke tests
+// Dopey — simple Playwright smoke tests (fast, minimal assertions)
 
 (async () => {
-  const baseUrl = process.env.BASE_URL || 'http://localhost:8080';
-  const pages = (process.env.PAGES || '/').split(',').map(value => value.trim()).filter(Boolean);
-  const saveScreenshots = process.env.SAVE_SCREENSHOTS === '1';
+  const BASE_URL = process.env.BASE_URL || 'http://localhost:8080';
+  const PAGES = (process.env.PAGES || '/').split(',').map(p => p.trim()).filter(Boolean);
+  const SAVE_SCREENSHOTS = process.env.SAVE_SCREENSHOTS === '1';
 
   let playwright;
   try {
     playwright = require('playwright');
-  } catch (_error) {
+  } catch (err) {
     console.error('Playwright not installed. Install with `npm i -D playwright` or let CI install it.');
-    process.exitCode = 78;
-    return;
+    process.exit(78);
   }
 
-  let browser;
+  const browser = await playwright.chromium.launch({ args: ['--no-sandbox'] });
+  const context = await browser.newContext();
+  const page = await context.newPage();
+
   let failures = 0;
-  try {
-    browser = await playwright.chromium.launch({ args: ['--no-sandbox'] });
-    const context = await browser.newContext();
-    const page = await context.newPage();
 
-  for (const pagePath of pages) {
-    const url = pagePath.startsWith('http')
-      ? pagePath
-      : `${baseUrl.replace(/\/$/, '')}${pagePath.startsWith('/') ? '' : '/'}${pagePath}`;
+  for (const p of PAGES) {
+    const url = p.startsWith('http') ? p : `${BASE_URL.replace(/\/$/, '')}${p.startsWith('/') ? '' : '/'}${p}`;
     console.log(`Visiting ${url}`);
-
     try {
-      const response = await page.goto(url, { waitUntil: 'networkidle', timeout: 15000 });
-      if (!response) {
+      const resp = await page.goto(url, { waitUntil: 'networkidle', timeout: 15000 });
+      if (!resp) {
         console.error(`No response for ${url}`);
         failures++;
         continue;
       }
-
-      const status = response.status();
+      const status = resp.status();
       console.log(`  HTTP ${status}`);
       if (status >= 400) {
         console.error(`  FAIL: ${url} returned ${status}`);
         failures++;
-        if (saveScreenshots) {
-          await page.screenshot({ path: `dopey-fail-${Date.now()}.png`, fullPage: true });
-        }
+        if (SAVE_SCREENSHOTS) await page.screenshot({ path: `dopey-fail-${Date.now()}.png`, fullPage: true });
         continue;
       }
 
+      // Basic title check (optional)
       const title = await page.title();
       console.log(`  title: ${title || '(no title)'}`);
+
+      // Basic DOM check: body exists
       const hasBody = await page.$('body') !== null;
       if (!hasBody) {
         console.error(`  FAIL: ${url} missing <body>`);
         failures++;
-        if (saveScreenshots) {
-          await page.screenshot({ path: `dopey-fail-${Date.now()}.png`, fullPage: true });
-        }
+        if (SAVE_SCREENSHOTS) await page.screenshot({ path: `dopey-fail-${Date.now()}.png`, fullPage: true });
       } else {
         console.log(`  OK: ${url}`);
       }
-    } catch (error) {
-      console.error(`  ERROR loading ${url}:`, error.message);
+    } catch (err) {
+      console.error(`  ERROR loading ${url}:`, err.message);
       failures++;
-      if (saveScreenshots) {
-        try {
-          await page.screenshot({ path: `dopey-ex-${Date.now()}.png`, fullPage: true });
-        } catch (_error) {
-          // Preserve the original navigation failure.
-        }
+      if (SAVE_SCREENSHOTS) {
+        try { await page.screenshot({ path: `dopey-ex-${Date.now()}.png`, fullPage: true }); } catch (_) {}
       }
     }
-    }
-  } finally {
-    if (browser) await browser.close();
   }
+
+  await browser.close();
 
   if (failures > 0) {
     console.error(`Dopey: ${failures} page(s) failed smoke checks`);
-    process.exitCode = 2;
-    return;
+    process.exit(2);
   }
 
   console.log('Dopey: smoke tests passed');
-})().catch(error => {
-  console.error('Dopey failed:', error.message);
-  process.exitCode = 2;
-});
+  process.exit(0);
+})();

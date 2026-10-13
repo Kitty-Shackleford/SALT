@@ -679,7 +679,7 @@ V2 introduces schema versioning:
 
 ```sql
 -- Correct: Join using database IDs
-SELECT
+SELECT 
   psa.firstSeen,
   psa.lastSeen,
   s.name AS serverName,
@@ -719,10 +719,10 @@ To search by gamertag:
 
 ```sql
 -- Correct way to find identity by gamertag
-SELECT pi.*
+SELECT pi.* 
 FROM player_identities pi
 JOIN player_gamertags pg ON pg.identityId = pi.id
-WHERE pg.gamertag = 'Player123'
+WHERE pg.gamertag = 'Player123' 
   AND pg.serverId = ?
   AND pg.isCurrentGamertag = 1;
 ```
@@ -752,7 +752,7 @@ WHERE g.discordGuildId = ?;
 ### Get All Players for a Server
 
 ```sql
-SELECT
+SELECT 
   pi.platform,
   pi.platformUserId,
   pg.gamertag,
@@ -772,7 +772,7 @@ ORDER BY psa.lastSeen DESC;
 ### Get Player's Gamertag History
 
 ```sql
-SELECT
+SELECT 
   pg.gamertag,
   pg.firstSeen,
   pg.lastSeen,
@@ -787,7 +787,7 @@ ORDER BY pg.lastSeen DESC;
 ### Get Top Killers for a Server
 
 ```sql
-SELECT
+SELECT 
   pi.platformUserId,
   pg.gamertag,
   ps.kills,
@@ -805,7 +805,7 @@ LIMIT 10;
 ### Get Recent Kill Events
 
 ```sql
-SELECT
+SELECT 
   ke.timestamp,
   ke.killerGamertag,
   ke.victimGamertag,
@@ -822,7 +822,7 @@ LIMIT 50;
 ### Get Active Sessions
 
 ```sql
-SELECT
+SELECT 
   ps.loginAt,
   pg.gamertag,
   pi.platform,
@@ -839,7 +839,7 @@ WHERE ps.logoutAt IS NULL
 ### Find Discord User's Game Accounts
 
 ```sql
-SELECT
+SELECT 
   u.username AS discordUsername,
   pi.platform,
   pi.platformUserId,
@@ -855,7 +855,7 @@ WHERE u.discordId = ?;
 ### Get Guild Statistics
 
 ```sql
-SELECT
+SELECT 
   g.name AS guildName,
   COUNT(DISTINCT s.id) AS totalServers,
   COUNT(DISTINCT psa.identityId) AS uniquePlayers,
@@ -932,5 +932,5 @@ For questions or issues:
 - Run the schema smoke test: `npm run db:smoke-test`
 - Open an issue on GitHub
 
-**Database Version**: Schema V2
+**Database Version**: Schema V2  
 **Last Updated**: 2024

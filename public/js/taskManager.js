@@ -84,7 +84,7 @@ async function loadTaskTypes() {
 async function loadTasks() {
   if (!currentServerId) return;
   const wrap = document.getElementById('tasksTableWrap');
-  wrap.innerHTML = '<p class="text-gray-400 animate-pulse">Loading tasks…</p>';
+  wrap.innerHTML = '<div class="dzc-skeleton" style="height:1.25rem;width:220px"></div>';
   try {
     const res = await fetch(`/api/tasks/${currentServerId}`);
     const data = await res.json();
@@ -99,7 +99,7 @@ function renderTasksTable(tasks) {
   const wrap = document.getElementById('tasksTableWrap');
   renderedTasks.clear();
   if (!tasks.length) {
-    wrap.innerHTML = '<p class="text-gray-400">No scheduled tasks. Add one below.</p>';
+    wrap.innerHTML = '<div class="dzc-empty"><div class="dzc-empty-title">No scheduled tasks. Add one below.</div></div>';
     return;
   }
 

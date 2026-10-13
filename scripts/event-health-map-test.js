@@ -160,6 +160,10 @@ async function testLoadsExactServerMissionAndNewestRpt() {
       '0:00:02 (group) Spawned TrainCar EventID:[47] CurrentID:[2] at [1.0,2.0,3.0] a:0.000',
       '0:00:03 Init sequence finished',
     ].join('\n'));
+    fs.writeFileSync(
+      path.join(config, 'DayZServer_X1_x64_2026-08-24_03-00-00.RPT'),
+      '0:00:01 Current session is still initializing'
+    );
 
     const result = await getEventHealth(root, 'enoch', {
       missionSubdirs: ['dayzxb_missions'],
@@ -183,6 +187,52 @@ async function testLoadsExactServerMissionAndNewestRpt() {
     });
     assert.strictEqual(retainedPreviousSession.chronologyVerified, false,
       'a retained RPT not named by the restart ledger must fail chronology closed');
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+}
+
+async function testFallsBackToNewestParsedRptWhenOlderCandidateIsInvalid() {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'event-health-invalid-fallback-'));
+  try {
+    const config = path.join(root, 'config');
+    fs.mkdirSync(config, { recursive: true });
+    const newest = 'DayZServer_X1_x64_2026-08-24_03-00-00.RPT';
+    fs.writeFileSync(path.join(config, newest), '0:00:01 Current session is still initializing');
+    const oversized = path.join(config, 'DayZServer_X1_x64_2026-08-24_02-00-00.RPT');
+    fs.writeFileSync(oversized, '');
+    fs.truncateSync(oversized, (64 * 1024 * 1024) + 1);
+
+    const result = await getEventHealth(root, 'enoch');
+    assert.strictEqual(result.sourceFile, newest,
+      'an invalid older RPT must not defeat the parsed newest-file fallback');
+    assert.strictEqual(result.startupComplete, false);
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+}
+
+async function testBoundsIncompleteRptFallbackSearch() {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'event-health-bounded-fallback-'));
+  try {
+    const config = path.join(root, 'config');
+    fs.mkdirSync(config, { recursive: true });
+    const newest = 'DayZServer_X1_x64_2026-08-24_06-00-00.RPT';
+    for (let hour = 6; hour >= 3; hour -= 1) {
+      fs.writeFileSync(
+        path.join(config, `DayZServer_X1_x64_2026-08-24_0${hour}-00-00.RPT`),
+        '0:00:01 Incomplete startup'
+      );
+    }
+    fs.writeFileSync(path.join(config, 'DayZServer_X1_x64_2026-08-24_02-00-00.RPT'), [
+      '0:00:01 Initializing of spawners done.',
+      '0:00:02 Init sequence finished',
+    ].join('\n'));
+
+    const result = await getEventHealth(root, 'enoch');
+    assert.strictEqual(result.sourceFile, newest,
+      'fallback search must stop before an unbounded fifth RPT candidate');
+    assert.strictEqual(result.startupComplete, false);
   } finally {
     fs.rmSync(root, { recursive: true, force: true });
   }
@@ -490,6 +540,8 @@ async function main() {
   testSpawnPositionsDoNotClaimCompleteConfiguration();
   testBoundsExpandedRptEvidence();
   await testLoadsExactServerMissionAndNewestRpt();
+  await testFallsBackToNewestParsedRptWhenOlderCandidateIsInvalid();
+  await testBoundsIncompleteRptFallbackSearch();
   await testRejectsAmbiguousMissionConfiguration();
   await testEventSpawnLocationsRejectAmbiguousMissionConfiguration();
   testBoundsMissionConfigurationInputAndExpansion();

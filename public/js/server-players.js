@@ -49,14 +49,14 @@ function formatPlaytime(seconds) {
 function platformBadge(platform) {
   const p = (platform || '').toLowerCase();
   if (p.includes('xbox'))
-    return '<span class="bg-green-900 text-green-300 text-xs px-1.5 py-px rounded font-medium">XB</span>';
+    return '<span class="dzc-badge">XB</span>';
   if (p.includes('ps') || p.includes('playstation'))
-    return '<span class="bg-blue-900 text-blue-300 text-xs px-1.5 py-px rounded font-medium">PS</span>';
+    return '<span class="dzc-badge">PS</span>';
   if (p.includes('switch2') || p.includes('switch 2') || p.includes('dayzswitch'))
-    return '<span class="bg-red-900 text-red-300 text-xs px-1.5 py-px rounded font-medium">NS2</span>';
+    return '<span class="dzc-badge">NS2</span>';
   if (p.includes('steam') || p.includes('pc'))
-    return '<span class="bg-gray-600 text-gray-300 text-xs px-1.5 py-px rounded font-medium">PC</span>';
-  return `<span class="bg-gray-700 text-gray-400 text-xs px-1.5 py-px rounded font-medium">${escHtml(platform || '?')}</span>`;
+    return '<span class="dzc-badge">PC</span>';
+  return `<span class="dzc-badge">${escHtml(platform || '?')}</span>`;
 }
 
 // ─── Toast notifications ──────────────────────────────────────────────────────
@@ -75,18 +75,30 @@ function showToast(msg, color = 'green') {
   setTimeout(() => el.remove(), 4000);
 }
 
-// ─── Sort indicators ──────────────────────────────────────────────────────────
+// ─── Sort indicators (reference contract: aria-sort on the th, arrow on the
+// button inside) ─────────────────────────────────────────────────────────────
 
 function updateSortIndicators() {
-  document.querySelectorAll('.sort-indicator').forEach(el => {
-    const col = el.dataset.col;
-    el.textContent = col === sortCol ? (sortDir === 'asc' ? '↑' : '↓') : '';
-  });
-  document.querySelectorAll('[data-sort]').forEach(th => {
-    th.classList.toggle('text-gray-200', th.dataset.sort === sortCol);
-    th.classList.toggle('text-gray-500', th.dataset.sort !== sortCol);
+  document.querySelectorAll('th[data-sort]').forEach(th => {
+    const active = th.dataset.sort === sortCol;
+    th.setAttribute('aria-sort', active ? (sortDir === 'asc' ? 'ascending' : 'descending') : 'none');
+    const dir = th.querySelector('.dzc-sort-dir');
+    if (dir) dir.textContent = active ? (sortDir === 'asc' ? '↑' : '↓') : '';
   });
 }
+
+// ─── Freshness ("updated Xs ago") ────────────────────────────────────────────
+
+let lastLoadedAt = 0;
+
+function updateFreshness() {
+  const el = document.getElementById('freshness');
+  if (!el) return;
+  if (!lastLoadedAt) { el.textContent = ''; return; }
+  const s = Math.round((Date.now() - lastLoadedAt) / 1000);
+  el.textContent = s < 90 ? `updated ${s}s ago` : `updated ${relativeTime(new Date(lastLoadedAt).toISOString())}`;
+}
+setInterval(updateFreshness, 15000);
 
 // ─── Pagination controls ──────────────────────────────────────────────────────
 
@@ -141,7 +153,7 @@ async function loadPlayers() {
   if (!currentServerId) return;
 
   const tbody = document.getElementById('playerTableBody');
-  tbody.innerHTML = `<tr><td colspan="7" class="text-gray-500 py-8 text-center text-sm">Loading...</td></tr>`;
+  tbody.innerHTML = '<tr class="dzc-state-row"><td colspan="8">Loading…</td></tr>';
 
   const params = new URLSearchParams({ page: currentPage, limit: pageSize, sort: sortCol, dir: sortDir });
   if (searchTerm) params.set('search', searchTerm);
@@ -151,6 +163,8 @@ async function loadPlayers() {
     const res  = await fetch(`/api/owner/servers/${currentServerId}/players?${params}`);
     const data = await res.json();
     if (!data.success) throw new Error(data.error || 'Unknown error');
+    lastLoadedAt = Date.now();
+    updateFreshness();
 
     // Update stats bar
     if (data.stats) {
@@ -162,7 +176,7 @@ async function loadPlayers() {
     updatePagination(data.total || 0);
     renderTable(data.players || []);
   } catch (err) {
-    tbody.innerHTML = `<tr><td colspan="7" class="text-red-400 py-8 text-center text-sm">❌ ${escHtml(err.message)}</td></tr>`;
+    tbody.innerHTML = `<tr class="dzc-state-row is-error"><td colspan="8">❌ ${escHtml(err.message)}</td></tr>`;
   }
 }
 
@@ -171,7 +185,7 @@ async function loadPlayers() {
 function renderTable(players) {
   const tbody = document.getElementById('playerTableBody');
   if (!players.length) {
-    tbody.innerHTML = `<tr><td colspan="8" class="text-gray-500 py-8 text-center text-sm">No players found.</td></tr>`;
+    tbody.innerHTML = '<tr class="dzc-state-row"><td colspan="8">No players found.</td></tr>';
     return;
   }
 
@@ -182,10 +196,9 @@ function renderTable(players) {
     const gtData     = escHtml(p.gamertag || '');
     const identityId = escHtml(String(p.id || ''));
     const isAlt      = Number(p.is_alt) === 1;
-    const isGrouped  = false;
 
     const altBadge = isAlt
-      ? ' <span class="bg-red-900 text-red-300 text-xs px-1 py-px rounded font-medium leading-none">ALT</span>'
+      ? ' <span class="dzc-badge is-danger">ALT</span>'
       : '';
 
     const lastSeen = relativeTime(p.lastSeen);
@@ -194,40 +207,26 @@ function renderTable(players) {
     const deaths   = p.totalDeaths ?? 0;
 
     const discord = p.linkedUsername
-      ? `<span class="text-blue-400 text-xs">${escHtml(p.linkedUsername)}</span>`
-      : '<span class="text-gray-700 text-xs">—</span>';
+      ? `<span class="dzc-info text-xs">${escHtml(p.linkedUsername)}</span>`
+      : '<span class="dzc-faint text-xs">—</span>';
 
-    // Nested alt rows get a left indent, a subtle connector line, and a dimmer background
-    const rowCls = isGrouped
-      ? 'border-b border-gray-700/40 bg-red-950/10 hover:bg-red-950/25'
-      : (isAlt
-          ? 'border-b border-gray-700/60 hover:bg-red-950/20'
-          : 'border-b border-gray-700/60 hover:bg-gray-700/20');
-
-    // Gamertag cell — indent nested rows with a tree connector
-    const nameCell = isGrouped
-      ? `<td class="px-3 py-1.5 font-medium whitespace-nowrap">
-           <span class="inline-flex items-center gap-1">
-             <span class="text-gray-600 text-xs select-none">└─</span>
-             ${gt}${altBadge}
-           </span>
-         </td>`
-      : `<td class="px-3 py-1.5 font-medium whitespace-nowrap">${gt}${altBadge}</td>`;
+    // Confirmed-alt rows get a subtle danger tint on hover (review signal only).
+    const rowCls = isAlt ? 'dzc-row is-alt-row' : 'dzc-row';
 
     return `<tr class="${rowCls}">
-      ${nameCell}
-      <td class="px-3 py-1.5">${platformBadge(p.platform)}</td>
-      <td class="px-3 py-1.5 text-gray-400 text-xs whitespace-nowrap" title="${escHtml(p.lastSeen || '')}">${lastSeen}</td>
-      <td class="px-3 py-1.5 text-gray-400 text-xs whitespace-nowrap">${playtime}</td>
-      <td class="px-3 py-1.5 text-gray-300 text-xs whitespace-nowrap tabular-nums">${kills} / ${deaths}</td>
-      <td class="px-3 py-1.5 text-gray-500 text-xs font-mono whitespace-nowrap" title="${escHtml(p.platform_user_id || '')}">${p.platform_user_id ? escHtml(p.platform_user_id.slice(0, 12)) + (p.platform_user_id.length > 12 ? '…' : '') : '—'}</td>
-      <td class="px-3 py-1.5 whitespace-nowrap">${discord}</td>
-      <td class="px-3 py-1.5 whitespace-nowrap">
-        <div class="flex gap-1">
-          <button data-action="blacklist"    data-gamertag="${gtData}" title="Blacklist" class="bg-red-800 hover:bg-red-700 px-1.5 py-0.5 rounded text-xs leading-none">🚫</button>
-          <button data-action="whitelist"    data-gamertag="${gtData}" title="Whitelist" class="bg-green-800 hover:bg-green-700 px-1.5 py-0.5 rounded text-xs leading-none">✅</button>
-          <button data-action="prioritylist" data-gamertag="${gtData}" title="Priority"  class="bg-yellow-700 hover:bg-yellow-600 px-1.5 py-0.5 rounded text-xs leading-none">⭐</button>
-          <button data-action="wipe-player"  data-identity-id="${identityId}" data-gamertag="${gtData}" title="Wipe player data" class="bg-orange-900 hover:bg-orange-800 px-1.5 py-0.5 rounded text-xs leading-none">🗑</button>
+      <td data-label="Gamertag" class="font-medium">${gt}${altBadge}</td>
+      <td data-label="Platform">${platformBadge(p.platform)}</td>
+      <td data-label="Last seen" class="dzc-muted" title="${escHtml(p.lastSeen || '')}">${lastSeen}</td>
+      <td data-label="Playtime" class="dzc-num dzc-muted">${playtime}</td>
+      <td data-label="K / D" class="dzc-num">${kills} / ${deaths}</td>
+      <td data-label="Account UID" class="dzc-muted font-mono" title="${escHtml(p.platform_user_id || '')}">${p.platform_user_id ? escHtml(p.platform_user_id.slice(0, 12)) + (p.platform_user_id.length > 12 ? '…' : '') : '<span class="dzc-faint">—</span>'}</td>
+      <td data-label="Discord">${discord}</td>
+      <td data-label="Actions">
+        <div class="dzc-row-actions">
+          <button data-action="blacklist"    data-gamertag="${gtData}" title="Add to banlist" aria-label="Add ${gtData} to banlist" class="dzc-btn is-warn">Ban</button>
+          <button data-action="whitelist"    data-gamertag="${gtData}" title="Add to whitelist" aria-label="Add ${gtData} to whitelist" class="dzc-btn is-stat">Allow</button>
+          <button data-action="prioritylist" data-gamertag="${gtData}" title="Add to priority list" aria-label="Add ${gtData} to priority list" class="dzc-btn">Priority</button>
+          <button data-action="wipe-player"  data-identity-id="${identityId}" data-gamertag="${gtData}" title="Wipe player data" aria-label="Wipe data for ${gtData}" class="dzc-btn is-danger">Wipe</button>
         </div>
       </td>
     </tr>`;
@@ -295,9 +294,9 @@ async function wipeServerAction() {
 // ─── List Management panel ────────────────────────────────────────────────────
 
 const LIST_COLORS = {
-  whitelist:    { item: 'bg-green-900/30 text-green-200 border-green-900', remove: 'text-green-500 hover:text-red-400' },
-  blacklist:    { item: 'bg-red-900/30 text-red-200 border-red-900',       remove: 'text-red-500 hover:text-red-300' },
-  prioritylist: { item: 'bg-yellow-900/30 text-yellow-200 border-yellow-900', remove: 'text-yellow-500 hover:text-red-400' },
+  whitelist:    { item: 'dzc-list-item is-whitelist' },
+  blacklist:    { item: 'dzc-list-item is-blacklist' },
+  prioritylist: { item: 'dzc-list-item is-prioritylist' },
 };
 
 /**
@@ -310,7 +309,7 @@ async function loadListSection(listType) {
   const itemsEl = document.getElementById(`${listType}Items`);
   if (!itemsEl) return;
 
-  itemsEl.innerHTML = '<span class="text-gray-600 italic">Loading…</span>';
+  itemsEl.innerHTML = '<span class="dzc-faint italic">Loading…</span>';
   if (countEl) countEl.textContent = '';
 
   try {
@@ -323,18 +322,18 @@ async function loadListSection(listType) {
 
     const colors = LIST_COLORS[listType] || LIST_COLORS.whitelist;
     if (!entries.length) {
-      itemsEl.innerHTML = '<span class="text-gray-600 italic">Empty</span>';
+      itemsEl.innerHTML = '<span class="dzc-faint italic">Empty</span>';
       return;
     }
     itemsEl.innerHTML = entries.map(gt => `
       <div class="flex items-center justify-between rounded px-2 py-0.5 border ${colors.item}">
         <span class="truncate" title="${escHtml(gt)}">${escHtml(gt)}</span>
         <button data-remove-list="${listType}" data-gamertag="${escHtml(gt)}"
-          class="${colors.remove} ml-2 shrink-0 text-sm leading-none font-bold" title="Remove">×</button>
+          class="dzc-list-remove ml-2 shrink-0 text-sm leading-none font-bold" title="Remove">×</button>
       </div>
     `).join('');
   } catch (err) {
-    itemsEl.innerHTML = `<span class="text-red-400 text-xs">❌ ${escHtml(err.message)}</span>`;
+    itemsEl.innerHTML = `<span class="dzc-danger text-xs">❌ ${escHtml(err.message)}</span>`;
   }
 }
 
@@ -401,11 +400,11 @@ async function listRemove(listType, gamertag) {
 
 function confidenceBadge(confidence) {
   const styles = {
-    confirmed: 'bg-red-900 text-red-200',
-    likely: 'bg-orange-900 text-orange-200',
-    possible: 'bg-yellow-900 text-yellow-200',
+    confirmed: 'dzc-badge is-danger',
+    likely: 'dzc-badge is-warn',
+    possible: 'dzc-badge is-warn',
   };
-  return `<span class="${styles[confidence] || styles.possible} px-2 py-0.5 rounded text-xs font-semibold uppercase">${escHtml(confidence)}</span>`;
+  return `<span class="${styles[confidence] || styles.possible} uppercase">${escHtml(confidence)}</span>`;
 }
 
 async function saveAltReview(identityIds, status, notes = '') {
@@ -446,7 +445,7 @@ async function runAltDetection() {
     status.textContent = `${candidates.length} candidate pair(s). Behavioral evidence never triggers automatic enforcement.`;
     container.innerHTML = candidates.map(candidate => {
       const accountLabels = candidate.accounts.map(account =>
-        `<div class="flex items-center gap-2">${platformBadge(account.platform)}<span class="text-sm text-gray-100">${escHtml(account.gamertag)}</span></div>`
+        `<div class="flex items-center gap-2">${platformBadge(account.platform)}<span class="text-sm">${escHtml(account.gamertag)}</span></div>`
       ).join('');
       const evidence = candidate.evidence.map(item => {
         const count = item.count == null ? '' : ` (${Number(item.count).toLocaleString()})`;
@@ -458,22 +457,22 @@ async function runAltDetection() {
       const reviewNotes = escHtml(notes);
       const reviewControls = data.canReview ? `
           <div class="flex gap-2 justify-end">
-            <button data-review-status="dismissed" data-review-notes="${reviewNotes}" data-identity-ids="${ids}" class="bg-gray-600 hover:bg-gray-500 px-2 py-1 rounded text-xs">Dismiss</button>
-            <button data-review-status="pending" data-review-notes="${reviewNotes}" data-identity-ids="${ids}" class="bg-yellow-800 hover:bg-yellow-700 px-2 py-1 rounded text-xs">Pending</button>
-            <button data-review-status="confirmed" data-review-notes="${reviewNotes}" data-identity-ids="${ids}" class="bg-red-800 hover:bg-red-700 px-2 py-1 rounded text-xs">Confirm Link</button>
+            <button data-review-status="dismissed" data-review-notes="${reviewNotes}" data-identity-ids="${ids}" class="dzc-btn">Dismiss</button>
+            <button data-review-status="pending" data-review-notes="${reviewNotes}" data-identity-ids="${ids}" class="dzc-btn is-warn">Pending</button>
+            <button data-review-status="confirmed" data-review-notes="${reviewNotes}" data-identity-ids="${ids}" class="dzc-btn is-danger">Confirm Link</button>
           </div>` : '';
 
       return `
-        <div class="bg-gray-700 rounded border border-gray-600 p-3" data-candidate-ids="${ids}">
+        <div class="dzc-card p-3" data-candidate-ids="${ids}">
           <div class="flex items-start justify-between gap-3 mb-2">
             <div class="space-y-1">${accountLabels}</div>
             <div class="text-right">
               ${confidenceBadge(candidate.confidence)}
-              <div class="text-xs text-gray-400 mt-1">Review: ${escHtml(reviewStatus)}</div>
+              <div class="text-xs dzc-muted mt-1">Review: ${escHtml(reviewStatus)}</div>
             </div>
           </div>
-          <ul class="list-disc ml-5 text-xs text-gray-300 space-y-0.5 mb-3">${evidence}</ul>
-          ${notes ? `<div class="text-xs text-gray-400 mb-2">Note: ${escHtml(notes)}</div>` : ''}
+          <ul class="list-disc ml-5 text-xs dzc-muted space-y-0.5 mb-3">${evidence}</ul>
+          ${notes ? `<div class="text-xs dzc-muted mb-2">Note: ${escHtml(notes)}</div>` : ''}
           ${reviewControls}
         </div>`;
     }).join('');
@@ -490,20 +489,31 @@ function resetUI() {
   );
   document.getElementById('wipeServerBtn').classList.add('hidden');
   document.getElementById('playerTableBody').innerHTML =
-    `<tr><td colspan="8" class="text-gray-500 py-8 text-center text-sm">Select a server above to view players.</td></tr>`;
+    '<tr class="dzc-state-row"><td colspan="8">Select a server above to view players.</td></tr>';
+  lastLoadedAt = 0;
+  updateFreshness();
 }
 
 // ─── DOMContentLoaded ─────────────────────────────────────────────────────────
 
 document.addEventListener('DOMContentLoaded', () => {
 
-  // Player table — event delegation for row action buttons
+  // Player table — event delegation for row action buttons + row selection
   document.getElementById('playerTableBody').addEventListener('click', (e) => {
     const btn = e.target.closest('button[data-action]');
-    if (!btn) return;
-    const { action, gamertag, identityId } = btn.dataset;
-    if (action === 'wipe-player') wipePlayerAction(identityId, gamertag);
-    else if (action && gamertag) listAction(action, 'add', gamertag);
+    if (btn) {
+      const { action, gamertag, identityId } = btn.dataset;
+      if (action === 'wipe-player') wipePlayerAction(identityId, gamertag);
+      else if (action && gamertag) listAction(action, 'add', gamertag);
+      return;
+    }
+    // Row selection: single selected row (accent-soft fill + inset accent bar);
+    // clicking the selected row again clears the selection.
+    const row = e.target.closest('tr.dzc-row');
+    if (!row) return;
+    const wasSelected = row.classList.contains('is-selected');
+    row.parentElement.querySelectorAll('tr.is-selected').forEach(r => r.classList.remove('is-selected'));
+    if (!wasSelected) row.classList.add('is-selected');
   });
 
   // Possible-alt review decisions
@@ -588,6 +598,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const icon     = document.getElementById('listPanelIcon');
     const expanded = content.classList.toggle('hidden');
     icon.textContent = expanded ? '▶ Expand' : '▼ Collapse';
+    document.getElementById('listPanelToggle').setAttribute('aria-expanded', String(!expanded));
     if (!expanded && currentServerId) loadAllLists();
   });
 
@@ -626,12 +637,23 @@ document.addEventListener('DOMContentLoaded', () => {
     const icon     = document.getElementById('altPanelIcon');
     const expanded = content.classList.toggle('hidden');
     icon.textContent = expanded ? '▶ Expand' : '▼ Collapse';
+    document.getElementById('altPanelToggle').setAttribute('aria-expanded', String(!expanded));
     if (!expanded && currentServerId) runAltDetection();
   });
 
   // Server select — reset state and load new server
   document.getElementById('serverSelect').addEventListener('change', async (e) => {
     currentServerId = e.target.value;
+
+    // Live context pill: display the selected server's snapshot (the shell
+    // only shows data the page is already authorized to load)
+    if (typeof window.dzcShellPollServer === 'function') {
+      if (currentServerId) {
+        window.dzcShellPollServer(currentServerId, e.target.selectedOptions[0].textContent.split(' (')[0]);
+      } else {
+        window.dzcShellPollServerStop();
+      }
+    }
 
     // Reset all filter/sort/pagination state
     currentPage = 1;
@@ -655,6 +677,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // Collapse alt panel on server switch
     document.getElementById('altPanelContent').classList.add('hidden');
     document.getElementById('altPanelIcon').textContent = '▶ Expand';
+    document.getElementById('altPanelToggle').setAttribute('aria-expanded', 'false');
     document.getElementById('altGroups').innerHTML = '';
     document.getElementById('altStatus').textContent = '';
     document.getElementById('altScanStatus').textContent = '';
@@ -662,6 +685,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // Collapse list panel on server switch
     document.getElementById('listPanelContent').classList.add('hidden');
     document.getElementById('listPanelIcon').textContent = '▶ Expand';
+    document.getElementById('listPanelToggle').setAttribute('aria-expanded', 'false');
 
     // Reset stats to loading state
     ['statTotal', 'statAlts', 'statLinked'].forEach(id => {

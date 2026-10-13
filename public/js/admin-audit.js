@@ -23,7 +23,7 @@ api.get('/api/user')
 function loadAuditLog() {
   const action = document.getElementById('actionFilter').value;
   const limit = document.getElementById('limitSelect').value;
-
+  
   let url = `/api/admin/audit?limit=${limit}`;
   if (action) {
     url += `&action=${action}`;
@@ -39,15 +39,15 @@ function loadAuditLog() {
     })
     .catch(err => {
       console.error('Error loading audit log:', err);
-      document.getElementById('audit-container').innerHTML =
+      document.getElementById('audit-container').innerHTML = 
         '<p class="text-red-400 text-center py-4">Failed to load audit log</p>';
     });
 }
 
 function displayAuditLog() {
   if (currentEntries.length === 0) {
-    document.getElementById('audit-container').innerHTML =
-      '<p class="text-gray-400 text-center py-4">No audit entries found</p>';
+    document.getElementById('audit-container').innerHTML = 
+      '<div class="dzc-empty"><div class="dzc-empty-title">No audit entries found</div></div>';
     return;
   }
 
@@ -70,15 +70,15 @@ function displayAuditLog() {
             const actionLabel = entry.action.replace(/_/g, ' ');
             const icon = getActionIcon(entry.action);
             const detailsStr = formatDetails(entry.details);
-
+            
             return `
               <tr class="border-b border-gray-700 hover:bg-gray-750">
                 <td class="p-3 text-sm">${esc(date.toLocaleString())}</td>
                 <td class="p-3">
                   <div class="flex items-center gap-2">
-                    ${entry.avatar ?
+                    ${entry.avatar ? 
                       `<img src="https://cdn.discordapp.com/avatars/${encodeURIComponent(entry.userId)}/${encodeURIComponent(entry.avatar)}.png"
-                           class="w-6 h-6 rounded-full" />` :
+                           class="w-6 h-6 rounded-full" />` : 
                       '<div class="w-6 h-6 rounded-full bg-gray-600"></div>'
                     }
                     <span>${esc(entry.username || 'Unknown')}</span>
@@ -117,12 +117,12 @@ function getActionIcon(action) {
 
 function formatDetails(details) {
   if (!details || typeof details !== 'object') return '-';
-
+  
   const entries = Object.entries(details)
     .filter(([, value]) => value !== null && value !== undefined)
     .map(([key, value]) => `${key}: ${value}`)
     .join(', ');
-
+  
   return entries || '-';
 }
 

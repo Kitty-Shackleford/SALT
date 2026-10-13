@@ -12,10 +12,10 @@ module.exports = {
       .setName('player')
       .setDescription('Exact linked gamertag')
       .setRequired(true))
-    .addIntegerOption(option => option
+    .addStringOption(option => option
       .setName('destination')
-      .setDescription('Teleport destination ID')
-      .setMinValue(1)
+      .setDescription('Teleport destination (search by name, or enter the ID)')
+      .setAutocomplete(true)
       .setRequired(true))
     .addBooleanOption(option => option
       .setName('override-pra')
@@ -28,7 +28,7 @@ module.exports = {
     await interaction.deferReply({ ephemeral: true });
     const serverId = Number(interaction.authorizedServerId);
     const playerName = interaction.options.getString('player', true).trim();
-    const destinationId = interaction.options.getInteger('destination', true);
+    const destinationId = Number(interaction.options.getString('destination', true));
     const overridePra = interaction.options.getBoolean('override-pra') === true;
 
     try {

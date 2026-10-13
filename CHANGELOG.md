@@ -4,7 +4,41 @@ All notable public changes to S.A.L.T. will be documented here.
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project intends to use semantic versioning once stable releases are tagged.
 
-## [Unreleased]
+## [2026-10-13] — October Update
+
+### Added
+
+- AI log intelligence — reads RPT/ADM/server logs and explains what went wrong
+- Config intelligence — multi-file balance passes with validation
+- Data-driven tuning — loot, weapons, and economy tuning from real server data
+- Natural-language admin — bounded answers, confirm prompts before actions
+- Event & content generation — events, spawn points, seasons from a description
+- Ask-the-server player AI — community answers, digests, and player onboarding
+- Ops intelligence — predictive warnings, remediation suggestions, rollback advice
+- 4 camo themes + high-contrast mode + holiday packs, with a live theme picker
+- Route-aware app shell — role-aware sidebar, topbar, and mobile drawer
+- Attention-first dashboard with an ops alerts panel
+- Map page with docked controls, shareable map state, and a mobile sheet
+- Mobile-first player portal
+- Splash/landing page with Discord, GitHub, Admin, and Player links
+- Discord notifications for ops alerts — per-guild opt-in, deduped, bot identity
+
+### Changed
+
+- Dashboard and player portal rebuilt on the new shell
+- Full accessibility and mobile sweep across every page
+
+### Fixed
+
+- Registration and account-linking flow clarified and reworked
+- Three UI defects from the community audit, including a panel lockout
+- Log-sync server.log fetch — direct download, no retry loops
+
+### Security
+
+- Security fixes, CI lint cleanup, and static-analysis triage included in the release
+
+## [2026-09-13] — Initial curated public source release candidate
 
 ### Added
 

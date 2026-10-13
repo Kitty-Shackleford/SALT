@@ -1,6 +1,7 @@
 'use strict';
 
 const { admTupleToWorld, worldVectorToWorld } = require('../utils/dayzCoordinates');
+const { FLAG_POLE_RADIUS_METERS, FLAG_POLE_SOURCE } = require('./factionTerritoryService');
 
 const DEFAULT_WINDOW_MINUTES = 60;
 const MIN_WINDOW_MINUTES = 15;
@@ -63,6 +64,90 @@ function recentEventRows(rows, type, projector) {
   })).filter(event => event.position);
 }
 
+function positiveInteger(value, fieldName) {
+  const parsed = Number(value);
+  if (!Number.isSafeInteger(parsed) || parsed <= 0) throw new TypeError(`${fieldName} must be a positive integer`);
+  return parsed;
+}
+
+function noteVersion(value) {
+  const parsed = Number(value);
+  if (!Number.isSafeInteger(parsed) || parsed < 0) throw new TypeError('expectedVersion must be a non-negative integer');
+  return parsed;
+}
+
+function normalizePlayerStaffNote(value) {
+  if (typeof value !== 'string') throw new TypeError('note must be a string');
+  const note = value.trim();
+  if (note.includes('\0')) throw new TypeError('note contains an unsupported character');
+  if (note.length > 1000) throw new TypeError('note must be 1000 characters or fewer');
+  return note;
+}
+
+function serializePlayerStaffNote(row) {
+  return {
+    text: row?.note || '',
+    version: Number(row?.version || 0),
+    updatedAt: iso(row?.updated_at),
+    updatedBy: row?.updated_by || null,
+  };
+}
+
+async function savePlayerStaffNote(db, {
+  serverId, identityId, actorUserId, note, expectedVersion,
+}) {
+  const canonicalServerId = positiveInteger(serverId, 'serverId');
+  const canonicalIdentityId = positiveInteger(identityId, 'identityId');
+  const canonicalActorUserId = positiveInteger(actorUserId, 'actorUserId');
+  const canonicalVersion = noteVersion(expectedVersion);
+  const canonicalNote = normalizePlayerStaffNote(note);
+
+  const activity = await db.get(
+    `SELECT identity_id FROM player_server_activity
+      WHERE server_id = ? AND identity_id = ?
+      FOR UPDATE`,
+    [canonicalServerId, canonicalIdentityId]
+  );
+  if (!activity) return null;
+
+  const existing = await db.get(
+    `SELECT version FROM player_staff_notes
+      WHERE server_id = ? AND identity_id = ?
+      FOR UPDATE`,
+    [canonicalServerId, canonicalIdentityId]
+  );
+  if (Number(existing?.version || 0) !== canonicalVersion) {
+    const error = new Error('Player note changed; refresh and try again');
+    error.code = 'STALE_PLAYER_NOTE';
+    throw error;
+  }
+
+  const returning = `RETURNING note, version, updated_at,
+    (SELECT username FROM users WHERE id = ?) AS updated_by`;
+  const row = existing
+    ? await db.get(
+      `UPDATE player_staff_notes
+          SET note = ?, version = version + 1, updated_by_user_id = ?, updated_at = NOW()
+        WHERE server_id = ? AND identity_id = ? AND version = ?
+        ${returning}`,
+      [canonicalNote, canonicalActorUserId, canonicalServerId, canonicalIdentityId,
+        canonicalVersion, canonicalActorUserId]
+    )
+    : await db.get(
+      `INSERT INTO player_staff_notes
+         (server_id, identity_id, note, version, updated_by_user_id)
+       VALUES (?, ?, ?, 1, ?)
+       ${returning}`,
+      [canonicalServerId, canonicalIdentityId, canonicalNote, canonicalActorUserId, canonicalActorUserId]
+    );
+  if (!row) {
+    const error = new Error('Player note changed; refresh and try again');
+    error.code = 'STALE_PLAYER_NOTE';
+    throw error;
+  }
+  return serializePlayerStaffNote(row);
+}
+
 async function buildOperationsMapSnapshot({
   db, serverId, mapName, windowMinutes, activeSessionStartedAt, now = new Date(),
 }) {
@@ -95,9 +180,25 @@ async function buildOperationsMapSnapshot({
 
   const playersPromise = presenceFresh ? db.query(
     `SELECT cache.identity_id, cache.gamertag, cache.login_at,
+            cache.updated_at AS roster_observed_at,
             position.timestamp AS position_observed_at,
-            position.pos_x, position.pos_y, position.pos_z
+            position.pos_x, position.pos_y, position.pos_z,
+            COALESCE(stats.kills, 0) AS kills,
+            COALESCE(stats.deaths, 0) AS deaths,
+            COALESCE(stats.total_playtime_seconds, 0) AS total_playtime_seconds,
+            COALESCE(activity.total_sessions, 0) AS total_sessions,
+            staff_note.note AS staff_note,
+            staff_note.version AS note_version,
+            staff_note.updated_at AS note_updated_at,
+            note_author.username AS note_updated_by
        FROM server_online_cache cache
+       LEFT JOIN player_stats stats
+         ON stats.server_id = cache.server_id AND stats.identity_id = cache.identity_id
+       LEFT JOIN player_server_activity activity
+         ON activity.server_id = cache.server_id AND activity.identity_id = cache.identity_id
+       LEFT JOIN player_staff_notes staff_note
+         ON staff_note.server_id = cache.server_id AND staff_note.identity_id = cache.identity_id
+       LEFT JOIN users note_author ON note_author.id = staff_note.updated_by_user_id
        LEFT JOIN LATERAL (
          SELECT snapshot.timestamp, snapshot.pos_x, snapshot.pos_y, snapshot.pos_z
            FROM player_position_snapshots snapshot
@@ -113,7 +214,7 @@ async function buildOperationsMapSnapshot({
     [new Date(sessionStartedMs).toISOString(), canonicalServerId]
   ) : Promise.resolve([]);
 
-  const [players, kills, deaths, damage, territory, purchases, factionMarkers, zones] = await Promise.all([
+  const [players, kills, deaths, damage, territory, purchases, factionMarkers, factionTerritories, zones] = await Promise.all([
     playersPromise,
     db.query(
       `SELECT id, killer_gamertag, victim_gamertag, weapon, distance, timestamp,
@@ -176,6 +277,18 @@ async function buildOperationsMapSnapshot({
       [canonicalServerId, canonicalMapName]
     ),
     db.query(
+      `SELECT ft.id, ft.faction_id, f.name AS faction_name, ft.map_name,
+              ft.pole_east, ft.pole_north, ft.radius_m, ft.status, ft.version,
+              ft.submitted_at, ft.reviewed_at, ft.decision_note
+         FROM faction_territories ft
+         JOIN factions f ON f.id = ft.faction_id AND f.guild_id = ft.guild_id
+        WHERE ft.server_id = ? AND ft.map_name = ?
+        ORDER BY CASE ft.status WHEN 'pending' THEN 0 WHEN 'approved' THEN 1 ELSE 2 END,
+                 ft.submitted_at DESC, ft.id DESC
+        LIMIT 200`,
+      [canonicalServerId, canonicalMapName]
+    ),
+    db.query(
       `SELECT id, source_type AS zone_type, label, center_x, center_z,
               radius_m AS radius_meters, status, evidence_count,
               first_evidence_at, last_evidence_at AS evidence_observed_at, reviewed_at
@@ -206,6 +319,42 @@ async function buildOperationsMapSnapshot({
     })),
   ].sort((left, right) => Date.parse(right.timestamp) - Date.parse(left.timestamp)).slice(0, STREAM_LIMIT);
 
+  const onlinePlayers = players.map(row => {
+    const kills = Math.max(0, Number(row.kills) || 0);
+    const deaths = Math.max(0, Number(row.deaths) || 0);
+    const loginMs = Date.parse(row.login_at || '');
+    const positionObservedMs = Date.parse(row.position_observed_at || '');
+    const position = Number.isFinite(positionObservedMs) && positionObservedMs >= sessionStartedMs
+      ? admPosition(row)
+      : null;
+    return {
+      identityId: Number(row.identity_id),
+      gamertag: row.gamertag || 'Unknown player',
+      loginAt: iso(row.login_at),
+      rosterObservedAt: iso(row.roster_observed_at) || iso(presenceSnapshot?.source_observed_at),
+      positionObservedAt: iso(row.position_observed_at),
+      positionFresh: Boolean(position) && isFresh(row.position_observed_at, nowMs, POSITION_MAX_AGE_MS) &&
+        positionObservedMs >= sessionStartedMs,
+      position,
+      stats: {
+        kills,
+        deaths,
+        killDeathRatio: deaths > 0 ? Number((kills / deaths).toFixed(2)) : null,
+        totalPlaytimeSeconds: Math.max(0, Number(row.total_playtime_seconds) || 0),
+        totalSessions: Math.max(0, Number(row.total_sessions) || 0),
+        currentSessionSeconds: Number.isFinite(loginMs)
+          ? Math.max(0, Math.floor((nowMs - loginMs) / 1000))
+          : 0,
+      },
+      staffNote: serializePlayerStaffNote({
+        note: row.staff_note,
+        version: row.note_version,
+        updated_at: row.note_updated_at,
+        updated_by: row.note_updated_by,
+      }),
+    };
+  });
+
   return {
     success: true,
     generatedAt: now.toISOString(),
@@ -218,21 +367,12 @@ async function buildOperationsMapSnapshot({
       presenceObservedAt: iso(presenceSnapshot?.source_observed_at),
       presencePublishedAt: iso(presenceSnapshot?.published_at),
       presenceFresh,
-      rosterCount: players.length,
+      rosterCount: onlinePlayers.length,
+      positionedCount: onlinePlayers.filter(player => player.position).length,
       eventMapScope: 'verified_active_session',
       limitation: 'Positions and events update when retained ADM/RPT logs are synchronized; this is not real-time GPS. Spatial rows are restricted to the verified active server session because historical rows do not record terrain identity.',
     },
-    rosterPlayers: players
-      .filter(row => Date.parse(row.position_observed_at || '') >= sessionStartedMs)
-      .map(row => ({
-      identityId: row.identity_id,
-      gamertag: row.gamertag,
-      loginAt: iso(row.login_at),
-      positionObservedAt: iso(row.position_observed_at),
-      positionFresh: isFresh(row.position_observed_at, nowMs, POSITION_MAX_AGE_MS) &&
-        Date.parse(row.position_observed_at || '') >= sessionStartedMs,
-      position: admPosition(row),
-    })).filter(player => player.position),
+    onlinePlayers,
     recentEvents,
     territoryObservations: territory.map(row => ({
       id: row.id,
@@ -271,6 +411,20 @@ async function buildOperationsMapSnapshot({
       position: { east: finite(row.pos_x), north: finite(row.pos_y), elevation: null },
       kind: 'marker_not_territory',
     })).filter(marker => marker.position.east !== null && marker.position.north !== null),
+    factionTerritories: factionTerritories.map(row => ({
+      id: Number(row.id),
+      factionId: Number(row.faction_id),
+      factionName: row.faction_name,
+      mapName: row.map_name,
+      pole: { east: finite(row.pole_east), north: finite(row.pole_north) },
+      radiusMeters: FLAG_POLE_RADIUS_METERS,
+      radiusSource: FLAG_POLE_SOURCE,
+      status: row.status,
+      version: Number(row.version),
+      submittedAt: iso(row.submitted_at),
+      reviewedAt: iso(row.reviewed_at),
+      decisionNote: row.decision_note || null,
+    })).filter(item => item.pole.east !== null && item.pole.north !== null && item.radiusMeters === 60),
     zones: zones
       .filter(row => Date.parse(row.first_evidence_at || '') >= sessionStartedMs &&
         Date.parse(row.evidence_observed_at || '') >= sessionStartedMs)
@@ -292,4 +446,5 @@ module.exports = {
   buildOperationsMapSnapshot,
   parseWindowMinutes,
   isSupportedMapName,
+  savePlayerStaffNote,
 };

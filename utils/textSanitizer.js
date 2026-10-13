@@ -1,7 +1,7 @@
 /* eslint-disable no-control-regex */
 /**
  * Text sanitization utilities for handling server names with special characters
- *
+ * 
  * Many DayZ servers use invisible control characters (SOH, zero-width spaces, etc.)
  * to appear first alphabetically. We preserve these in the database but sanitize
  * for display purposes.
@@ -14,7 +14,7 @@
  */
 function sanitizeServerName(text) {
   if (!text) return '';
-
+  
   return text
     // Remove ASCII control characters (0x00-0x1F) except tab (\x09), newline (\x0A), carriage return (\x0D)
     // Tab/newline/CR are preserved in content but trimmed from edges below
@@ -66,12 +66,12 @@ function getDisplayName(server) {
  */
 function sanitizeForLog(text, maxLength = 100) {
   if (!text) return '(empty)';
-
+  
   const sanitized = sanitizeServerName(text);
   if (sanitized.length <= maxLength) {
     return sanitized;
   }
-
+  
   return sanitized.substring(0, maxLength) + '...';
 }
 

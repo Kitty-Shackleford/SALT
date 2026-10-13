@@ -6,7 +6,7 @@ module.exports = {
     .setName('server-status')
     .setDescription('Check the status of your registered Nitrado servers')
     .setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
-
+  
   async execute(interaction) {
     await interaction.deferReply({ flags: MessageFlags.Ephemeral });
 
@@ -29,7 +29,7 @@ module.exports = {
 
       // Get guild's servers
       const serversRes = await pool.query(`
-        SELECT
+        SELECT 
           s.name as server_name,
           s.platform_server_id as nitrado_server_id,
           s.created_at,

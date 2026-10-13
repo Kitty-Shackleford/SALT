@@ -1,5 +1,8 @@
 'use strict';
 
+const { ensureTestEncryptionKey } = require('./lib/test-env');
+ensureTestEncryptionKey();
+
 const assert = require('assert');
 
 async function testExternalClientReliability() {
@@ -1161,7 +1164,7 @@ async function testRouteIntegrationBoundaries() {
   assert(githubActionsIntegrationSource.includes('listWorkflows') && githubActionsIntegrationSource.includes('listWorkflowRuns'), 'GitHub workflow-run status is not connected to integration discovery');
   assert(aiSource.includes('suggestionId') && aiPageScript.includes('editedSuggestionId'), 'AI chat edits are not persisted before apply');
   assert(!aiPageScript.includes('id: null'), 'AI chat still attempts to apply a nonexistent suggestion');
-  assert(aiPageScript.includes('/api/mission-files/${encodeURIComponent(currentServerId)}'), 'AI mission-file requests must use the platform server ID');
+  assert(aiPageScript.includes('function fetchMissionFile(serverId, filename)') && aiPageScript.includes('/api/mission-files/${encodeURIComponent(serverId)}') && aiPageScript.includes('fetchMissionFile(currentServerId, filename)'), 'AI mission-file requests must use the platform server ID');
   assert(!aiPageScript.includes('/api/mission-files/${encodeURIComponent(currentInternalServerId)}'), 'AI mission-file requests incorrectly use the internal server ID');
   assert(aiSource.includes("err.service === 'GitHub'"), 'GitHub PR failures bypass the normalized provider error response');
   assert(aiSource.includes("!['pending', 'accepted', 'applying'].includes(suggestion.status)"), 'Rejected AI suggestions can still be finalized through the API');
@@ -1175,11 +1178,19 @@ async function testRouteIntegrationBoundaries() {
   assert(aiSource.includes('ai-edit/suggestion-'), 'Suggestion finalization lacks a deterministic GitHub branch');
   assert(aiSource.includes('Suggestion state changed'), 'Suggestion state updates can overwrite an active finalization claim');
   assert(aiSource.includes('MAX_CHAT_MESSAGES') && aiSource.includes('MAX_CHAT_HISTORY_CHARS') && aiSource.includes('boundChatHistory('), 'AI chat history is not bounded before provider requests and persistence');
-  assert(aiSource.includes('assertCompleteFileContent(fileContent)'), 'AI chat can persist a truncated file as a complete replacement');
+  assert(!aiSource.includes('assertCompleteFileContent(fileContent)'), 'AI chat must not hard-block large working copies at the input boundary');
+  assert(aiSource.includes('No hard input cap'), 'AI routes must document that full files pass through to the provider');
   assert(aiSource.includes("typeof fileContent !== 'string'"), 'AI chat does not require fresh complete file content on every request');
   assert(!aiSource.includes('fileContent.slice(0, 30000)'), 'AI chat truncates complete file context before replacement generation');
   assert(aiSource.includes('buildCurrentFileContext') && aiSource.includes('providerHistory'), 'AI chat does not bind every request to current complete file state');
   assert(aiSource.includes("err.service !== 'GitHub'"), 'Ambiguous GitHub mutation outcomes release the deterministic finalization lease');
+  // Log intelligence (RPT/ADM/server.log): exact-server routes, gated through
+  // the platformServerId param hook, grounded deterministic analysis with an
+  // optional AI layer that always resolves the provider + shared-router quota.
+  assert(aiSource.includes("/log-summary/:platformServerId") && aiSource.includes("/log-why/:platformServerId") && aiSource.includes("/log-summary/:platformServerId/explain"), 'Log-intelligence routes are not registered');
+  assert(aiSource.includes('logIntelligenceService'), 'Log-intelligence routes must drive the deterministic service');
+  assert(aiSource.includes('resolveExistingContainedPath') && aiSource.includes('getGuildDownloadPath'), 'Log-intelligence config dir is not resolved via a contained path under the server download root');
+  assert(aiSource.includes('prepareAiProvider'), 'Log-intelligence AI routes must share the provider-resolver + shared-router quota path');
   assert(aiSource.includes("err.category === 'conflict'"), 'Deterministic pre-mutation GitHub conflicts leave the finalization lease stuck');
   assert(aiSource.includes('expectedOriginalContent: suggestion.original_content'), 'GitHub finalization does not reject stale base-file content');
   const patchSuggestionBlock = aiSource.slice(aiSource.indexOf("router.patch('/suggestions/:suggestionId'"), aiSource.indexOf("router.post('/suggestions/:suggestionId/apply'"));
@@ -1235,7 +1246,7 @@ async function testRouteIntegrationBoundaries() {
   assert(botStatusSource.includes('getAuthenticatedUser('), 'Bot identity backfill does not use NitradoService');
   assert(botStatusSource.includes('getRawGameserver(token, platformServerId)') && botStatusSource.includes('listTasks(token, platformServerId)'), 'Bot status metadata operations duplicate provider requests');
   const metadataCallers = [
-    ['../bot/commands/register-token', 'listGameServers(token)'],
+    ['../bot/commands/register-token', 'getRegistrationData(token)'],
     ['../bot/utils/nitrado', 'getRawGameserver(token, platformServerId)'],
     ['../routes/logParser', 'getRawGameserver(token, nitradoServerId)'],
     ['../routes/missionFiles', 'getRawGameserver(token, serverId)'],

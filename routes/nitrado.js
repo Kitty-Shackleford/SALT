@@ -476,10 +476,10 @@ router.put('/account-servers/:serviceId/hostname', ensurePlatformServerOwner, as
  */
 router.get('/registered-servers', async (req, res) => {
   const db = req.app.locals.db;
-
+  
   try {
     const rows = await db.query(
-      `SELECT
+      `SELECT 
          s.id,
          s.guild_id,
          s.name as server_name,
@@ -527,11 +527,11 @@ router.get('/registered-servers', async (req, res) => {
  */
 router.get('/servers', ensureApprovedGuildOperator, async (req, res) => {
   const { guildId } = req.query;
-
+  
   if (!guildId) {
-    return res.status(400).json({
+    return res.status(400).json({ 
       success: false,
-      error: 'guildId is required'
+      error: 'guildId is required' 
     });
   }
 
@@ -546,9 +546,9 @@ router.get('/servers', ensureApprovedGuildOperator, async (req, res) => {
       [req.guildAccess.guildId, 'nitrado']
     );
     if (!tokenRow || !tokenRow.token_hash) {
-      return res.status(404).json({
+      return res.status(404).json({ 
         success: false,
-        error: 'No Nitrado token registered for this guild. Use /register-token in Discord.'
+        error: 'No Nitrado token registered for this guild. Use /register-token in Discord.' 
       });
     }
 

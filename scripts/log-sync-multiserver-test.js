@@ -1,5 +1,8 @@
 'use strict';
 
+const { ensureTestEncryptionKey } = require('./lib/test-env');
+ensureTestEncryptionKey();
+
 const assert = require('assert');
 const fs = require('fs');
 const os = require('os');
@@ -102,7 +105,7 @@ async function testLowLatencyAdmUsesLiveConsolePathDialect() {
       authorizeServer: async () => ({
         id: 42,
         platformServerId: fixture.platformServerId,
-        guildDiscordId: '900000000000000001',
+        guildDiscordId: '123456789012345678',
       }),
       getRawGameserver: async () => ({
         service_id: fixture.platformServerId,
@@ -883,6 +886,7 @@ async function testSerialAndConcurrentSyncStayServerScoped() {
   let includeAdmLogs = true;
   let includeRptLogs = false;
   let includeServerLog = true;
+  let serverLogDirectTransferOk = true;
   let incompleteServerLogDownloads = true;
   let incompleteRptDownloads = true;
   let gameserverStatus = null;
@@ -975,6 +979,16 @@ async function testSerialAndConcurrentSyncStayServerScoped() {
     }
     if (String(url).includes('/file_server/download?file=')) {
       const fileName = decodeURIComponent(String(url).split('file=')[1]);
+      // Model the real provider behavior: the raw ftproot server.log transfer
+      // token is only issued when the file physically exists on a console
+      // server. When the mock says the file is absent (serverLogDirectTransferOk
+      // false) the download endpoint refuses it, so logsync must fall through
+      // to its (WAF-gated) listing path and report "No server.log file found".
+      if (fileName.endsWith('/ftproot/dayzxb/config/server.log') && !serverLogDirectTransferOk) {
+        const refused = new Error('Nitrado request failed (403)');
+        refused.response = { status: 403, data: { message: 'Permission denied' } };
+        throw refused;
+      }
       return {
         data: {
           status: 'success',
@@ -1331,6 +1345,7 @@ async function testSerialAndConcurrentSyncStayServerScoped() {
 
     includeAdmLogs = true;
     includeServerLog = false;
+    serverLogDirectTransferOk = false;
     for (const sync of [syncService.performLogSync, syncService.performLogSyncConcurrent]) {
       fs.rmSync(path.join(__dirname, '..', 'downloads', guildId), { recursive: true, force: true });
       const result = await sync(db, 7, 'test-token', ['101']);
@@ -1345,6 +1360,7 @@ async function testSerialAndConcurrentSyncStayServerScoped() {
     }
 
     includeServerLog = true;
+    serverLogDirectTransferOk = true;
     missingConfigServerIds.add('101');
     for (const [sync, concurrent] of [
       [syncService.performLogSync, false],
@@ -1380,6 +1396,203 @@ async function testSerialAndConcurrentSyncStayServerScoped() {
     nitradoModule.createNitradoService = originalCreateNitradoService;
     delete require.cache[servicePath];
     fs.rmSync(path.join(__dirname, '..', 'downloads', guildId), { recursive: true, force: true });
+  }
+}
+
+function xboxStructure(serverId) {
+  return {
+    platform: 'xbox',
+    missionsPath: `/games/${serverId}/ftproot/dayzxb_missions`,
+    configPath: `/games/${serverId}/ftproot/dayzxb/config`,
+    pathsToSync: [],
+  };
+}
+
+function stubHttp(handler) {
+  const calls = [];
+  return {
+    calls,
+    get: async (url, options) => {
+      calls.push({ url: String(url), options });
+      return handler(String(url), options, calls);
+    },
+  };
+}
+
+function waf401() {
+  const error = new Error('Nitrado request failed (401)');
+  error.response = { status: 401, data: { message: 'Forbidden' } };
+  return error;
+}
+
+function transferTokenResponse() {
+  return { data: { status: 'success', data: { token: { url: 'https://transfer.nitrado.net/xyz' } } } };
+}
+
+async function testServerLogUsesDirectFtprootTransferToken() {
+  const { fetchServerLogEntryFromRawConfigPath, createFtprootListingBreaker } =
+    require('../services/logSyncService');
+  const serverId = '15580969';
+  const breaker = createFtprootListingBreaker({ cooldownMs: 60 * 60 * 1000 });
+  const fakeHttp = stubHttp(url => {
+    if (url.includes('/file_server/download?file=')) return transferTokenResponse();
+    throw new Error(`unexpected listing request: ${url}`);
+  });
+  const entry = await fetchServerLogEntryFromRawConfigPath(
+    fakeHttp, 'guild-1-token', serverId, xboxStructure(serverId),
+    { breaker, breakerKey: 'nitrado:guild-1-token', nowMs: () => 0 }
+  );
+  assert.ok(entry, 'the direct ftproot transfer must resolve server.log without a listing');
+  assert.strictEqual(entry.name, 'server.log');
+  assert.strictEqual(entry.path, `/games/${serverId}/ftproot/dayzxb/config/server.log`);
+  assert.strictEqual(entry.size, null, 'a direct entry has no advertised size');
+  assert.strictEqual(fakeHttp.calls.length, 1, 'no raw ftproot listing may be requested');
+  assert.ok(fakeHttp.calls[0].url.includes('/file_server/download?file='));
+  assert.ok(fakeHttp.calls[0].url.includes(
+    encodeURIComponent(`/games/${serverId}/ftproot/dayzxb/config/server.log`)),
+    'the direct transfer must target the deterministic raw ftproot server.log path');
+  assert.strictEqual(breaker.retryAt('nitrado:guild-1-token'), null,
+    'a successful direct transfer must not trip the listing breaker');
+}
+
+async function testServerLogRawListingBacksOffOnWafBanPerGuild() {
+  const { fetchServerLogEntryFromRawConfigPath, createFtprootListingBreaker } =
+    require('../services/logSyncService');
+  const serverId = '15580969';
+  const otherGuildServerId = '16000564';
+  const breaker = createFtprootListingBreaker({ cooldownMs: 60 * 60 * 1000 });
+  const guild1Key = 'nitrado:guild-1-token';
+  const guild15Key = 'nitrado:guild-15-token';
+  const nowMs = () => 1000000;
+
+  const fakeHttp = stubHttp(url => {
+    if (url.includes('/file_server/download?file=')) throw waf401();
+    if (url.includes('/file_server/list?dir=')) throw waf401();
+    throw new Error(`unexpected URL: ${url}`);
+  });
+
+  // Run 1 (guild 1): direct transfer refused -> raw listing attempted -> 401
+  // -> breaker trips for this guild.
+  const first = await fetchServerLogEntryFromRawConfigPath(
+    fakeHttp, 'guild-1-token', serverId, xboxStructure(serverId),
+    { breaker, breakerKey: guild1Key, nowMs }
+  );
+  assert.strictEqual(first, null, 'a WAF-banned raw listing must not fabricate a server.log');
+  assert.strictEqual(breaker.retryAt(guild1Key), 1000000 + 60 * 60 * 1000,
+    'a single 401 must suppress raw listings for that guild for an hour');
+
+  // Run 2 (guild 1, same tick): direct transfer still refused, but the raw
+  // listing must now be SUPPRESSED by the breaker (no new 401 / no deeper ban).
+  const callCountAfterFirst = fakeHttp.calls.length;
+  const second = await fetchServerLogEntryFromRawConfigPath(
+    fakeHttp, 'guild-1-token', serverId, xboxStructure(serverId),
+    { breaker, breakerKey: guild1Key, nowMs }
+  );
+  assert.strictEqual(second, null);
+  assert.strictEqual(fakeHttp.calls.length, callCountAfterFirst + 1,
+    'a suppressed guild must only attempt the direct transfer, not the raw listing');
+  assert.ok(fakeHttp.calls.at(-1).url.includes('/file_server/download?file='),
+    'the suppressed run must fall back to the direct transfer token, not a listing');
+
+  // Run 3 (guild 15, different token, same tick): independent breaker state —
+  // its raw listing is still attempted (not carried over from guild 1's ban).
+  const guild15CallsBefore = fakeHttp.calls.length;
+  const third = await fetchServerLogEntryFromRawConfigPath(
+    fakeHttp, 'guild-15-token', otherGuildServerId, xboxStructure(otherGuildServerId),
+    { breaker, breakerKey: guild15Key, nowMs }
+  );
+  assert.strictEqual(third, null);
+  const guild15Urls = fakeHttp.calls.slice(guild15CallsBefore).map(item => item.url);
+  assert.ok(guild15Urls.some(url => url.includes('/file_server/list?dir=')),
+    'a different guild token keeps independent raw-listing breaker state');
+  assert.strictEqual(breaker.retryAt(guild15Key), 1000000 + 60 * 60 * 1000,
+    'the other guild trips its own breaker independently');
+
+  // After the cooldown elapses, the breaker clears and raw listings resume.
+  const laterNowMs = () => 1000000 + 60 * 60 * 1000 + 1;
+  const fourth = await fetchServerLogEntryFromRawConfigPath(
+    fakeHttp, 'guild-1-token', serverId, xboxStructure(serverId),
+    { breaker, breakerKey: guild1Key, nowMs: laterNowMs }
+  );
+  assert.strictEqual(fourth, null);
+  assert.strictEqual(breaker.retryAt(guild1Key), 1000000 + 60 * 60 * 1000 + 1 + 60 * 60 * 1000,
+    'an expired breaker must re-trip on the next 401 from a fresh listing');
+}
+
+function testFtprootListingBreakerCooldownsPerKey() {
+  const { createFtprootListingBreaker } = require('../services/logSyncService');
+  const breaker = createFtprootListingBreaker({ cooldownMs: 2 * 60 * 1000 });
+  const t0 = 1000000;
+  assert.strictEqual(breaker.isTripped('a', t0), false);
+  const retryAt = breaker.trip('a', t0);
+  assert.strictEqual(retryAt, t0 + 2 * 60 * 1000);
+  assert.strictEqual(breaker.isTripped('a', t0 + 1), true,
+    'a tripped key must suppress raw listings inside the cooldown');
+  assert.strictEqual(breaker.isTripped('b', t0 + 1), false,
+    'breaker state must be per-key (per-guild)');
+  assert.strictEqual(breaker.isTripped('a', t0 + 2 * 60 * 1000), false,
+    'the breaker must clear once the cooldown elapses');
+  assert.strictEqual(breaker.retryAt('a'), null);
+  breaker.trip('a', t0 + 10);
+  breaker.reset('a');
+  assert.strictEqual(breaker.isTripped('a', t0 + 20), false, 'reset must clear the trip');
+  const floor = createFtprootListingBreaker({ cooldownMs: 1 });
+  assert.strictEqual(floor.retryAt('x'), null, 'a fresh breaker has no pending retry');
+  const floored = floor.trip('x', 0);
+  assert.ok(floored >= 60 * 1000, 'the cooldown must never fall below one minute');
+}
+
+async function testDownloadLogFileHandlesSizeUnknownDirectEntry() {
+  const relativeDirectory = path.join('.test-direct-server-log', String(process.pid));
+  const localPath = path.join(__dirname, '..', 'downloads', relativeDirectory, 'server.log');
+  const providerPath = '/games/15580969/ftproot/dayzxb/config/server.log';
+  const originalGet = http.get;
+  fs.mkdirSync(path.dirname(localPath), { recursive: true });
+  const requests = [];
+  http.get = async url => {
+    requests.push(String(url));
+    if (String(url).includes('/file_server/download?file=')) return transferTokenResponse();
+    return { data: Buffer.from('direct-bytes'), headers: { 'content-length': '12' } };
+  };
+  try {
+    const changed = await downloadLogFile('guild-1-token', '15580969', {
+      type: 'file',
+      name: 'server.log',
+      path: providerPath,
+      size: null,
+    }, localPath);
+    assert.strictEqual(changed, true);
+    assert.strictEqual(fs.readFileSync(localPath, 'utf8'), 'direct-bytes',
+      'a size-unknown direct entry must be written using its body bytes');
+    const downloadUrl = requests.find(url => url.includes('/file_server/download?file='));
+    assert.ok(downloadUrl, 'the direct entry must request a transfer token');
+    const requestedPath = decodeURIComponent(downloadUrl.split('file=')[1]);
+    assert.strictEqual(requestedPath, providerPath,
+      'the direct entry must be fetched through its deterministic ftproot path');
+    // A direct entry with a mismatched Content-Length must be rejected as
+    // incomplete rather than written.
+    http.get = async url => {
+      if (String(url).includes('/file_server/download?file=')) return transferTokenResponse();
+      return { data: Buffer.from('short'), headers: { 'content-length': '55' } };
+    };
+    await assert.rejects(
+      downloadLogFile('guild-1-token', '15580969', {
+        type: 'file',
+        name: 'server.log',
+        path: providerPath,
+        size: null,
+      }, localPath),
+      /incomplete/i,
+      'a size-unknown direct entry with a mismatched content-length must fail closed'
+    );
+    assert.strictEqual(fs.readFileSync(localPath, 'utf8'), 'direct-bytes',
+      'a rejected direct download must preserve the previously verified copy');
+  } finally {
+    http.get = originalGet;
+    fs.rmSync(path.join(__dirname, '..', 'downloads', '.test-direct-server-log'), {
+      recursive: true,
+      force: true,
+    });
   }
 }
 
@@ -1828,7 +2041,7 @@ async function testPlatformResolutionUsesExactStoredServerAfterProviderFailure()
     },
   };
 
-  const platform = await resolveServerPlatform(db, 'token', '90000001', {
+  const platform = await resolveServerPlatform(db, 'token', '19811731', {
     fetchPlatform: async () => 'unknown',
     internalServerId: 42,
   });
@@ -1838,7 +2051,7 @@ async function testPlatformResolutionUsesExactStoredServerAfterProviderFailure()
   assert.doesNotMatch(queries[0].sql, /platform_server_id/);
 
   await assert.rejects(
-    () => resolveServerPlatform({ get: async () => ({ platform: 'unknown' }) }, 'token', '90000001', {
+    () => resolveServerPlatform({ get: async () => ({ platform: 'unknown' }) }, 'token', '19811731', {
       fetchPlatform: async () => 'unknown',
       internalServerId: 42,
     }),
@@ -3026,8 +3239,9 @@ async function testPositionSnapshotsRemainIndependentFromCombatHealth() {
     'faction member locations must decode ADM tuples into semantic positions');
 
   const mapClient = fs.readFileSync(path.join(__dirname, '..', 'public', 'js', 'player-map-standalone.js'), 'utf8');
-  assert.match(mapClient, /mapName=\$\{encodeURIComponent\(mapName\)\}&serverId=\$\{encodeURIComponent\(currentServerId\)\}/,
-    'faction polling must include the authorized internal server ID');
+  assert.match(mapClient,
+    /mapName=\$\{encodeURIComponent\(context\.mapName\)\}&serverId=\$\{encodeURIComponent\(context\.serverId\)\}/,
+    'faction polling must include the captured authorized internal server ID');
   assert.match(mapClient, /gameToLeaflet\(m\.position\.east, m\.position\.north, mapName\)/,
     'faction members must be plotted from their semantic position adapter');
   assert.match(mapClient, /gameToLeaflet\(lp\.position\.east, lp\.position\.north, mapName\)/,
@@ -3197,6 +3411,10 @@ async function main() {
   await testManualAndScheduledParsesShareDurableCheckpoint();
   await testParseWatermarkUsesUnambiguousInternalServerId();
   await testSerialAndConcurrentSyncStayServerScoped();
+  await testServerLogUsesDirectFtprootTransferToken();
+  await testServerLogRawListingBacksOffOnWafBanPerGuild();
+  testFtprootListingBreakerCooldownsPerKey();
+  await testDownloadLogFileHandlesSizeUnknownDirectEntry();
   testFullRescanIncludesLogsOlderThanIncrementalWindow();
   testLogInventoryPropagatesFilesystemFailures();
   testLogInventoryRejectsSymlinkEscapes();

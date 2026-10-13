@@ -184,6 +184,19 @@ function registerMiddleware(app, db, csrfProtection) {
   // Only report-only mission diagnostics accept larger browser drafts.
   // Authentication precedes allocation; other APIs retain the default limit.
   app.use('/api/validate', ensureAuthenticated, express.json({ limit: '6mb' }));
+  // AI chat/analysis carry the full working-copy file in the body (the read
+  // endpoint caps it at 5MB); 12MB covers JSON escaping + history overhead.
+  // Config intelligence routes carry up to five working-copy files in one
+  // body (types.xml alone is ~740KB); same 12MB envelope as chat/analyze.
+  // One shared parser instance across the routes: body parsing happens on the
+  // first matching layer and is a no-op (req.body already set) for the rest.
+  const largeAiBody = express.json({ limit: '12mb' });
+  for (const routePath of [
+    '/api/ai/chat', '/api/ai/analyze',
+    '/api/ai/config-edit', '/api/ai/balance-pass', '/api/ai/config-validate',
+  ]) {
+    app.use(routePath, ensureAuthenticated, largeAiBody);
+  }
   app.use(express.json());
   app.use(express.urlencoded({ extended: false }));
   // HTML documents are served only by the canonical route handlers, where

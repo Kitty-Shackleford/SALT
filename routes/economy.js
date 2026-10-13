@@ -486,7 +486,7 @@ router.post('/admin/:serverId/config', requireServerManage, strictLimiter, async
     'enabled', 'kill_rewards_enabled', 'playtime_rewards_enabled', 'achievement_rewards_enabled',
     'death_penalty_enabled', 'death_drops_money_on_ground',
     'transfer_enabled', 'transfer_require_both_online', 'bank_enabled', 'bank_daily_fee_enabled',
-    'inactivity_tax_enabled', 'fixed_supply_enabled', 'casino_enabled',
+    'inactivity_tax_enabled', 'fixed_supply_enabled', 'casino_enabled', 'teleport_cost_enabled',
   ]);
   const textLimits = new Map([['currency_name', 32], ['currency_symbol', 8]]);
   const enumFields = new Map(Object.entries(ECONOMY_ENUM_FIELDS));
@@ -505,7 +505,7 @@ router.post('/admin/:serverId/config', requireServerManage, strictLimiter, async
     'transfer_offline_fee_percentage', 'transfer_min_amount', 'transfer_max_amount',
     'max_bank_balance', 'bank_deposit_fee_percentage', 'bank_withdraw_fee_percentage',
     'bank_daily_fee_amount', 'inactivity_tax_percentage', 'max_money_supply',
-    'casino_min_bet', 'casino_max_bet',
+    'casino_min_bet', 'casino_max_bet', 'teleport_cost',
   ]);
   const allowed = [...booleanFields, ...textLimits.keys(), ...enumFields.keys(),
     ...numberFields, 'inactivity_threshold_days'];

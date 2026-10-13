@@ -46,7 +46,6 @@ function assertCommandSerializes(relativePath) {
   const accessRoute = normalize(read('routes/access.js'));
   const adminFeeds = normalize(read('public/js/admin-feeds.js'));
   const dashboardFeeds = normalize(read('public/js/dashboard-feeds.js'));
-  const adminFeedsHtml = read('public/admin/feeds.html');
   const dashboardFeedsHtml = read('public/dashboard/feeds.html');
   const logParser = normalize(read('routes/logParser.js'));
   const feedProcessor = normalize(read('workers/feedProcessor.js'));
@@ -169,7 +168,6 @@ function assertCommandSerializes(relativePath) {
         '/${currentServerId}/test`',
       ], `${label} feed UI`);
     }
-    assert(adminFeedsHtml.includes('id="serverSelect"'), 'admin feed UI has no server selector');
     assert(dashboardFeedsHtml.includes('id="serverSelect"'), 'dashboard feed UI has no server selector');
   });
 

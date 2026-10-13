@@ -12,15 +12,15 @@ if (!fs.existsSync(logDir)) {
 const sanitizeFormat = winston.format((info) => {
   // Remove sensitive fields
   const sensitiveFields = ['password', 'token', 'accessToken', 'refreshToken', 'nitradoToken', 'session'];
-
+  
   const sanitized = { ...info };
-
+  
   Object.keys(sanitized).forEach(key => {
     if (sensitiveFields.some(field => key.toLowerCase().includes(field))) {
       sanitized[key] = '[REDACTED]';
     }
   });
-
+  
   return sanitized;
 });
 
@@ -34,14 +34,14 @@ const logger = winston.createLogger({
   ),
   transports: [
     // Error logs
-    new winston.transports.File({
-      filename: path.join(logDir, 'error.log'),
+    new winston.transports.File({ 
+      filename: path.join(logDir, 'error.log'), 
       level: 'error',
       maxsize: 10485760, // 10MB
       maxFiles: 5
     }),
     // Combined logs
-    new winston.transports.File({
+    new winston.transports.File({ 
       filename: path.join(logDir, 'combined.log'),
       maxsize: 10485760,
       maxFiles: 5

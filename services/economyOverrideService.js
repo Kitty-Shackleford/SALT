@@ -34,7 +34,7 @@ const OVERRIDE_FILES = [
 class EconomyOverrideService {
   constructor() {
     this.customFolder = 'custom'; // Single folder for all overrides
-
+    
     // File prefixes for different sources
     this.dashboardPrefix = 'dashboard_';
     this.botPrefix = 'bot_';
@@ -353,12 +353,12 @@ class EconomyOverrideService {
       if (customCeIndex >= 0) {
         // Custom folder already exists - update it
         const existingCe = economyCoreXml.economycore.ce[customCeIndex];
-
+        
         // Ensure file array exists
         if (!existingCe.file) {
           existingCe.file = [];
         }
-
+        
         if (!Array.isArray(existingCe.file)) {
           existingCe.file = [existingCe.file];
         }
@@ -379,7 +379,7 @@ class EconomyOverrideService {
           $: { folder: this.customFolder },
           file: ourFiles.map(file => ({ $: { name: file.name, type: file.type } }))
         };
-
+        
         economyCoreXml.economycore.ce.push(customCe);
       }
 
@@ -431,10 +431,10 @@ class EconomyOverrideService {
       const xml = await parser.parseStringPromise(content);
 
       const ceEntries = xml.economycore.ce || [];
-
+      
       const loadOrder = (Array.isArray(ceEntries) ? ceEntries : [ceEntries]).map((ce, index) => {
         const files = Array.isArray(ce.file) ? ce.file : [ce.file];
-
+        
         return {
           position: index + 1,
           folder: ce.$.folder,
@@ -468,13 +468,13 @@ class EconomyOverrideService {
   async verifyLoadOrder(serverId, nitradoToken) {
     try {
       const orderResult = await this.getLoadOrder(serverId, nitradoToken);
-
+      
       if (!orderResult.success) {
         return orderResult;
       }
 
       const customFolder = orderResult.loadOrder.find(entry => entry.isCustomFolder);
-
+      
       if (!customFolder) {
         return {
           success: false,
@@ -704,8 +704,8 @@ class EconomyOverrideService {
       xmlObj[rootKey][itemKey] = [];
     }
 
-    const items = Array.isArray(xmlObj[rootKey][itemKey])
-      ? xmlObj[rootKey][itemKey]
+    const items = Array.isArray(xmlObj[rootKey][itemKey]) 
+      ? xmlObj[rootKey][itemKey] 
       : [xmlObj[rootKey][itemKey]];
 
     const existingIndex = items.findIndex(item => item.$.name === itemName);
@@ -729,8 +729,8 @@ class EconomyOverrideService {
       return xmlObj;
     }
 
-    xmlObj[rootKey][itemKey] = (Array.isArray(xmlObj[rootKey][itemKey])
-      ? xmlObj[rootKey][itemKey]
+    xmlObj[rootKey][itemKey] = (Array.isArray(xmlObj[rootKey][itemKey]) 
+      ? xmlObj[rootKey][itemKey] 
       : [xmlObj[rootKey][itemKey]]
     ).filter(item => item.$.name !== itemName);
 

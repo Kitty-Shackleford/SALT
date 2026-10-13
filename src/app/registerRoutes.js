@@ -31,6 +31,7 @@ const { validateToken } = require('../../middleware/validators');
 const { errorHandler, notFoundHandler } = require('../../middleware/errorHandler');
 
 const { renderWithCsrf } = require('../../utils/renderWithCsrf');
+const { renderShellPage, displayGuildName } = require('../../utils/appShell');
 const { getGuildToken, getGuildTokenForServer } = require('../../utils/guildTokens');
 const { getUserGuilds } = require('../../utils/discordAPI');
 const { getGuildDownloadPath, resolveGuildDiscordId } = require('../../services/logSyncService');
@@ -60,6 +61,8 @@ const nitradoRoutes = require('../../routes/nitrado');
 const ownerDashboardRoutes = require('../../routes/ownerDashboard');
 const playerPortalRoutes = require('../../routes/playerPortal');
 const guildsRoutes = require('../../routes/guilds');
+const themeRoutes = require('../../routes/theme');
+const { themeInjectionMiddleware } = require('../../middleware/themeInjection');
 const feedsRoutes = require('../../routes/feeds');
 const discordRouter = require('../../routes/discord');
 const accessRoutes = require('../../routes/access');
@@ -82,6 +85,7 @@ const lootFinderRoutes = require('../../routes/lootFinder');
 const shopRoutes = require('../../routes/shop');
 const mapHeatmapRoutes = require('../../routes/mapHeatmap');
 const operationsMapRoutes = require('../../routes/operationsMap');
+const factionTerritoriesRoutes = require('../../routes/factionTerritories');
 const spawnExclusionsRoutes = require('../../routes/spawnExclusions');
 const tasksRoutes = require('../../routes/tasks');
 const serverControlRoutes = require('../../routes/serverControl');
@@ -181,6 +185,11 @@ async function listModeratableGuilds(db, userId) {
 function registerRoutes(app, csrfProtection) {
   const publicConfig = getPublicConfig();
 
+  // Resolve the theme for each request before routing. Runs after
+  // session+passport (registered in registerMiddleware), so req.user is
+  // available. Fails soft — a theme error must never block a page.
+  app.use(themeInjectionMiddleware);
+
   // Browsers request this legacy path automatically when pages do not declare
   // an icon. Serve the SVG explicitly so every page gets a favicon without
   // duplicating a <link> element across the static HTML files.
@@ -227,6 +236,7 @@ function registerRoutes(app, csrfProtection) {
   app.use('/api/event-health', ensureAuthenticated, eventHealthRoutes);
   app.use('/api/nitrado', ensureAuthenticated, nitradoRoutes);
   app.use('/api/guilds', ensureAuthenticated, guildsRoutes);
+  app.use('/api/theme', themeRoutes);
   app.get('/api/access/setup', onboardingLimiter);
   app.use('/api/access', ensureAuthenticated, accessRoutes);
   app.use('/api/roles', ensureAuthenticated, roleManagementRoutes);
@@ -247,6 +257,7 @@ function registerRoutes(app, csrfProtection) {
   app.use('/api/loot', ensureAuthenticated, ensureApproved, lootFinderRoutes);
   app.use('/api/map', ensureAuthenticated, ensurePlayerApproved, mapHeatmapRoutes);
   app.use('/api/operations-map', ensureAuthenticated, operationsMapRoutes);
+  app.use('/api/faction-territories', ensureAuthenticated, factionTerritoriesRoutes);
   app.use('/api/spawn-exclusions', ensureAuthenticated, spawnExclusionsRoutes);
   app.use('/api/tasks', ensureAuthenticated, ensureApproved, tasksRoutes);
   app.use('/api/control', ensureAuthenticated, ensureApproved, serverControlRoutes);
@@ -395,9 +406,13 @@ function registerRoutes(app, csrfProtection) {
     }
   });
 
-  // Public server list placeholder
+  // Unimplemented opt-in server directory. Returns 410 Gone until the
+  // public directory endpoint is implemented, instead of a fake success.
   app.get('/api/public/servers', ensureAuthenticated, (req, res) => {
-    res.json({ success: true, servers: [] });
+    return res.status(410).json({
+      error: 'This endpoint is not implemented.',
+      message: 'The public server directory is an opt-in feature that is not available yet. Use /api/guilds/:guildId/servers for your own guild servers instead.'
+    });
   });
 
   // Deprecated – V1 user-based token endpoint
@@ -909,16 +924,28 @@ function registerRoutes(app, csrfProtection) {
   // -------------------------------------------------------------------------
 
   // Player portal
-  app.get('/player', apiLimiter, ensureAuthenticated, (req, res) => {
+  app.get('/player', apiLimiter, ensureAuthenticated, async (req, res) => {
     console.log('🎮 Player portal accessed');
     console.log('   isPlayerPortal:', req.isPlayerPortal);
     res.set('Cache-Control', 'no-store');
-    renderWithCsrf(pub('player-portal.html'), req, res);
+    return renderShellPage(pub('player-portal.html'), req, res, {
+      surface: 'player',
+      activePath: '/player',
+      crumbs: [{ label: 'Player Portal' }],
+      serverContext: { kind: 'player' },
+      contentClass: 'dzc-portal',
+    });
   });
 
-  app.get('/player-portal', apiLimiter, ensureAuthenticated, (req, res) => {
+  app.get('/player-portal', apiLimiter, ensureAuthenticated, async (req, res) => {
     res.set('Cache-Control', 'no-store');
-    renderWithCsrf(pub('player-portal.html'), req, res);
+    return renderShellPage(pub('player-portal.html'), req, res, {
+      surface: 'player',
+      activePath: '/player',
+      crumbs: [{ label: 'Player Portal' }],
+      serverContext: { kind: 'player' },
+      contentClass: 'dzc-portal',
+    });
   });
 
   // Standalone player map — same auth requirement as player portal
@@ -943,7 +970,13 @@ function registerRoutes(app, csrfProtection) {
 
       if (rows && rows.length > 0) {
         console.log('📊 Dashboard accessed by owner:', req.user?.username);
-        return renderWithCsrf(pub('dashboard.html'), req, res);
+        const guildName = await displayGuildName(db, req.user.id);
+        return renderShellPage(pub('dashboard.html'), req, res, {
+          surface: 'owner',
+          activePath: '/dashboard',
+          crumbs: [{ label: 'Dashboard' }],
+          serverContext: { kind: 'guild', guildName },
+        });
       }
 
       // No approved guilds/servers — show splash and prevent access to full dashboard
@@ -972,104 +1005,224 @@ function registerRoutes(app, csrfProtection) {
     }
   });
 
-  app.get('/dashboard/feeds', apiLimiter, ensureAuthenticated, (req, res) => {
+  app.get('/dashboard/feeds', apiLimiter, ensureAuthenticated,async (req, res) => {
     console.log('🔔 Dashboard feeds accessed by:', req.user?.username);
-    renderWithCsrf(pub('dashboard', 'feeds.html'), req, res);
+    const guildName = await displayGuildName(req.app.locals.db, req.user.id);
+    return renderShellPage(pub('dashboard', 'feeds.html'), req, res, {
+      surface: 'owner',
+      activePath: '/dashboard/feeds',
+      crumbs: [{ label: 'DayZ Ops', href: '/dashboard' }, { label: 'Feeds', href: '/dashboard/feeds' }],
+      serverContext: { kind: 'guild', guildName },
+    });
   });
 
-  app.get('/dashboard/economy', apiLimiter, ensureAuthenticated, (req, res) => {
+  app.get('/dashboard/economy', apiLimiter, ensureAuthenticated,async (req, res) => {
     console.log('💰 Dashboard economy accessed by:', req.user?.username);
-    renderWithCsrf(pub('dashboard', 'economy.html'), req, res);
+    const guildName = await displayGuildName(req.app.locals.db, req.user.id);
+    return renderShellPage(pub('dashboard', 'economy.html'), req, res, {
+      surface: 'owner',
+      activePath: '/dashboard/economy',
+      crumbs: [{ label: 'DayZ Ops', href: '/dashboard' }, { label: 'Economy', href: '/dashboard/economy' }],
+      serverContext: { kind: 'guild', guildName },
+    });
   });
 
-  app.get('/dashboard/economy-leaderboard', apiLimiter, ensureAuthenticated, (req, res) => {
+  app.get('/dashboard/economy-leaderboard', apiLimiter, ensureAuthenticated,async (req, res) => {
     console.log('🏆 Dashboard economy leaderboard accessed by:', req.user?.username);
-    renderWithCsrf(pub('dashboard', 'economy-leaderboard.html'), req, res);
+    const guildName = await displayGuildName(req.app.locals.db, req.user.id);
+    return renderShellPage(pub('dashboard', 'economy-leaderboard.html'), req, res, {
+      surface: 'owner',
+      activePath: '/dashboard/economy-leaderboard',
+      crumbs: [{ label: 'DayZ Ops', href: '/dashboard' }, { label: 'Economy Leaderboard', href: '/dashboard/economy-leaderboard' }],
+      serverContext: { kind: 'guild', guildName },
+    });
   });
 
-  app.get('/dashboard/economy-transactions', apiLimiter, ensureAuthenticated, (req, res) => {
+  app.get('/dashboard/economy-transactions', apiLimiter, ensureAuthenticated,async (req, res) => {
     console.log('📜 Dashboard economy transactions accessed by:', req.user?.username);
-    renderWithCsrf(pub('dashboard', 'economy-transactions.html'), req, res);
+    const guildName = await displayGuildName(req.app.locals.db, req.user.id);
+    return renderShellPage(pub('dashboard', 'economy-transactions.html'), req, res, {
+      surface: 'owner',
+      activePath: '/dashboard/economy-transactions',
+      crumbs: [{ label: 'DayZ Ops', href: '/dashboard' }, { label: 'Economy Transactions', href: '/dashboard/economy-transactions' }],
+      serverContext: { kind: 'guild', guildName },
+    });
   });
 
-  app.get('/dashboard/automation', apiLimiter, ensureAuthenticated, ensureHasOperableServers, (req, res) => {
+  app.get('/dashboard/automation', apiLimiter, ensureAuthenticated, ensureHasOperableServers,async (req, res) => {
     console.log('⚙️  Dashboard automation accessed by:', req.user?.username);
-    renderWithCsrf(pub('dashboard', 'automation.html'), req, res);
+    const guildName = await displayGuildName(req.app.locals.db, req.user.id);
+    return renderShellPage(pub('dashboard', 'automation.html'), req, res, {
+      surface: 'owner',
+      activePath: '/dashboard/automation',
+      crumbs: [{ label: 'DayZ Ops', href: '/dashboard' }, { label: 'Automation', href: '/dashboard/automation' }],
+      serverContext: { kind: 'guild', guildName },
+    });
   });
 
-  app.get('/dashboard/tasks', apiLimiter, ensureAuthenticated, ensureHasServers, (req, res) => {
+  app.get('/dashboard/tasks', apiLimiter, ensureAuthenticated, ensureHasServers,async (req, res) => {
     console.log('🕒 Task manager accessed by:', req.user?.username);
-    renderWithCsrf(pub('dashboard', 'tasks.html'), req, res);
+    const guildName = await displayGuildName(req.app.locals.db, req.user.id);
+    return renderShellPage(pub('dashboard', 'tasks.html'), req, res, {
+      surface: 'owner',
+      activePath: '/dashboard/tasks',
+      crumbs: [{ label: 'DayZ Ops', href: '/dashboard' }, { label: 'Tasks', href: '/dashboard/tasks' }],
+      serverContext: { kind: 'guild', guildName },
+    });
   });
 
-  app.get('/dashboard/server-control', apiLimiter, ensureAuthenticated, ensureHasServers, (req, res) => {
+  app.get('/dashboard/server-control', apiLimiter, ensureAuthenticated, ensureHasServers,async (req, res) => {
     console.log('🎮 Server control accessed by:', req.user?.username);
-    renderWithCsrf(pub('dashboard', 'server-control.html'), req, res);
+    const guildName = await displayGuildName(req.app.locals.db, req.user.id);
+    return renderShellPage(pub('dashboard', 'server-control.html'), req, res, {
+      surface: 'owner',
+      activePath: '/dashboard/server-control',
+      crumbs: [{ label: 'DayZ Ops', href: '/dashboard' }, { label: 'Server Control', href: '/dashboard/server-control' }],
+      serverContext: { kind: 'guild', guildName },
+    });
   });
 
-  app.get('/dashboard/spawn-exclusions', apiLimiter, ensureAuthenticated, ensureHasServers, (req, res) => {
+  app.get('/dashboard/spawn-exclusions', apiLimiter, ensureAuthenticated, ensureHasServers,async (req, res) => {
     console.log('🛡️ Spawn exclusion review accessed by:', req.user?.username);
-    renderWithCsrf(pub('dashboard', 'spawn-exclusions.html'), req, res);
+    const guildName = await displayGuildName(req.app.locals.db, req.user.id);
+    return renderShellPage(pub('dashboard', 'spawn-exclusions.html'), req, res, {
+      surface: 'owner',
+      activePath: '/dashboard/spawn-exclusions',
+      crumbs: [{ label: 'DayZ Ops', href: '/dashboard' }, { label: 'Spawn Exclusions', href: '/dashboard/spawn-exclusions' }],
+      serverContext: { kind: 'guild', guildName },
+    });
   });
 
-  app.get('/dashboard/backups', apiLimiter, ensureAuthenticated, ensureHasServers, (req, res) => {
+  app.get('/dashboard/backups', apiLimiter, ensureAuthenticated, ensureHasServers,async (req, res) => {
     console.log('💾 Backup manager accessed by:', req.user?.username);
-    renderWithCsrf(pub('dashboard', 'backups.html'), req, res);
+    const guildName = await displayGuildName(req.app.locals.db, req.user.id);
+    return renderShellPage(pub('dashboard', 'backups.html'), req, res, {
+      surface: 'owner',
+      activePath: '/dashboard/backups',
+      crumbs: [{ label: 'DayZ Ops', href: '/dashboard' }, { label: 'Backups', href: '/dashboard/backups' }],
+      serverContext: { kind: 'guild', guildName },
+    });
   });
 
-  app.get('/dashboard/rotation', apiLimiter, ensureAuthenticated, ensureHasServers, (req, res) => {
+  app.get('/dashboard/rotation', apiLimiter, ensureAuthenticated, ensureHasServers,async (req, res) => {
     console.log('🔄 Rotation manager accessed by:', req.user?.username);
-    renderWithCsrf(pub('dashboard', 'rotation.html'), req, res);
+    const guildName = await displayGuildName(req.app.locals.db, req.user.id);
+    return renderShellPage(pub('dashboard', 'rotation.html'), req, res, {
+      surface: 'owner',
+      activePath: '/dashboard/rotation',
+      crumbs: [{ label: 'DayZ Ops', href: '/dashboard' }, { label: 'Rotation', href: '/dashboard/rotation' }],
+      serverContext: { kind: 'guild', guildName },
+    });
   });
 
-  app.get('/dashboard/ai-assistant', apiLimiter, ensureAuthenticated, ensureHasServers, (req, res) => {
+  app.get('/dashboard/ai-assistant', apiLimiter, ensureAuthenticated, ensureHasServers,async (req, res) => {
     console.log('🤖 AI assistant accessed by:', req.user?.username);
-    renderWithCsrf(pub('dashboard', 'ai-assistant.html'), req, res);
+    const guildName = await displayGuildName(req.app.locals.db, req.user.id);
+    return renderShellPage(pub('dashboard', 'ai-assistant.html'), req, res, {
+      surface: 'owner',
+      activePath: '/dashboard/ai-assistant',
+      crumbs: [{ label: 'DayZ Ops', href: '/dashboard' }, { label: 'AI Assistant', href: '/dashboard/ai-assistant' }],
+      serverContext: { kind: 'guild', guildName },
+    });
   });
 
-  app.get('/dashboard/server-stats', apiLimiter, ensureAuthenticated, ensureHasModeratableServers, (req, res) => {
+  app.get('/dashboard/server-stats', apiLimiter, ensureAuthenticated, ensureHasModeratableServers,async (req, res) => {
     console.log('📊 Server stats accessed by:', req.user?.username);
-    renderWithCsrf(pub('dashboard', 'server-stats.html'), req, res);
+    const guildName = await displayGuildName(req.app.locals.db, req.user.id);
+    return renderShellPage(pub('dashboard', 'server-stats.html'), req, res, {
+      surface: 'owner',
+      activePath: '/dashboard/server-stats',
+      crumbs: [{ label: 'DayZ Ops', href: '/dashboard' }, { label: 'Server Stats', href: '/dashboard/server-stats' }],
+      serverContext: { kind: 'guild', guildName },
+    });
   });
 
-  app.get('/dashboard/activity-log', apiLimiter, ensureAuthenticated, ensureHasServers, (req, res) => {
+  app.get('/dashboard/activity-log', apiLimiter, ensureAuthenticated, ensureHasServers,async (req, res) => {
     console.log('📋 Activity log accessed by:', req.user?.username);
-    renderWithCsrf(pub('dashboard', 'activity-log.html'), req, res);
+    const guildName = await displayGuildName(req.app.locals.db, req.user.id);
+    return renderShellPage(pub('dashboard', 'activity-log.html'), req, res, {
+      surface: 'owner',
+      activePath: '/dashboard/activity-log',
+      crumbs: [{ label: 'DayZ Ops', href: '/dashboard' }, { label: 'Activity Log', href: '/dashboard/activity-log' }],
+      serverContext: { kind: 'guild', guildName },
+    });
   });
 
-  app.get('/dashboard/console', apiLimiter, ensureAuthenticated, ensureHasServers, (req, res) => {
+  app.get('/dashboard/console', apiLimiter, ensureAuthenticated, ensureHasServers,async (req, res) => {
     console.log('🖥️  Console accessed by:', req.user?.username);
-    renderWithCsrf(pub('dashboard', 'console.html'), req, res);
+    const guildName = await displayGuildName(req.app.locals.db, req.user.id);
+    return renderShellPage(pub('dashboard', 'console.html'), req, res, {
+      surface: 'owner',
+      activePath: '/dashboard/console',
+      crumbs: [{ label: 'DayZ Ops', href: '/dashboard' }, { label: 'Console', href: '/dashboard/console' }],
+      serverContext: { kind: 'guild', guildName },
+    });
   });
 
-  app.get('/dashboard/boost', apiLimiter, ensureAuthenticated, ensureHasServers, (req, res) => {
+  app.get('/dashboard/boost', apiLimiter, ensureAuthenticated, ensureHasServers,async (req, res) => {
     console.log('🚀 Boost manager accessed by:', req.user?.username);
-    renderWithCsrf(pub('dashboard', 'boost.html'), req, res);
+    const guildName = await displayGuildName(req.app.locals.db, req.user.id);
+    return renderShellPage(pub('dashboard', 'boost.html'), req, res, {
+      surface: 'owner',
+      activePath: '/dashboard/boost',
+      crumbs: [{ label: 'DayZ Ops', href: '/dashboard' }, { label: 'Boost', href: '/dashboard/boost' }],
+      serverContext: { kind: 'guild', guildName },
+    });
   });
 
-  app.get('/dashboard/support', apiLimiter, ensureAuthenticated, ensureHasServers, (req, res) => {
+  app.get('/dashboard/support', apiLimiter, ensureAuthenticated, ensureHasServers,async (req, res) => {
     console.log('🎫 Support hub accessed by:', req.user?.username);
-    renderWithCsrf(pub('dashboard', 'support.html'), req, res);
+    const guildName = await displayGuildName(req.app.locals.db, req.user.id);
+    return renderShellPage(pub('dashboard', 'support.html'), req, res, {
+      surface: 'owner',
+      activePath: '/dashboard/support',
+      crumbs: [{ label: 'DayZ Ops', href: '/dashboard' }, { label: 'Support', href: '/dashboard/support' }],
+      serverContext: { kind: 'guild', guildName },
+    });
   });
 
-  app.get('/dashboard/settings', apiLimiter, ensureAuthenticated, ensureHasServers, (req, res) => {
+  app.get('/dashboard/settings', apiLimiter, ensureAuthenticated, ensureHasServers, async (req, res) => {
     console.log('🔧 Dashboard settings accessed by:', req.user?.username);
-    renderWithCsrf(pub('dashboard', 'settings.html'), req, res);
+    const guildName = await displayGuildName(req.app.locals.db, req.user.id);
+    return renderShellPage(pub('dashboard', 'settings.html'), req, res, {
+      surface: 'owner',
+      activePath: '/dashboard/settings',
+      crumbs: [{ label: 'DayZ Ops', href: '/dashboard' }, { label: 'Settings', href: '/dashboard/settings' }],
+      serverContext: { kind: 'server', guildName },
+    });
   });
 
-  app.get('/dashboard/economy-settings', apiLimiter, ensureAuthenticated, (req, res) => {
+  app.get('/dashboard/economy-settings', apiLimiter, ensureAuthenticated,async (req, res) => {
     console.log('💰 Economy settings accessed by:', req.user?.username);
-    renderWithCsrf(pub('dashboard', 'economy-settings.html'), req, res);
+    const guildName = await displayGuildName(req.app.locals.db, req.user.id);
+    return renderShellPage(pub('dashboard', 'economy-settings.html'), req, res, {
+      surface: 'owner',
+      activePath: '/dashboard/economy-settings',
+      crumbs: [{ label: 'DayZ Ops', href: '/dashboard' }, { label: 'Economy Settings', href: '/dashboard/economy-settings' }],
+      serverContext: { kind: 'guild', guildName },
+    });
   });
 
-  app.get('/dashboard/shop-admin', apiLimiter, ensureAuthenticated, (req, res) => {
+  app.get('/dashboard/shop-admin', apiLimiter, ensureAuthenticated,async (req, res) => {
     console.log('🛒 Shop admin accessed by:', req.user?.username);
-    renderWithCsrf(pub('dashboard', 'shop-admin.html'), req, res);
+    const guildName = await displayGuildName(req.app.locals.db, req.user.id);
+    return renderShellPage(pub('dashboard', 'shop-admin.html'), req, res, {
+      surface: 'owner',
+      activePath: '/dashboard/shop-admin',
+      crumbs: [{ label: 'DayZ Ops', href: '/dashboard' }, { label: 'Shop', href: '/dashboard/shop-admin' }],
+      serverContext: { kind: 'guild', guildName },
+    });
   });
 
-  app.get('/dashboard/casino', apiLimiter, ensureAuthenticated, ensureAdmin, (req, res) => {
+  app.get('/dashboard/casino', apiLimiter, ensureAuthenticated, ensureAdmin,async (req, res) => {
     console.log('🎰 Casino stats accessed by:', req.user?.username);
-    renderWithCsrf(pub('dashboard', 'casino.html'), req, res);
+    const guildName = await displayGuildName(req.app.locals.db, req.user.id);
+    return renderShellPage(pub('dashboard', 'casino.html'), req, res, {
+      surface: 'owner',
+      activePath: '/dashboard/casino',
+      crumbs: [{ label: 'DayZ Ops', href: '/dashboard' }, { label: 'Casino', href: '/dashboard/casino' }],
+      serverContext: { kind: 'guild', guildName },
+    });
   });
 
   app.get('/shop', apiLimiter, ensureAuthenticated, (req, res) => {
@@ -1079,9 +1232,15 @@ function registerRoutes(app, csrfProtection) {
   });
 
   // Server tools
-  app.get('/map', apiLimiter, ensureAuthenticated, ensureHasModeratableServers, (req, res) => {
+  app.get('/map', apiLimiter, ensureAuthenticated, ensureHasModeratableServers, async (req, res) => {
     console.log('🗺️  Map page accessed by:', req.user?.username);
-    renderWithCsrf(pub('map.html'), req, res);
+    const guildName = await displayGuildName(req.app.locals.db, req.user.id);
+    return renderShellPage(pub('map.html'), req, res, {
+      surface: 'owner',
+      activePath: '/map',
+      crumbs: [{ label: 'DayZ Ops', href: '/dashboard' }, { label: 'Map', href: '/map' }],
+      serverContext: { kind: 'server', guildName },
+    });
   });
 
   app.get('/loot-finder', apiLimiter, ensureAuthenticated, (req, res) => {
@@ -1089,24 +1248,48 @@ function registerRoutes(app, csrfProtection) {
     renderWithCsrf(pub('loot-finder.html'), req, res);
   });
 
-  app.get('/mission-editor', apiLimiter, ensureAuthenticated, ensureHasServers, (req, res) => {
+  app.get('/mission-editor', apiLimiter, ensureAuthenticated, ensureHasServers,async (req, res) => {
     console.log('📝 Mission editor accessed by:', req.user?.username);
-    renderWithCsrf(pub('mission-editor.html'), req, res);
+    const guildName = await displayGuildName(req.app.locals.db, req.user.id);
+    return renderShellPage(pub('mission-editor.html'), req, res, {
+      surface: 'owner',
+      activePath: '/mission-editor',
+      crumbs: [{ label: 'DayZ Ops', href: '/dashboard' }, { label: 'Mission Editor', href: '/mission-editor' }],
+      serverContext: { kind: 'guild', guildName },
+    });
   });
 
-  app.get('/logs', apiLimiter, ensureAuthenticated, ensureHasOperableServers, (req, res) => {
+  app.get('/logs', apiLimiter, ensureAuthenticated, ensureHasOperableServers,async (req, res) => {
     console.log('📋 Logs page accessed by:', req.user?.username);
-    renderWithCsrf(pub('logs.html'), req, res);
+    const guildName = await displayGuildName(req.app.locals.db, req.user.id);
+    return renderShellPage(pub('logs.html'), req, res, {
+      surface: 'owner',
+      activePath: '/logs',
+      crumbs: [{ label: 'DayZ Ops', href: '/dashboard' }, { label: 'Logs', href: '/logs' }],
+      serverContext: { kind: 'guild', guildName },
+    });
   });
 
-  app.get('/server-players', apiLimiter, ensureAuthenticated, (req, res) => {
+  app.get('/server-players', apiLimiter, ensureAuthenticated, async (req, res) => {
     console.log('👥 Server players page accessed by:', req.user?.username);
-    renderWithCsrf(pub('server-players.html'), req, res);
+    const guildName = await displayGuildName(req.app.locals.db, req.user.id);
+    return renderShellPage(pub('server-players.html'), req, res, {
+      surface: 'owner',
+      activePath: '/server-players',
+      crumbs: [{ label: 'DayZ Ops', href: '/dashboard' }, { label: 'Players', href: '/server-players' }],
+      serverContext: { kind: 'server', guildName },
+    });
   });
 
-  app.get('/server-lists', apiLimiter, ensureAuthenticated, (req, res) => {
+  app.get('/server-lists', apiLimiter, ensureAuthenticated,async (req, res) => {
     console.log('📋 Server lists page accessed by:', req.user?.username);
-    renderWithCsrf(pub('server-lists.html'), req, res);
+    const guildName = await displayGuildName(req.app.locals.db, req.user.id);
+    return renderShellPage(pub('server-lists.html'), req, res, {
+      surface: 'owner',
+      activePath: '/server-lists',
+      crumbs: [{ label: 'DayZ Ops', href: '/dashboard' }, { label: 'Server Lists', href: '/server-lists' }],
+      serverContext: { kind: 'guild', guildName },
+    });
   });
 
   // Redirects
@@ -1135,66 +1318,149 @@ function registerRoutes(app, csrfProtection) {
   // cannot exhaust the sensitive-operation bucket.
   app.use('/admin/*', apiLimiter, ensureAuthenticated, ensureAdmin);
 
-  app.get('/admin', apiLimiter, ensureAuthenticated, ensureAdmin, (req, res) => {
+  app.get('/admin', apiLimiter, ensureAuthenticated, ensureAdmin,async (req, res) => {
     console.log('⚡ Admin dashboard accessed by:', req.user?.username);
-    renderWithCsrf(pub('admin', 'index.html'), req, res);
+    const guildName = await displayGuildName(req.app.locals.db, req.user.id);
+    return renderShellPage(pub('admin', 'index.html'), req, res, {
+      surface: 'admin',
+      activePath: '/admin',
+      crumbs: [{ label: 'Platform Admin', href: '/admin' }, { label: 'Admin Dashboard', href: '/admin' }],
+      serverContext: { kind: 'guild', guildName },
+    });
   });
 
-  app.get('/admin/guilds', (req, res) => {
+  app.get('/admin/guilds', async (req, res) => {
     console.log('🏰 Admin guilds page accessed by:', req.user?.username);
-    renderWithCsrf(pub('admin', 'guilds.html'), req, res);
+    const guildName = await displayGuildName(req.app.locals.db, req.user.id);
+    return renderShellPage(pub('admin', 'guilds.html'), req, res, {
+      surface: 'admin',
+      activePath: '/admin/guilds',
+      crumbs: [{ label: 'Platform Admin', href: '/admin' }, { label: 'Guilds', href: '/admin/guilds' }],
+      serverContext: { kind: 'guild', guildName },
+    });
   });
 
-  app.get('/admin/guilds-approval', (req, res) => {
+  app.get('/admin/theme', async (req, res) => {
+    console.log('🎨 Admin theme page accessed by:', req.user?.username);
+    const guildName = await displayGuildName(req.app.locals.db, req.user.id);
+    return renderShellPage(pub('admin', 'theme.html'), req, res, {
+      surface: 'admin',
+      activePath: '/admin/theme',
+      crumbs: [{ label: 'Platform Admin', href: '/admin' }, { label: 'Theme', href: '/admin/theme' }],
+      serverContext: { kind: 'guild', guildName },
+    });
+  });
+
+  app.get('/admin/guilds-approval', async (req, res) => {
     console.log('🛡️  Admin guilds approval page accessed by:', req.user?.username);
-    renderWithCsrf(pub('admin', 'guilds-approval.html'), req, res);
+    const guildName = await displayGuildName(req.app.locals.db, req.user.id);
+    return renderShellPage(pub('admin', 'guilds-approval.html'), req, res, {
+      surface: 'admin',
+      activePath: '/admin/guilds-approval',
+      crumbs: [{ label: 'Platform Admin', href: '/admin' }, { label: 'Guild Approval', href: '/admin/guilds-approval' }],
+      serverContext: { kind: 'guild', guildName },
+    });
   });
 
-  app.get('/admin/servers', (req, res) => {
+  app.get('/admin/servers', async (req, res) => {
     console.log('🖥️  Admin servers page accessed by:', req.user?.username);
-    renderWithCsrf(pub('admin', 'servers.html'), req, res);
+    const guildName = await displayGuildName(req.app.locals.db, req.user.id);
+    return renderShellPage(pub('admin', 'servers.html'), req, res, {
+      surface: 'admin',
+      activePath: '/admin/servers',
+      crumbs: [{ label: 'Platform Admin', href: '/admin' }, { label: 'Servers', href: '/admin/servers' }],
+      serverContext: { kind: 'guild', guildName },
+    });
   });
 
-  app.get('/admin/users', (req, res) => {
+  app.get('/admin/users', async (req, res) => {
     console.log('👥 Admin users page accessed by:', req.user?.username);
-    renderWithCsrf(pub('admin', 'users.html'), req, res);
+    const guildName = await displayGuildName(req.app.locals.db, req.user.id);
+    return renderShellPage(pub('admin', 'users.html'), req, res, {
+      surface: 'admin',
+      activePath: '/admin/users',
+      crumbs: [{ label: 'Platform Admin', href: '/admin' }, { label: 'Users', href: '/admin/users' }],
+      serverContext: { kind: 'guild', guildName },
+    });
   });
 
-  app.get('/admin/roles', (req, res) => {
-    renderWithCsrf(pub('admin', 'users.html'), req, res);
+  app.get('/admin/roles', async (req, res) => {
+    const guildName = await displayGuildName(req.app.locals.db, req.user.id);
+    return renderShellPage(pub('admin', 'users.html'), req, res, {
+      surface: 'admin',
+      activePath: '/admin/roles',
+      crumbs: [{ label: 'Platform Admin', href: '/admin' }, { label: 'Roles', href: '/admin/roles' }],
+      serverContext: { kind: 'guild', guildName },
+    });
   });
 
-  app.get('/dashboard/roles', apiLimiter, ensureAuthenticated, (req, res) => {
-    renderWithCsrf(pub('admin', 'users.html'), req, res);
+  app.get('/dashboard/roles', apiLimiter, ensureAuthenticated,async (req, res) => {
+    const guildName = await displayGuildName(req.app.locals.db, req.user.id);
+    return renderShellPage(pub('admin', 'users.html'), req, res, {
+      surface: 'admin',
+      activePath: '/dashboard/roles',
+      crumbs: [{ label: 'Platform Admin', href: '/admin' }, { label: 'Roles', href: '/dashboard/roles' }],
+      serverContext: { kind: 'guild', guildName },
+    });
   });
 
-  app.get('/admin/audit', (req, res) => {
+  app.get('/admin/audit', async (req, res) => {
     console.log('📜 Admin audit log accessed by:', req.user?.username);
-    renderWithCsrf(pub('admin', 'audit.html'), req, res);
+    const guildName = await displayGuildName(req.app.locals.db, req.user.id);
+    return renderShellPage(pub('admin', 'audit.html'), req, res, {
+      surface: 'admin',
+      activePath: '/admin/audit',
+      crumbs: [{ label: 'Platform Admin', href: '/admin' }, { label: 'Audit Log', href: '/admin/audit' }],
+      serverContext: { kind: 'guild', guildName },
+    });
   });
 
-  app.get('/admin/database', (req, res) => {
+  app.get('/admin/database', async (req, res) => {
     console.log('🧹 Admin database tools accessed by:', req.user?.username);
-    renderWithCsrf(pub('admin', 'database.html'), req, res);
+    const guildName = await displayGuildName(req.app.locals.db, req.user.id);
+    return renderShellPage(pub('admin', 'database.html'), req, res, {
+      surface: 'admin',
+      activePath: '/admin/database',
+      crumbs: [{ label: 'Platform Admin', href: '/admin' }, { label: 'Database', href: '/admin/database' }],
+      serverContext: { kind: 'guild', guildName },
+    });
   });
 
-  app.get('/admin/reports', (req, res) => {
+  app.get('/admin/reports', async (req, res) => {
     console.log('📋 Admin reports accessed by:', req.user?.username);
-    renderWithCsrf(pub('admin', 'reports.html'), req, res);
+    const guildName = await displayGuildName(req.app.locals.db, req.user.id);
+    return renderShellPage(pub('admin', 'reports.html'), req, res, {
+      surface: 'admin',
+      activePath: '/admin/reports',
+      crumbs: [{ label: 'Platform Admin', href: '/admin' }, { label: 'Reports', href: '/admin/reports' }],
+      serverContext: { kind: 'guild', guildName },
+    });
   });
 
   app.get('/admin/feeds', (req, res) => {
     res.redirect('/dashboard/feeds');
   });
 
-  app.get('/admin/supply-monitor', (req, res) => {
+  app.get('/admin/supply-monitor', async (req, res) => {
     console.log('💎 Admin supply monitor accessed by:', req.user?.username);
-    renderWithCsrf(pub('admin', 'supply-monitor.html'), req, res);
+    const guildName = await displayGuildName(req.app.locals.db, req.user.id);
+    return renderShellPage(pub('admin', 'supply-monitor.html'), req, res, {
+      surface: 'admin',
+      activePath: '/admin/supply-monitor',
+      crumbs: [{ label: 'Platform Admin', href: '/admin' }, { label: 'Supply Monitor', href: '/admin/supply-monitor' }],
+      serverContext: { kind: 'guild', guildName },
+    });
   });
 
-  app.get('/admin/economy-analytics', (req, res) => {
+  app.get('/admin/economy-analytics', async (req, res) => {
     console.log('📊 Admin economy analytics accessed by:', req.user?.username);
-    renderWithCsrf(pub('admin', 'economy-analytics.html'), req, res);
+    const guildName = await displayGuildName(req.app.locals.db, req.user.id);
+    return renderShellPage(pub('admin', 'economy-analytics.html'), req, res, {
+      surface: 'admin',
+      activePath: '/admin/economy-analytics',
+      crumbs: [{ label: 'Platform Admin', href: '/admin' }, { label: 'Economy Analytics', href: '/admin/economy-analytics' }],
+      serverContext: { kind: 'guild', guildName },
+    });
   });
 
   // Root

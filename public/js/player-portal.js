@@ -5,6 +5,22 @@ let selectedAccount = null;
 let selectedServer = null;
 let currentIdentityId = null;
 let currentEconomyServerId = null;
+// Stats sub-sections reachable from the shell nav (card 7/9). Keyed by nav
+// section name -> element id of the sub-section inside #my-stats.
+const STAT_SUBSECTIONS = {
+  sessions: 'session-section',
+  health: 'health-section',
+  damage: 'damage-section',
+  weapons: 'weapon-analytics-section',
+  territory: 'territory-section',
+  kills: 'recent-kills-section',
+  deaths: 'recent-deaths-section',
+  achievements: 'achievements-section',
+  performance: 'performance-section',
+};
+// Identity whose stats payload was last rendered (null = not loaded).
+let statsLoadedForIdentity = null;
+let communityAverages = null; // { kills, deaths, playtime } for the current guild
 
 /** Escape a string for safe insertion into HTML */
 function escHtml(str) {
@@ -30,6 +46,60 @@ function safeImageUrl(value) {
   } catch {
     return '';
   }
+}
+
+/** Return the Discord CDN avatar URL only when both parts are well-formed. */
+function safeAvatarUrl(userId, avatar) {
+  if (!userId || avatar === undefined || avatar === null || avatar === '') return '';
+  if (!/^[a-z0-9]+$/i.test(String(avatar))) return '';
+  return 'https://cdn.discordapp.com/avatars/' + encodeURIComponent(String(userId)) + '/' + avatar + '.png';
+}
+
+/**
+ * Render a compact "vs community average" delta chip.
+ * HigherIsBetter flips the good/bad coloring (e.g. deaths).
+ * Returns '' when there is no baseline or no difference to show.
+ */
+function deltaChip(value, baseline, higherIsBetter) {
+  if (baseline === null || baseline === undefined || baseline === 0 || value === null || value === undefined) return '';
+  const pct = Math.round(((value - baseline) / baseline) * 100);
+  if (pct === 0) return '<span class="dzc-delta is-flat">≈ server avg</span>';
+  const good = higherIsBetter ? pct > 0 : pct < 0;
+  const cls = good ? 'is-up' : 'is-down';
+  const sign = pct > 0 ? '+' : '';
+  return `<span class="dzc-delta ${cls}">${sign}${pct}% vs avg</span>`;
+}
+
+/**
+ * Inline SVG sparkline for recent session durations (seconds).
+ * Returns '' with fewer than 2 data points.
+ */
+function sessionSparkline(durations) {
+  const values = (durations || []).filter(d => typeof d === 'number' && d > 0);
+  if (values.length < 2) return '';
+  const W = 300, H = 56, PAD = 4;
+  const max = Math.max(...values);
+  const min = Math.min(...values);
+  const span = max - min || 1;
+  const step = (W - PAD * 2) / (values.length - 1);
+  const points = values.map((v, i) => {
+    const x = PAD + i * step;
+    const y = H - PAD - ((v - min) / span) * (H - PAD * 2);
+    return [Math.round(x * 10) / 10, Math.round(y * 10) / 10];
+  });
+  const line = points.map(p => p.join(',')).join(' ');
+  const area = `${PAD},${H - PAD} ${line} ${W - PAD},${H - PAD}`;
+  return `<svg class="dzc-spark" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" role="img" aria-label="Recent session durations">
+    <polygon class="dzc-spark-fill" points="${area}"></polygon>
+    <polyline class="dzc-spark-line" points="${line}"></polyline>
+  </svg>`;
+}
+
+/** Scroll a portal sub-section into view, respecting reduced motion. */
+function scrollSectionIntoView(el) {
+  if (!el) return;
+  const reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  el.scrollIntoView({ behavior: reduce ? 'auto' : 'smooth', block: 'start' });
 }
 
 function playerApiUrl(path, params = {}) {
@@ -65,13 +135,13 @@ function loadGuilds() {
       if (data.success && data.guilds.length > 0) {
         displayGuilds(data.guilds);
       } else {
-        document.getElementById('guilds-container').innerHTML =
+        document.getElementById('guilds-container').innerHTML = 
           '<p class="text-gray-400 text-center py-8">You are not a member of any communities with DayZ servers.</p>';
       }
     })
     .catch(err => {
       console.error('Error loading guilds:', err);
-      document.getElementById('guilds-container').innerHTML =
+      document.getElementById('guilds-container').innerHTML = 
         '<p class="text-red-400 text-center py-4">Failed to load communities</p>';
     });
 }
@@ -80,7 +150,7 @@ function displayGuilds(guilds) {
   const html = `
     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
       ${guilds.flatMap(guild => (guild.servers || []).map(server => `
-        <div class="guild-card bg-gray-700 p-6 rounded-lg" data-guild-id="${escAttr(guild.guild_id)}" data-guild-name="${escAttr(guild.guild_name)}" data-server-id="${escAttr(server.id)}" data-server-name="${escAttr(server.name)}">
+        <div class="guild-card bg-gray-700 p-6 rounded-lg" role="button" tabindex="0" aria-label="Open ${escAttr(guild.guild_name)} — ${escAttr(server.name)}" data-guild-id="${escAttr(guild.guild_id)}" data-guild-name="${escAttr(guild.guild_name)}" data-server-id="${escAttr(server.id)}" data-server-name="${escAttr(server.name)}">
           <div class="flex items-center gap-3 mb-4">
             ${safeImageUrl(guild.icon_url) ?
               `<img src="${escAttr(safeImageUrl(guild.icon_url))}" class="w-16 h-16 rounded" />` :
@@ -109,19 +179,21 @@ function selectGuild(guildId, guildName, serverId, serverName) {
   currentEconomyServerId = currentServerId;
   window.currentEconomyServerId = currentServerId;
   document.getElementById('selectedGuildName').textContent = `${guildName} — ${serverName}`;
-
-  // Show navigation
-  document.getElementById('playerNav').style.display = 'block';
-  document.getElementById('nav-discovery').style.display = 'block';
-  document.getElementById('nav-stats').style.display = 'block';
-  document.getElementById('nav-leaderboard').style.display = 'block';
-  document.getElementById('nav-economy').style.display = 'block';
-  document.getElementById('nav-casino').style.display = 'block';
-  document.getElementById('nav-factions').style.display = 'block';
-  document.getElementById('nav-bounties').style.display = 'block';
-  document.getElementById('nav-map').style.display = 'block';
-  document.getElementById('nav-shop').style.display = 'block';
-  document.getElementById('nav-emotes').style.display = 'block';
+  
+  // Show navigation (shell: the sidebar is always visible; only the tab
+  // buttons are hidden until a guild is selected)
+  const playerNavEl = document.getElementById('playerNav');
+  if (playerNavEl) playerNavEl.style.display = 'block';
+  // Reveal the client-driven tabs: the shell renders them with the `hidden`
+  // attribute until a guild is selected — remove it (inline display:none-fights
+  // would leave the a11y state inconsistent with the visual state).
+  ['discovery', 'stats', 'leaderboard', 'economy', 'casino', 'factions',
+    'bounties', 'map', 'shop', 'emotes', ...Object.keys(STAT_SUBSECTIONS)].forEach(section => {
+    const el = document.getElementById('nav-' + section);
+    if (el) el.hidden = false;
+  });
+  statsLoadedForIdentity = null;
+  communityAverages = null;
 
   // Pre-resolve the player's identity in the background so Economy and Casino
   // tabs are ready immediately without needing the Stats tab to be visited first.
@@ -181,37 +253,48 @@ function showSection(section) {
   if (bountiesTabEl) bountiesTabEl.style.display = 'none';
   const emotesTabEl = document.getElementById('emotes-tab');
   if (emotesTabEl) emotesTabEl.style.display = 'none';
-
-  // Update nav buttons
-  document.querySelectorAll('nav button').forEach(btn => {
-    btn.className = 'bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded';
-  });
-
+  
+  // Update nav buttons (shell-aware: toggle the active state, never
+  // overwrite the base dzc-shell-nav-item classes)
+  document.querySelectorAll('nav button.is-active').forEach(btn => btn.classList.remove('is-active'));
+  
   // Show selected section
   if (section === 'guilds') {
     document.getElementById('community-selector').style.display = 'block';
-    document.getElementById('nav-guilds').className = 'bg-green-600 px-4 py-2 rounded font-semibold';
+    document.getElementById('nav-guilds').classList.add('is-active');;
   } else if (section === 'discovery') {
     document.getElementById('account-discovery').style.display = 'block';
-    document.getElementById('nav-discovery').className = 'bg-green-600 px-4 py-2 rounded font-semibold';
+    document.getElementById('nav-discovery').classList.add('is-active');;
     loadDiscovery();
   } else if (section === 'stats') {
     document.getElementById('my-stats').style.display = 'block';
-    document.getElementById('nav-stats').className = 'bg-green-600 px-4 py-2 rounded font-semibold';
+    document.getElementById('nav-stats').classList.add('is-active');;
     loadStats();
+  } else if (STAT_SUBSECTIONS[section]) {
+    // Stats sub-section (sessions/health/...): show the stats page and scroll
+    // to the sub-section; load stats first if they are not loaded yet.
+    document.getElementById('my-stats').style.display = 'block';
+    const navBtn = document.getElementById('nav-' + section);
+    if (navBtn) navBtn.classList.add('is-active');
+    const target = document.getElementById(STAT_SUBSECTIONS[section]);
+    if (statsLoadedForIdentity) {
+      scrollSectionIntoView(target);
+    } else {
+      loadStats().then(() => scrollSectionIntoView(target));
+    }
   } else if (section === 'leaderboard') {
     document.getElementById('leaderboard').style.display = 'block';
-    document.getElementById('nav-leaderboard').className = 'bg-green-600 px-4 py-2 rounded font-semibold';
+    document.getElementById('nav-leaderboard').classList.add('is-active');;
     loadLeaderboard();
   } else if (section === 'economy') {
     if (economyTabEl) economyTabEl.style.display = 'block';
-    document.getElementById('nav-economy').className = 'bg-yellow-600 px-4 py-2 rounded font-semibold';
+    document.getElementById('nav-economy').classList.add('is-active');;
     resolveLinkedIdentity().then(id => {
       if (id) loadPlayerEconomyDashboard(id);
     });
   } else if (section === 'casino') {
     if (casinoTabEl) casinoTabEl.style.display = 'block';
-    document.getElementById('nav-casino').className = 'bg-purple-700 px-4 py-2 rounded font-semibold';
+    document.getElementById('nav-casino').classList.add('is-active');;
     if (typeof CasinoSlots !== 'undefined') {
       resolveLinkedIdentity().then(id => {
         if (id) {
@@ -228,25 +311,25 @@ function showSection(section) {
     }
   } else if (section === 'map') {
     if (mapSectionEl) mapSectionEl.style.display = 'block';
-    document.getElementById('nav-map').className = 'bg-blue-600 px-4 py-2 rounded font-semibold';
+    document.getElementById('nav-map').classList.add('is-active');;
     // Resolve identity first (same pattern as Casino/Factions) so the map
     // can open even if the Stats tab hasn't been visited yet.
     resolveLinkedIdentity().then(() => openPlayerMap());
   } else if (section === 'factions') {
     if (factionsTabEl) factionsTabEl.style.display = 'block';
-    document.getElementById('nav-factions').className = 'bg-red-700 px-4 py-2 rounded font-semibold';
+    document.getElementById('nav-factions').classList.add('is-active');;
     if (typeof initFactions === 'function') {
       resolveLinkedIdentity().then(id => initFactions(currentGuildId, id));
     }
   } else if (section === 'bounties') {
     if (bountiesTabEl) bountiesTabEl.style.display = 'block';
-    document.getElementById('nav-bounties').className = 'bg-orange-700 px-4 py-2 rounded font-semibold';
+    document.getElementById('nav-bounties').classList.add('is-active');;
     if (typeof initBounties === 'function') {
       resolveLinkedIdentity().then(id => { if (id) initBounties(currentServerId, currentGuildId, id); });
     }
   } else if (section === 'emotes') {
     if (emotesTabEl) emotesTabEl.style.display = 'block';
-    document.getElementById('nav-emotes').className = 'bg-indigo-600 px-4 py-2 rounded font-semibold';
+    document.getElementById('nav-emotes').classList.add('is-active');;
     resolveLinkedIdentity().then(id => { if (id) loadEmoteStats(id); });
   }
 }
@@ -258,7 +341,7 @@ function loadDiscovery() {
   container.innerHTML = `
     <div class="text-center py-8">
       <div class="spinner border-4 border-green-600 border-t-transparent rounded-full w-12 h-12 mx-auto mb-4"></div>
-      <p class="text-gray-400">Loading your accounts...</p>
+      <div class="dzc-skeleton" style="height:1.25rem;width:220px"></div>
     </div>`;
 
   fetch(`/api/player/discover/${currentGuildId}`)
@@ -291,7 +374,7 @@ function displayMyAccounts(linked, alts) {
         <h3 class="text-base font-semibold text-green-400 mb-3">✅ Your Linked Accounts</h3>
         <div class="space-y-2">
           ${linked.map(a => `
-            <div class="bg-gray-700 p-4 rounded-lg flex items-center gap-3">
+            <div class="dzc-acct-row bg-gray-700 p-4 rounded-lg flex items-center gap-3">
               <div class="flex-1 min-w-0">
                 <div class="flex flex-wrap items-center gap-2 mb-1">
                   <span class="font-bold">${escHtml(a.gamertag)}</span>
@@ -321,7 +404,7 @@ function displayMyAccounts(linked, alts) {
         <p class="text-sm text-gray-400 mb-3">These accounts share a device with your linked account. You can link them to your profile too.</p>
         <div class="space-y-2">
           ${alts.map(a => `
-            <div class="bg-gray-700 p-4 rounded-lg flex items-center gap-3">
+            <div class="dzc-acct-row bg-gray-700 p-4 rounded-lg flex items-center gap-3">
               <div class="flex-1 min-w-0">
                 <div class="flex flex-wrap items-center gap-2 mb-1">
                   <span class="font-bold">${escHtml(a.gamertag)}</span>
@@ -356,7 +439,7 @@ function displayDiscoveredAccounts(accounts) {
   const container = document.getElementById('discovered-accounts');
 
   if (accounts.length === 0) {
-    container.innerHTML = '<p class="text-gray-400 text-center py-8">No accounts found matching that gamertag.</p>';
+    container.innerHTML = '<div class="dzc-empty"><div class="dzc-empty-title">No accounts found matching that gamertag.</div></div>';
     return;
   }
 
@@ -365,7 +448,7 @@ function displayDiscoveredAccounts(accounts) {
     const linkedToOther = account.linkedToOther;
 
     return `
-      <div class="bg-gray-700 p-4 rounded-lg flex items-center gap-3">
+      <div class="dzc-acct-row bg-gray-700 p-4 rounded-lg flex items-center gap-3">
         <div class="flex-1 min-w-0">
           <div class="flex flex-wrap items-center gap-2 mb-1">
             <span class="font-bold">${escHtml(account.gamertag)}</span>
@@ -398,17 +481,21 @@ function displayDiscoveredAccounts(accounts) {
 function searchGamertag() {
   const gamertag = document.getElementById('searchGamertag').value.trim();
   if (!gamertag || !currentGuildId) return;
-
+  
   fetch(playerApiUrl('/api/player/search', { guildId: currentGuildId, gamertag }))
     .then(res => res.json())
     .then(data => {
       if (data.success) {
         displayDiscoveredAccounts(data.accounts);
+      } else {
+        document.getElementById('discovered-accounts').innerHTML =
+          `<p class="text-red-400 text-center py-4">❌ ${escHtml(data.error || 'Failed to search accounts. Please try again.')}</p>`;
       }
     })
     .catch(err => {
       console.error('Error searching:', err);
-      alert('Failed to search accounts');
+      document.getElementById('discovered-accounts').innerHTML =
+        '<p class="text-red-400 text-center py-4">Failed to search accounts. Please check your connection and try again.</p>';
     });
 }
 
@@ -419,7 +506,7 @@ function showLinkModal(accountId, gamertag, platform, serverId) {
   safeGamertag.textContent = gamertag;
   const safePlatform = document.createElement('div');
   safePlatform.textContent = platform;
-
+  
   document.getElementById('linkAccountDetails').innerHTML = `
     <p class="font-semibold">${safeGamertag.innerHTML}</p>
     <p class="text-sm text-gray-400">Platform: ${safePlatform.innerHTML}</p>
@@ -435,7 +522,7 @@ function closeLinkModal() {
 
 function confirmLink() {
   if (!selectedAccount || !selectedServer || !currentGuildId) return;
-
+  
   fetchWithCsrf('/api/accounts/link', {
     method: 'POST',
     body: JSON.stringify({
@@ -451,8 +538,14 @@ function confirmLink() {
         .map(step => `${step.position}. ${step.label}`)
         .join('\n');
       alert(
-        `Ownership check required on ${data.serverName}:\n\n${steps}\n\n` +
-        'Perform these emotes in order, wait for the next log sync, then press Link again. The challenge expires in 30 minutes.'
+        `Ownership check required on ${data.serverName}:\n\n` +
+        `Perform these emotes, in order, while playing on that server as this gamertag:\n${steps}\n\n` +
+        'How it works:\n' +
+        `1. Join ${data.serverName} in-game.\n` +
+        '2. Perform the emotes above, one after the other.\n' +
+        '3. We detect your emotes from the server log, which is downloaded automatically — allow up to about 15 minutes.\n' +
+        '4. Come back here and press "Confirm" again; your link completes automatically.\n\n' +
+        'The challenge expires in 30 minutes.'
       );
     } else if (data.success) {
       closeLinkModal();
@@ -463,7 +556,10 @@ function confirmLink() {
       currentIdentityId = null; // reset so resolveLinkedIdentity re-fetches
       resolveLinkedIdentity();
       loadDiscovery();
-      alert('Account linked successfully!');
+      alert(
+        (data.message || 'Account linked successfully!') +
+        (data.roleWarning ? '\n\n' + data.roleWarning : '')
+      );
     } else {
       alert('Failed to link account: ' + (data.error || 'Unknown error'));
     }
@@ -474,67 +570,90 @@ function confirmLink() {
 }
 
 function loadStats() {
-  if (!currentGuildId) return;
+  if (!currentGuildId) return Promise.resolve();
+  
+  // Community baseline for the comparison deltas: same endpoint the
+  // Leaderboard tab uses (top-50 average is the baseline — no new data).
+  const averages = fetch(playerApiUrl(`/api/player/leaderboard/${currentGuildId}`, { sortBy: 'playtime' }))
+    .then(res => res.json())
+    .then(data => {
+      if (data.success && Array.isArray(data.leaderboard) && data.leaderboard.length > 0) {
+        const n = data.leaderboard.length;
+        communityAverages = {
+          kills: data.leaderboard.reduce((sum, p) => sum + (p.total_kills || 0), 0) / n,
+          deaths: data.leaderboard.reduce((sum, p) => sum + (p.total_deaths || 0), 0) / n,
+          playtime: data.leaderboard.reduce((sum, p) => sum + (p.total_playtime || 0), 0) / n,
+        };
+      }
+    })
+    .catch(() => { /* baseline is optional — stats render without it */ });
 
-  fetch(playerApiUrl('/api/player/stats', { guildId: currentGuildId }))
+  return fetch(playerApiUrl('/api/player/stats', { guildId: currentGuildId }))
     .then(res => res.json())
     .then(data => {
       if (data.success) {
-        displayStats(data.accounts);
-      } else {
-        document.getElementById('stats-container').innerHTML =
-          `<p class="text-red-400 text-center py-4">${escHtml(data.error || 'Failed to load stats')}</p>`;
+        // Render after the baseline resolves so the delta chips are present
+        // on first paint.
+        return averages.then(() => displayStats(data.accounts));
       }
+      document.getElementById('stats-container').innerHTML =
+        `<p class="text-red-400 text-center py-4">${escHtml(data.error || 'Failed to load stats')}</p>`;
     })
     .catch(err => {
       console.error('Error loading stats:', err);
-      document.getElementById('stats-container').innerHTML =
+      document.getElementById('stats-container').innerHTML = 
         '<p class="text-red-400 text-center py-4">Failed to load stats</p>';
     });
 }
 
 function displayStats(accounts) {
   if (accounts.length === 0) {
-    document.getElementById('stats-container').innerHTML =
-      '<p class="text-gray-400 text-center py-8">No linked accounts found. Link an account first.</p>';
+    document.getElementById('stats-container').innerHTML = 
+      '<div class="dzc-empty"><div class="dzc-empty-title">No linked accounts found. Link an account first.</div></div>';
     document.getElementById('session-section').style.display = 'none';
+    statsLoadedForIdentity = null;
     return;
   }
 
   const html = accounts.map(account => {
-    const kd = account.total_deaths > 0
-      ? (account.total_kills / account.total_deaths).toFixed(2)
-      : (account.total_kills || 0).toFixed(2);
-    const kdColor = kd >= 2 ? 'text-green-400' : kd >= 1 ? 'text-yellow-400' : 'text-red-400';
+    const kills = account.total_kills || 0;
+    const deaths = account.total_deaths || 0;
+    const kd = deaths > 0 ? (kills / deaths) : kills;
+    const kdClass = kd >= 2 ? 'is-good' : kd >= 1 ? 'is-ok' : 'is-bad';
+    const avg = communityAverages || {};
     const serverName = account.server_names ? account.server_names.split(',')[0] : '';
     return `
-    <div class="bg-gray-700 p-6 rounded-lg mb-4">
-      <div class="flex items-center justify-between mb-4">
+    <div class="dzc-stat-card">
+      <div class="dzc-stat-card-head">
         <div>
-          <h3 class="text-2xl font-bold">${account.gamertag}</h3>
-          <p class="text-gray-400">${account.platform} • ${serverName}</p>
+          <h3 class="dzc-stat-card-tag">${escHtml(account.gamertag)}</h3>
+          <p class="dzc-stat-card-sub">${escHtml(account.platform)} • ${escHtml(serverName)}</p>
         </div>
-        <span class="text-gray-400">${account.guild_name || ''}</span>
+        <span class="dzc-stat-card-guild">${escHtml(account.guild_name || '')}</span>
       </div>
-      <div class="grid grid-cols-4 gap-4">
-        <div class="text-center">
-          <p class="text-3xl font-bold text-green-400">${account.total_kills || 0}</p>
-          <p class="text-sm text-gray-400">Kills</p>
+      <dl class="dzc-stat-grid">
+        <div class="dzc-stat">
+          <p class="dzc-stat-num is-kills">${kills}</p>
+          <p class="dzc-stat-label">Kills</p>
+          ${deltaChip(kills, avg.kills, true)}
         </div>
-        <div class="text-center">
-          <p class="text-3xl font-bold text-red-400">${account.total_deaths || 0}</p>
-          <p class="text-sm text-gray-400">Deaths</p>
+        <div class="dzc-stat">
+          <p class="dzc-stat-num is-deaths">${deaths}</p>
+          <p class="dzc-stat-label">Deaths</p>
+          ${deltaChip(deaths, avg.deaths, false)}
         </div>
-        <div class="text-center">
-          <p class="text-3xl font-bold text-blue-400">${formatPlaytime(account.total_playtime)}</p>
-          <p class="text-sm text-gray-400">Playtime</p>
+        <div class="dzc-stat">
+          <p class="dzc-stat-num is-playtime">${formatPlaytime(account.total_playtime)}</p>
+          <p class="dzc-stat-label">Playtime</p>
+          ${deltaChip(account.total_playtime || 0, avg.playtime, true)}
         </div>
-        <div class="text-center">
-          <p class="text-3xl font-bold ${kdColor}">${kd}</p>
-          <p class="text-sm text-gray-400">K/D Ratio</p>
+        <div class="dzc-stat">
+          <p class="dzc-stat-num is-kd ${kdClass}">${kd.toFixed(2)}</p>
+          <p class="dzc-stat-label">K/D Ratio</p>
+          ${deltaChip(kd, avg.kills && avg.deaths ? (avg.kills / Math.max(1, avg.deaths)) : null, true)}
         </div>
-      </div>
-      ${account.lastSeenAt ? `<p class="text-sm text-gray-400 mt-4">Last seen: ${new Date(account.lastSeenAt).toLocaleString()}</p>` : ''}
+      </dl>
+      ${account.lastSeenAt ? `<p class="dzc-stat-lastseen">Last seen: ${new Date(account.lastSeenAt).toLocaleString()}</p>` : ''}
     </div>
   `;
   }).join('');
@@ -544,6 +663,7 @@ function displayStats(accounts) {
   // Load session data for first linked account
   if (accounts[0] && accounts[0].identity_id) {
     currentIdentityId = accounts[0].identity_id;
+    statsLoadedForIdentity = accounts[0].identity_id;
     currentEconomyServerId = currentServerId;
     window.currentEconomyServerId = currentEconomyServerId;
     lastUpdateTime = Date.now();
@@ -584,9 +704,9 @@ function displayStats(accounts) {
 
 function loadLeaderboard() {
   if (!currentGuildId) return;
-
+  
   const sortBy = document.getElementById('sortBy').value;
-
+  
   fetch(playerApiUrl(`/api/player/leaderboard/${currentGuildId}`, { sortBy }))
     .then(res => res.json())
     .then(data => {
@@ -599,51 +719,56 @@ function loadLeaderboard() {
     })
     .catch(err => {
       console.error('Error loading leaderboard:', err);
-      document.getElementById('leaderboard-container').innerHTML =
+      document.getElementById('leaderboard-container').innerHTML = 
         '<p class="text-red-400 text-center py-4">Failed to load leaderboard</p>';
     });
 }
 
 function displayLeaderboard(leaderboard) {
   if (leaderboard.length === 0) {
-    document.getElementById('leaderboard-container').innerHTML =
-      '<p class="text-gray-400 text-center py-8">No leaderboard data available.</p>';
+    document.getElementById('leaderboard-container').innerHTML = 
+      '<div class="dzc-empty"><div class="dzc-empty-title">No leaderboard data available.</div></div>';
     return;
   }
 
+  // Reference table contract (card 5) — sticky header, right-aligned tabular
+  // numerics, hover state, stacked card rows at <=640px via td[data-label].
   const html = `
-    <div class="overflow-x-auto">
-      <table class="w-full">
-        <thead class="bg-gray-700">
+    <div class="dzc-table-wrap">
+      <table class="dzc-table">
+        <thead>
           <tr>
-            <th class="p-3 text-left">Rank</th>
-            <th class="p-3 text-left">Player</th>
-            <th class="p-3 text-left">Gamertag</th>
-            <th class="p-3 text-left">Kills</th>
-            <th class="p-3 text-left">Deaths</th>
-            <th class="p-3 text-left">Playtime</th>
+            <th scope="col" data-label="Rank">Rank</th>
+            <th scope="col" data-label="Player">Player</th>
+            <th scope="col" data-label="Gamertag">Gamertag</th>
+            <th scope="col" class="dzc-num" data-label="Kills">Kills</th>
+            <th scope="col" class="dzc-num" data-label="Deaths">Deaths</th>
+            <th scope="col" class="dzc-num" data-label="Playtime">Playtime</th>
           </tr>
         </thead>
         <tbody>
-          ${leaderboard.map((player, index) => `
-            <tr class="border-b border-gray-700 hover:bg-gray-750">
-              <td class="p-3 font-bold">
-                ${index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : `#${index + 1}`}
-              </td>
-              <td class="p-3">
+          ${leaderboard.map((player, index) => {
+            const isMe = currentIdentityId && Number(player.identity_id) === Number(currentIdentityId);
+            const avatarUrl = safeAvatarUrl(player.userId, player.avatar);
+            const rank = index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : '#' + (index + 1);
+            return `
+            <tr class="dzc-row${isMe ? ' is-selected' : ''}">
+              <td data-label="Rank">${rank}${isMe ? ' <span class="dzc-badge">YOU</span>' : ''}</td>
+              <td data-label="Player">
                 ${player.discordUsername ? `
-                  <div class="flex items-center gap-2">
-                    ${player.avatar ? `<img src="https://cdn.discordapp.com/avatars/${player.userId}/${player.avatar}.png" class="w-8 h-8 rounded-full" />` : ''}
-                    <span>${player.discordUsername}</span>
-                  </div>
-                ` : '-'}
+                  <span class="flex items-center gap-2">
+                    ${avatarUrl ? `<img src="${avatarUrl}" class="w-8 h-8 rounded-full" alt="" />` : ''}
+                    <span>${escHtml(player.discordUsername)}${isMe ? ' (you)' : ''}</span>
+                  </span>
+                ` : '—'}
               </td>
-              <td class="p-3">${player.gamertag}</td>
-              <td class="p-3 text-green-400 font-bold">${player.total_kills || 0}</td>
-              <td class="p-3 text-red-400">${player.total_deaths || 0}</td>
-              <td class="p-3 text-blue-400">${formatPlaytime(player.total_playtime)}</td>
+              <td data-label="Gamertag">${escHtml(player.gamertag)}</td>
+              <td class="dzc-num" data-label="Kills">${player.total_kills || 0}</td>
+              <td class="dzc-num" data-label="Deaths">${player.total_deaths || 0}</td>
+              <td class="dzc-num" data-label="Playtime">${formatPlaytime(player.total_playtime)}</td>
             </tr>
-          `).join('')}
+          `;
+          }).join('')}
         </tbody>
       </table>
     </div>
@@ -668,32 +793,33 @@ async function loadSessionStats(identityId) {
 
     if (!data.success || data.stats.length === 0) {
       document.getElementById('session-stats-container').innerHTML =
-        '<p class="text-gray-400">No session data available yet. Play on a server and scan logs.</p>';
+        '<div class="dzc-empty"><div class="dzc-empty-title">No session data available yet. Play on a server and scan logs.</div></div>';
       return;
     }
 
-    let html = '<div class="grid grid-cols-1 md:grid-cols-2 gap-4">';
+    // Overall average session length across servers (delta baseline).
+    const totalLen = data.stats.reduce((sum, s) => sum + (s.avg_session_length || 0), 0);
+    const overallAvg = data.stats.length > 0 ? totalLen / data.stats.length : 0;
 
-    for (const stat of data.stats) {
+    const html = data.stats.map(stat => {
       const totalHours = Math.floor((stat.total_playtime || 0) / 3600);
       const avgMinutes = Math.floor((stat.avg_session_length || 0) / 60);
       const timeSince = stat.last_played ? getTimeSince(new Date(stat.last_played)) : 'Never';
-
-      html += `
-        <div class="bg-gray-600 p-4 rounded-lg">
-          <h5 class="font-bold mb-2">${stat.server_name}</h5>
+      return `
+        <div class="dzc-session-card">
+          <h5>${escHtml(stat.server_name)}</h5>
           <div class="grid grid-cols-2 gap-2 text-sm">
-            <div><span class="text-gray-400">Sessions:</span> <span class="font-semibold">${stat.total_sessions}</span></div>
-            <div><span class="text-gray-400">Playtime:</span> <span class="font-semibold">${totalHours}h</span></div>
-            <div><span class="text-gray-400">Avg Session:</span> <span class="font-semibold">${avgMinutes} min</span></div>
-            <div><span class="text-gray-400">Last Played:</span> <span class="font-semibold">${timeSince}</span></div>
+            <div><span class="dzc-muted">Sessions:</span> <span class="font-semibold tabular-nums">${stat.total_sessions}</span></div>
+            <div><span class="dzc-muted">Playtime:</span> <span class="font-semibold tabular-nums">${totalHours}h</span></div>
+            <div><span class="dzc-muted">Avg Session:</span> <span class="font-semibold tabular-nums">${avgMinutes} min</span>${deltaChip(stat.avg_session_length || 0, overallAvg, true)}</div>
+            <div><span class="dzc-muted">Last Played:</span> <span class="font-semibold">${timeSince}</span></div>
           </div>
         </div>
       `;
-    }
+    }).join('');
 
-    html += '</div>';
-    document.getElementById('session-stats-container').innerHTML = html;
+    document.getElementById('session-stats-container').innerHTML =
+      `<div class="grid grid-cols-1 md:grid-cols-2 gap-4">${html}</div>`;
   } catch (error) {
     console.error('Error loading session stats:', error);
   }
@@ -709,36 +835,44 @@ async function loadSessionHistory(identityId, limit = 10) {
 
     if (!data.success || data.sessions.length === 0) {
       document.getElementById('session-history-container').innerHTML =
-        '<p class="text-gray-400">No sessions found.</p>';
+        '<div class="dzc-empty"><div class="dzc-empty-title">No sessions found.</div></div>';
       return;
     }
 
+    const spark = sessionSparkline(data.sessions.map(s => s.duration));
+
     let html = `
       <h5 class="font-bold mb-2">Session History</h5>
-      <div class="overflow-x-auto">
-        <table class="w-full text-sm">
-          <thead class="bg-gray-600">
+      ${spark}
+      <p class="dzc-spark-label">Duration of the last ${data.sessions.length} sessions (oldest → newest)</p>
+      <div class="dzc-table-wrap">
+        <table class="dzc-table">
+          <thead>
             <tr>
-              <th class="p-2 text-left">Server</th>
-              <th class="p-2 text-left">Login</th>
-              <th class="p-2 text-left">Logout</th>
-              <th class="p-2 text-left">Duration</th>
+              <th scope="col" data-label="Server">Server</th>
+              <th scope="col" data-label="Login">Login</th>
+              <th scope="col" data-label="Logout">Logout</th>
+              <th scope="col" class="dzc-num" data-label="Duration">Duration</th>
             </tr>
           </thead>
           <tbody>
     `;
 
     for (const session of data.sessions) {
-      const loginTime = session.loginAt ? new Date(session.loginAt).toLocaleString() : '-';
-      const logoutTime = session.logoutAt ? new Date(session.logoutAt).toLocaleString() : 'In progress';
+      // API returns snake_case columns (login_at/logout_at); the camelCase
+      // fallback keeps older payload shapes working.
+      const loginRaw = session.login_at !== undefined ? session.login_at : session.loginAt;
+      const logoutRaw = session.logout_at !== undefined ? session.logout_at : session.logoutAt;
+      const loginTime = loginRaw ? new Date(loginRaw).toLocaleString() : '-';
+      const logoutTime = logoutRaw ? new Date(logoutRaw).toLocaleString() : 'In progress';
       const duration = session.duration ? formatDuration(session.duration) : '-';
 
       html += `
-        <tr class="border-b border-gray-600">
-          <td class="p-2">${session.server_name}</td>
-          <td class="p-2">${loginTime}</td>
-          <td class="p-2">${logoutTime}</td>
-          <td class="p-2">${duration}</td>
+        <tr class="dzc-row">
+          <td data-label="Server">${escHtml(session.server_name)}</td>
+          <td data-label="Login">${loginTime}</td>
+          <td data-label="Logout">${logoutTime}</td>
+          <td class="dzc-num" data-label="Duration">${duration}</td>
         </tr>
       `;
     }
@@ -772,14 +906,14 @@ async function loadCharacterHealth(identityId) {
 
     for (const health of data.healthStatus) {
       const statusIcon = getStatusIcon(health.status);
-      const statusText = health.status.charAt(0).toUpperCase() + health.status.slice(1);
+      const statusText = escHtml(health.status.charAt(0).toUpperCase() + health.status.slice(1));
       const hpPercent = Math.min(100, (health.currentHP / health.maxHP) * 100);
       const hpColor = getHPColor(hpPercent);
       const timeSince = health.lastUpdated ? getTimeSince(new Date(health.lastUpdated)) : 'Unknown';
 
       html += `
         <div class="bg-gray-600 p-4 rounded-lg">
-          <h5 class="font-bold mb-2">${health.serverName}</h5>
+          <h5 class="font-bold mb-2">${escHtml(health.serverName)}</h5>
           <div class="mb-2">
             <span class="text-lg">${statusIcon}</span>
             <strong class="ml-1">${statusText}</strong>
@@ -905,7 +1039,7 @@ async function loadTopThreats(identityId, limit = 5) {
 
     if (!data.success || data.topThreats.length === 0) {
       document.getElementById('top-threats-container').innerHTML =
-        '<p class="text-gray-400">No threat data available yet.</p>';
+        '<div class="dzc-empty"><div class="dzc-empty-title">No threat data available yet.</div></div>';
       return;
     }
 
@@ -1007,7 +1141,7 @@ async function loadWeaponCategories(identityId) {
 
     if (!data.success || data.categories.length === 0) {
       document.getElementById('weapon-category-container').innerHTML =
-        '<p class="text-gray-400">No weapon category data available.</p>';
+        '<div class="dzc-empty"><div class="dzc-empty-title">No weapon category data available.</div></div>';
       return;
     }
 
@@ -1059,7 +1193,7 @@ async function loadWeaponBreakdown(identityId, limit = 20) {
 
     if (!data.success || data.weapons.length === 0) {
       document.getElementById('weapon-breakdown-container').innerHTML =
-        '<p class="text-gray-400">No weapon data available.</p>';
+        '<div class="dzc-empty"><div class="dzc-empty-title">No weapon data available.</div></div>';
       return;
     }
 
@@ -1143,7 +1277,7 @@ async function loadBodyPartStats(identityId) {
 
     if (!data.success || data.bodyParts.length === 0) {
       document.getElementById('bodypart-stats-container').innerHTML =
-        '<p class="text-gray-400">No body part data available yet.</p>';
+        '<div class="dzc-empty"><div class="dzc-empty-title">No body part data available yet.</div></div>';
       return;
     }
 
@@ -1356,7 +1490,8 @@ function backToGuilds() {
   currentIdentityId = null;
   currentEconomyServerId = null;
   window.currentEconomyServerId = null;
-  document.getElementById('playerNav').style.display = 'none';
+  const playerNavEl = document.getElementById('playerNav');
+  if (playerNavEl) playerNavEl.style.display = 'none';
   showSection('guilds');
   loadGuilds();
 }
@@ -1458,7 +1593,7 @@ async function loadTerritoryStats(identityId) {
 
     if (!data.success || data.stats.length === 0) {
       document.getElementById('territory-stats-container').innerHTML =
-        '<p class="text-gray-400">No territory events found. Build something!</p>';
+        '<div class="dzc-empty"><div class="dzc-empty-title">No territory events found. Build something!</div></div>';
       return;
     }
 
@@ -1561,7 +1696,7 @@ async function loadTerritoryEvents(identityId, limit = 20) {
 
     if (!data.success || data.territoryEvents.length === 0) {
       document.getElementById('territory-events-container').innerHTML =
-        '<p class="text-gray-400">No recent territory events.</p>';
+        '<div class="dzc-empty"><div class="dzc-empty-title">No recent territory events.</div></div>';
       return;
     }
 
@@ -1621,7 +1756,7 @@ async function loadFavoriteWeapons(identityId, limit = 5) {
 
     if (!data.success || data.weapons.length === 0) {
       document.getElementById('favorite-weapons-container').innerHTML =
-        '<p class="text-gray-400">No kills tracked yet.</p>';
+        '<div class="dzc-empty"><div class="dzc-empty-title">No kills tracked yet.</div></div>';
       return;
     }
 
@@ -1658,7 +1793,7 @@ async function loadRecentKills(identityId, limit = 10) {
 
     if (!data.success || data.kills.length === 0) {
       document.getElementById('recent-kills-container').innerHTML =
-        '<p class="text-gray-400">No kills tracked yet.</p>';
+        '<div class="dzc-empty"><div class="dzc-empty-title">No kills tracked yet.</div></div>';
       return;
     }
 
@@ -1707,7 +1842,7 @@ async function loadRecentDeaths(identityId, limit = 10) {
 
     if (!data.success || data.deaths.length === 0) {
       document.getElementById('recent-deaths-container').innerHTML =
-        '<p class="text-gray-400">No deaths tracked yet.</p>';
+        '<div class="dzc-empty"><div class="dzc-empty-title">No deaths tracked yet.</div></div>';
       return;
     }
 
@@ -1756,7 +1891,7 @@ async function loadPlaytimeBreakdown(identityId) {
 
     if (!data.success || data.breakdown.length === 0) {
       document.getElementById('playtime-breakdown-container').innerHTML =
-        '<p class="text-gray-400">No session data available yet.</p>';
+        '<div class="dzc-empty"><div class="dzc-empty-title">No session data available yet.</div></div>';
       return;
     }
 
@@ -1801,7 +1936,7 @@ async function loadDeathStats(identityId) {
 
     if (!data.success) {
       document.getElementById('death-stats-container').innerHTML =
-        '<p class="text-gray-400">No survival data available yet.</p>';
+        '<div class="dzc-empty"><div class="dzc-empty-title">No survival data available yet.</div></div>';
       return;
     }
 
@@ -1823,7 +1958,7 @@ async function loadDeathStats(identityId) {
       <div>
         <h4 class="text-lg font-bold mb-3">☠️ Cause of Death</h4>`;
     if (totalTrackedDeaths === 0) {
-      html += '<p class="text-gray-400 text-sm">No deaths recorded yet.</p>';
+      html += '<div class="dzc-empty"><div class="dzc-empty-title">No deaths recorded yet.</div></div>';
     } else {
       for (const row of deathBreakdown) {
         const meta = deathTypeLabels[row.deathType] || { label: row.deathType, icon: '❓' };
@@ -1942,7 +2077,7 @@ async function loadEmoteStats(identityId) {
     // Top emotes bar chart
     const topEl = document.getElementById('emotes-top-container');
     if (!data.topEmotes || data.topEmotes.length === 0) {
-      topEl.innerHTML = '<p class="text-gray-400">No emotes recorded yet.</p>';
+      topEl.innerHTML = '<div class="dzc-empty"><div class="dzc-empty-title">No emotes recorded yet.</div></div>';
     } else {
       const maxCnt = data.topEmotes[0].count || 1;
       topEl.innerHTML = `<p class="text-sm text-gray-400 mb-3">Total emotes: <strong>${data.total.toLocaleString()}</strong></p>` +
@@ -2079,7 +2214,7 @@ async function loadPerformanceTimeline(identityId, days = 30) {
 
     if (!data.success || data.timeline.length === 0) {
       document.getElementById('performance-container').innerHTML =
-        '<p class="text-gray-400">No kill data available for the selected period.</p>';
+        '<div class="dzc-empty"><div class="dzc-empty-title">No kill data available for the selected period.</div></div>';
       return;
     }
 
@@ -2191,7 +2326,7 @@ async function loadRecentTransactions(identityId, limit = 10) {
 
     const container = document.getElementById('economy-transactions');
     if (!data.success || data.transactions.length === 0) {
-      container.innerHTML = '<p class="text-gray-400 text-sm">No recent transactions.</p>';
+      container.innerHTML = '<div class="dzc-empty"><div class="dzc-empty-title">No recent transactions.</div></div>';
       return;
     }
 
@@ -2434,7 +2569,7 @@ function displaySearchResults(players) {
   if (!resultsEl) return;
 
   if (!players || players.length === 0) {
-    resultsEl.innerHTML = '<p class="text-gray-400 text-sm p-3">No players found.</p>';
+    resultsEl.innerHTML = '<div class="dzc-empty"><div class="dzc-empty-title">No players found.</div></div>';
     resultsEl.classList.remove('hidden');
     return;
   }
@@ -2579,7 +2714,7 @@ async function loadTransferHistory(identityId, direction = 'all') {
   const container = document.getElementById('transferHistoryList');
   if (!container) return;
 
-  container.innerHTML = '<p class="text-gray-400 text-sm">Loading...</p>';
+  container.innerHTML = '<div class="dzc-skeleton" style="height:1.25rem;width:220px"></div>';
 
   try {
     const response = await fetch(`/api/economy/player/${identityId}/transfers?serverId=${encodeURIComponent(currentEconomyServerId)}&direction=${direction}&limit=50`);
@@ -2601,7 +2736,7 @@ async function loadTransferHistory(identityId, direction = 'all') {
       : all;
 
     if (items.length === 0) {
-      container.innerHTML = '<p class="text-gray-400 text-sm">No transfers found.</p>';
+      container.innerHTML = '<div class="dzc-empty"><div class="dzc-empty-title">No transfers found.</div></div>';
       return;
     }
 
@@ -2883,7 +3018,7 @@ async function loadPlayerTransactions(identityId, filter = 'all', limit = 20, of
   if (!container) return;
 
   if (offset === 0) {
-    container.innerHTML = '<p class="text-gray-400 text-sm text-center py-4">Loading...</p>';
+    container.innerHTML = '<div class="dzc-skeleton" style="height:1.25rem;width:220px"></div>';
   }
 
   try {
@@ -2900,7 +3035,7 @@ async function loadPlayerTransactions(identityId, filter = 'all', limit = 20, of
 
     if (!data.success || data.transactions.length === 0) {
       if (offset === 0) {
-        container.innerHTML = '<p class="text-gray-400 text-sm text-center py-4">No transactions found.</p>';
+        container.innerHTML = '<div class="dzc-empty"><div class="dzc-empty-title">No transactions found.</div></div>';
       }
       if (loadMoreBtn) loadMoreBtn.classList.add('hidden');
       return;
@@ -3035,7 +3170,7 @@ async function loadLeaderboardPreview(identityId) {
     const symbol = currentEconomyData?.currency?.symbol || '$';
 
     if (!data.top10 || data.top10.length === 0) {
-      container.innerHTML = '<p class="text-gray-400 text-sm text-center py-4">No leaderboard data available.</p>';
+      container.innerHTML = '<div class="dzc-empty"><div class="dzc-empty-title">No leaderboard data available.</div></div>';
       return;
     }
 
@@ -3339,15 +3474,23 @@ document.addEventListener('DOMContentLoaded', function() {
   document.getElementById('nav-guilds').addEventListener('click', function() {
     showSection('guilds');
   });
-
+  
   document.getElementById('nav-discovery').addEventListener('click', function() {
     showSection('discovery');
   });
-
+  
   document.getElementById('nav-stats').addEventListener('click', function() {
     showSection('stats');
   });
-
+  
+  // Stats sub-sections (card 7/9)
+  Object.keys(STAT_SUBSECTIONS).forEach(section => {
+    const btn = document.getElementById('nav-' + section);
+    if (btn) btn.addEventListener('click', function() {
+      showSection(section);
+    });
+  });
+  
   document.getElementById('nav-leaderboard').addEventListener('click', function() {
     showSection('leaderboard');
   });
@@ -3400,7 +3543,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
   // Search gamertag button and Enter key
   document.getElementById('searchGamertagBtn').addEventListener('click', searchGamertag);
-
+  
   document.getElementById('searchGamertag').addEventListener('keypress', function(e) {
     if (e.key === 'Enter') {
       searchGamertag();
@@ -3423,14 +3566,25 @@ document.addEventListener('DOMContentLoaded', function() {
   setupEconomyTabButtons();
 
   // Event delegation for dynamically generated guild cards
-  document.getElementById('guilds-container').addEventListener('click', function(e) {
+  // (click + keyboard: cards are role="button" tabindex="0").
+  function activateGuildCard(guildCard) {
+    const guildId = guildCard.getAttribute('data-guild-id');
+    const guildName = guildCard.getAttribute('data-guild-name');
+    const serverId = guildCard.getAttribute('data-server-id');
+    const serverName = guildCard.getAttribute('data-server-name');
+    selectGuild(guildId, guildName, serverId, serverName);
+  }
+  const guildsContainer = document.getElementById('guilds-container');
+  guildsContainer.addEventListener('click', function(e) {
+    const guildCard = e.target.closest('.guild-card');
+    if (guildCard) activateGuildCard(guildCard);
+  });
+  guildsContainer.addEventListener('keydown', function(e) {
+    if (e.key !== 'Enter' && e.key !== ' ') return;
     const guildCard = e.target.closest('.guild-card');
     if (guildCard) {
-      const guildId = guildCard.getAttribute('data-guild-id');
-      const guildName = guildCard.getAttribute('data-guild-name');
-      const serverId = guildCard.getAttribute('data-server-id');
-      const serverName = guildCard.getAttribute('data-server-name');
-      selectGuild(guildId, guildName, serverId, serverName);
+      e.preventDefault();
+      activateGuildCard(guildCard);
     }
   });
 });

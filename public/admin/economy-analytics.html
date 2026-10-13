@@ -2,7 +2,9 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Economy Analytics - DayZ Dashboard</title>
+  <link rel="stylesheet" href="/css/theme.css">
   <link rel="stylesheet" href="/css/tailwind.css">
   <style>
     @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
@@ -23,19 +25,6 @@
       </div>
     </div>
 
-    <!-- Admin Navigation -->
-    <nav class="bg-gray-800 rounded-lg p-4 mb-6">
-      <div class="flex gap-2 flex-wrap">
-        <a href="/admin" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">Dashboard</a>
-        <a href="/admin/guilds" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">Discord Communities</a>
-        <a href="/admin/guilds-approval" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">Guild Approval</a>
-        <a href="/admin/servers" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">All Servers</a>
-        <a href="/admin/users" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">Users</a>
-        <a href="/admin/audit" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">Audit Log</a>
-        <a href="/admin/supply-monitor" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">💎 Supply Monitor</a>
-        <a href="/admin/economy-analytics" class="bg-orange-600 px-4 py-2 rounded font-semibold">📊 Analytics</a>
-      </div>
-    </nav>
 
     <!-- Guild Selector + Controls -->
     <div class="bg-gray-800 p-6 rounded-lg shadow-lg mb-6">

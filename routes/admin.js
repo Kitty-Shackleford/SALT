@@ -162,7 +162,7 @@ router.get('/guilds', ensureAdmin, async (req, res) => {
   const db = req.app.locals.db;
 
   const query = `
-    SELECT
+    SELECT 
       g.*,
       g.discord_guild_id as guild_id,
       g.name as "guildName",
@@ -462,7 +462,7 @@ router.get('/audit', ensureAdmin, async (req, res) => {
   }
 
   let query = `
-    SELECT
+    SELECT 
       al.*,
       u.username,
       u.avatar,
@@ -515,7 +515,7 @@ router.get('/guilds/pending', ensureAdmin, async (req, res) => {
   const db = req.app.locals.db;
 
   const query = `
-    SELECT
+    SELECT 
       g.*,
       g.discord_guild_id as guild_id,
       g.name as "guildName",
@@ -639,8 +639,8 @@ router.post('/guilds/:guildId/enable', ensureAdmin, async (req, res) => {
     }
 
     const updateResult = await db.run(
-      `UPDATE guilds
-       SET status = 'approved',
+      `UPDATE guilds 
+       SET status = 'approved', 
            approved_at = CURRENT_TIMESTAMP,
            approved_by = ?,
            disabled_at = NULL,

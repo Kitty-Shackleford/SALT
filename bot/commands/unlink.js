@@ -30,7 +30,7 @@ module.exports = {
     .addStringOption(option => option
       .setName('server')
       .setDescription('Nitrado service ID (required when this guild has multiple servers)')),
-
+  
   async execute(interaction) {
     await interaction.deferReply({ flags: MessageFlags.Ephemeral });
 

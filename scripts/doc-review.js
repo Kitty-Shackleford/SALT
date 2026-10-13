@@ -1,37 +1,30 @@
 #!/usr/bin/env node
 // Lightweight PR reviewer for DayZ Dashboard (Doc agent scaffold)
 
-const { execFileSync } = require('child_process');
+const { execSync } = require('child_process');
 const fs = require('fs');
 const path = require('path');
 
-function runGit(args) {
-  return execFileSync('git', args, { stdio: 'pipe' }).toString().trim();
-}
-
-const baseRef = process.env.DOC_REVIEW_BASE_SHA || 'origin/main';
-const headRef = process.env.DOC_REVIEW_HEAD_SHA || 'HEAD';
-
-try {
-  for (const [label, ref] of [['base', baseRef], ['head', headRef]]) {
-    if (process.env.GITHUB_ACTIONS && !/^[0-9a-f]{40}$/i.test(ref)) {
-      throw new Error(`${label} revision is not an immutable commit SHA`);
-    }
-    runGit(['cat-file', '-e', `${ref}^{commit}`]);
+function run(cmd) {
+  try {
+    return execSync(cmd, { stdio: 'pipe' }).toString().trim();
+  } catch (e) {
+    return '';
   }
-} catch (error) {
-  console.error(`Unable to resolve documentation review revisions: ${error.message}`);
-  process.exit(1);
 }
 
-let fileListStr;
-try {
-  fileListStr = runGit(['diff', '--name-only', `${baseRef}...${headRef}`]);
-} catch (error) {
-  console.error(`Unable to calculate documentation review diff: ${error.message}`);
-  process.exit(1);
+// Determine base ref from env (GitHub Actions sets GITHUB_BASE_REF/GITHUB_HEAD_REF)
+const baseRef = process.env.GITHUB_BASE_REF || 'origin/main';
+const headRef = process.env.GITHUB_HEAD_REF || 'HEAD';
+
+// Ensure refs are available
+if (baseRef.startsWith('origin/') === false && baseRef !== 'origin/main') {
+  try { run(`git fetch origin ${baseRef} --depth=1`); } catch (e) {}
 }
 
+// Get changed files between base and head
+let diffCmd = `git diff --name-only ${baseRef}...${headRef}`;
+const fileListStr = run(diffCmd);
 if (!fileListStr) {
   console.log('No changed files detected.');
   process.exit(0);
@@ -43,29 +36,64 @@ console.log(`Doc: reviewing ${files.length} changed files`);
 let issues = [];
 
 files.forEach(file => {
-  // Only review files that still exist in the checked-out tree.
+  // only review files that still exist in tree
   if (!fs.existsSync(file)) return;
   const content = fs.readFileSync(file, 'utf8');
-  const basename = path.basename(file);
-  const isDocumentation = file.endsWith('.md') || file.endsWith('.html');
-  const isPrivateEnvironmentFile = /^\.env(?:\.|$)/.test(basename)
-    && !/\.example$/.test(basename);
 
-  // Documentation TODOs are advisory. Code quality and secret scanning are
-  // handled by the canonical CI suite, ESLint, security:audit, and Gitleaks.
-  if (isDocumentation) {
-    const todoMatches = content.match(/\b(TODO|FIXME)\b/gi);
-    if (todoMatches) {
-      issues.push({ file, type: 'todo', message: `Found TODO/FIXME (${todoMatches.length})` });
+  // TODO/FIXME
+  const todoMatches = content.match(/\b(TODO|FIXME)\b/gi);
+  if (todoMatches) {
+    issues.push({ file, type: 'todo', message: `Found TODO/FIXME (${todoMatches.length})` });
+  }
+
+  // console.* in non-dev assets (flag JS in public/ or server code)
+  if (file.endsWith('.js') || file.endsWith('.ts')) {
+    const consoleMatches = content.match(/console\.(log|error|warn|info)\(/g);
+    if (consoleMatches) {
+      issues.push({ file, type: 'console', message: `Found console.* usages (${consoleMatches.length})` });
+    }
+
+    // AGPL header check for JS files that are added/modified (quick heuristic)
+    const firstChunk = content.slice(0, 800);
+    if (!/GNU Affero General Public License/i.test(firstChunk)) {
+      issues.push({ file, type: 'license', message: 'Missing AGPL license header in JS/TS file' });
     }
   }
 
-  // A private environment file or embedded private key is never documentation.
-  // Example files and documented environment-variable names are legitimate.
-  if (isPrivateEnvironmentFile) {
-    issues.push({ file, type: 'env_file', message: 'Private environment file must not be committed' });
+  // possible secret: 64 hex chars
+  const secretMatch = content.match(/[0-9a-fA-F]{64}/g);
+  if (secretMatch) {
+    issues.push({ file, type: 'secret', message: `Possible 64-hex secret (${secretMatch.length})` });
   }
-  if (/-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----/.test(content)) {
+
+  // eval usage
+  if (/\beval\s*\(/.test(content)) {
+    issues.push({ file, type: 'eval', message: 'Use of eval() detected' });
+  }
+
+  // child_process usage
+  if (/child_process\.(exec|execSync|spawn|spawnSync)/.test(content) || /require\(['\"]child_process['\"]\)/.test(content)) {
+    issues.push({ file, type: 'child_process', message: 'Use of child_process APIs detected' });
+  }
+
+  // .env file or dotenv usage (flag if .env file is modified or a literal .env was added)
+  if (file === '.env' || /\bdotenv\.config\(/.test(content) || /\.env['\"]/.test(content)) {
+    issues.push({ file, type: 'env_file', message: 'Reference to .env or dotenv detected; ensure secrets are not committed' });
+  }
+
+  // Hardcoded sensitive-looking env values (quick heuristic)
+  const sensitiveKeyRegex = /(?:ENCRYPTION_KEY|DISCORD_CLIENT_SECRET|DISCORD_CLIENT_ID|DISCORD_BOT_TOKEN|SESSION_SECRET)\s*[:=]\s*['\"]?([0-9A-Za-z\-_+\/=]{8,})['\"]?/g;
+  let m;
+  let foundSensitive = 0;
+  while ((m = sensitiveKeyRegex.exec(content)) !== null) {
+    foundSensitive++;
+  }
+  if (foundSensitive) {
+    issues.push({ file, type: 'sensitive_env', message: `Possible hardcoded sensitive env values (${foundSensitive})` });
+  }
+
+  // PEM/private key blocks
+  if (/-----BEGIN (RSA |)PRIVATE KEY-----/.test(content)) {
     issues.push({ file, type: 'secret', message: 'Possible private key block detected (PEM)' });
   }
 });

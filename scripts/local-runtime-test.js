@@ -47,7 +47,7 @@ try {
 
   const baseEnv = {
     ...process.env,
-    DISCORD_CLIENT_ID: '900000000000000013',
+    DISCORD_CLIENT_ID: '12345678901234567',
     DISCORD_CLIENT_SECRET: 'local-test-client-secret',
     SESSION_SECRET: 's'.repeat(32),
     ENCRYPTION_KEY: 'a'.repeat(64),
@@ -116,8 +116,8 @@ try {
   await assert.rejects(
     deployCommands({
       rest: { put: async () => { throw new Error('Discord unavailable'); } },
-      clientId: '900000000000000013',
-      guildId: '900000000000000014',
+      clientId: '12345678901234567',
+      guildId: '12345678901234568',
       commands: [],
     }),
     /Discord unavailable/,

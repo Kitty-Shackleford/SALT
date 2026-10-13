@@ -326,7 +326,7 @@ async function ensureHasServers(req, res, next) {
   const userId = req.user.id;
 
   const query = `
-    SELECT s.id
+    SELECT s.id 
     FROM servers s
     LEFT JOIN guild_roles gr ON gr.guild_id = s.guild_id AND gr.user_id = ?
     WHERE gr.role IS NOT NULL

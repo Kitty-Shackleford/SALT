@@ -19,11 +19,11 @@ function classifySchemaState(currentVersion, hasOldTables) {
  */
 async function initializeDatabase() {
   console.log('📦 Initializing database...');
-
+  
   try {
     // Initialize database connection using abstraction layer
     const db = await initDB();
-
+    
     // Detect legacy tables before reading schema-version metadata. The version
     // read creates its tracking table on fresh databases, so this order keeps
     // legacy refusal non-mutating.
@@ -39,7 +39,7 @@ async function initializeDatabase() {
     console.log(`   Current schema version: ${currentVersion}`);
     console.log(`   Target schema version: ${SCHEMA_VERSION}`);
     const schemaState = classifySchemaState(currentVersion, hasOldTables);
-
+    
     if (schemaState === 'fresh') {
       // Fresh install - create v2 schema
       console.log('✨ Fresh installation detected - creating Schema V2...\n');
@@ -60,14 +60,14 @@ async function initializeDatabase() {
         + 'Back up the database and use a separately validated upgrade process.'
       );
     }
-
+    
     // Run pending PostgreSQL migrations.
     const nativeDb = db.getNativeConnection ? db.getNativeConnection() : db;
     await runMigrationsPg(nativeDb);
 
     // Return the adapter so all callers use the unified abstraction interface
     return db;
-
+    
   } catch (error) {
     console.error('❌ Database initialization failed:', error);
     throw error;
@@ -86,14 +86,14 @@ async function checkForOldSchema(db) {
       'discord_guilds',  // Renamed to 'guilds' in v2
       'game_accounts'    // Split into players/identities/gamertags in v2
     ];
-
+    
     for (const tableName of oldTableChecks) {
       const exists = await db.tableExists(tableName);
       if (exists) {
         return true;
       }
     }
-
+    
     return false;
   } catch (error) {
     console.error('Error checking for old schema:', error);

@@ -2,7 +2,9 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Role Management - Admin Panel</title>
+  <link rel="stylesheet" href="/css/theme.css">
   <link rel="stylesheet" href="/css/tailwind.css">
   <style>
     @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
@@ -21,17 +23,6 @@
       </div>
     </div>
 
-    <!-- Admin Navigation -->
-    <nav class="bg-gray-800 rounded-lg p-4 mb-6">
-      <div class="flex gap-2 flex-wrap">
-        <a href="/admin" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">Dashboard</a>
-        <a href="/admin/guilds" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">Discord Communities</a>
-        <a href="/admin/guilds-approval" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">Guild Approval</a>
-        <a href="/admin/servers" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">All Servers</a>
-        <a href="/admin/users" class="bg-orange-600 px-4 py-2 rounded font-semibold">Users</a>
-        <a href="/admin/audit" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">Audit Log</a>
-      </div>
-    </nav>
 
     <!-- Search -->
     <div class="bg-gray-800 p-6 rounded-lg shadow-lg mb-6">
@@ -65,7 +56,7 @@
   </div>
 
   <div id="role-modal" class="hidden fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4">
-    <div class="bg-gray-800 p-6 rounded-lg shadow-xl max-w-3xl w-full max-h-[90vh] overflow-y-auto">
+    <div class="bg-gray-800 p-6 rounded-lg shadow-xl max-w-3xl w-full max-h-[90vh] overflow-y-auto" role="dialog" aria-modal="true" aria-labelledby="role-modal-title">
       <div class="flex justify-between items-center mb-4">
         <h2 class="text-2xl font-bold" id="role-modal-title">Roles</h2>
         <button id="close-role-modal" class="bg-gray-600 hover:bg-gray-700 px-3 py-2 rounded">Close</button>

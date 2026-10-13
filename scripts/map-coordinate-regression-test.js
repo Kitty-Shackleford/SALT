@@ -1,5 +1,8 @@
 'use strict';
 
+const { ensureTestEncryptionKey } = require('./lib/test-env');
+ensureTestEncryptionKey();
+
 const assert = require('assert');
 const childProcess = require('child_process');
 const fs = require('fs');
@@ -210,8 +213,8 @@ function testRenderersUseTheCentralTransformWithoutLegacyVanillaGeometry() {
     /setInterval\(function\(\) \{\s*loadFactionMapData\(currentMapName\);/,
     'faction polling must use the current terrain instead of capturing the bootstrap map');
   assert.match(standalonePlayerMap,
-    /const requestId = \+\+factionMapRequestId;[\s\S]{0,500}requestId !== factionMapRequestId \|\| mapName !== currentMapName/,
-    'stale faction requests must not repaint overlays after a map switch');
+    /const requestId = \+\+factionMapRequestId;[\s\S]{0,900}requestId === factionMapRequestId[\s\S]{0,300}context\.serverId === String\(currentServerId\)[\s\S]{0,300}context\.factionId === String\(currentFactionId\)/,
+    'stale faction requests must not repaint overlays after a map, server, guild, or faction switch');
   assert.match(standalonePlayerMap,
     /function switchMap\(mapName\)[\s\S]{0,150}exitPlacementMode\(\)/,
     'switching terrain must cancel faction marker placement before coordinates can be saved');

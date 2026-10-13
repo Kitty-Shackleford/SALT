@@ -315,6 +315,26 @@ async function reserveAndAdvanceCasinoSession(
 }
 
 /**
+ * Outcomes of settlement are persisted as player-side results only —
+ * casino_game_history.result is CHECK-constrained to ('win','loss','push')
+ * (migration 028) and is never widened. Some game resolvers emit richer
+ * labels ('blackjack' for a natural, 'split' for a split-hand aggregate)
+ * that must be normalized to the legal token that the already-computed
+ * payout implies before anything is written:
+ *   net > 0 → 'win'   (player came out ahead, e.g. a 3:2 natural)
+ *   net = 0 → 'push'  (tie, e.g. every split hand pushed)
+ *   net < 0 → 'loss'  (player came out behind, e.g. all split hands lost)
+ * Legal labels pass through unchanged; payout amounts are never touched.
+ */
+const LEGAL_SETTLEMENT_RESULTS = new Set(['win', 'loss', 'push']);
+function legalSettlementResult(result, netCents) {
+  if (LEGAL_SETTLEMENT_RESULTS.has(result)) return result;
+  if (netCents > 0) return 'win';
+  if (netCents < 0) return 'loss';
+  return 'push';
+}
+
+/**
  * Atomically settle a casino bet while holding the wallet row lock. When a
  * session binding is supplied, the same transaction locks and consumes that
  * session, making terminal settlement exactly-once.
@@ -445,6 +465,9 @@ async function settleCasinoBetInTransaction(db, {
     const newBalance = centsToAmount(newBalanceCents);
     const timestamp = new Date().toISOString();
     const sym = currencySymbol || '$';
+    // Persist only a CHECK-legal player-side result; game-specific labels
+    // ('blackjack', 'split') stay in resultData and the response payload.
+    const legalResult = legalSettlementResult(result, netCents);
     const walletUpdate = await transactionDb.run(
       `UPDATE player_wallets SET cash_on_hand = ?, last_updated = CURRENT_TIMESTAMP
        WHERE identity_id = ? AND server_id = ?`,
@@ -479,7 +502,7 @@ async function settleCasinoBetInTransaction(db, {
        (identity_id, server_id, guild_id, game_type, wager, payout, result, result_data, played_at)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [identityId, serverId, guildId, gameType, centsToDecimal(wagerCents),
-        centsToDecimal(payoutCents), result, JSON.stringify(resultData), timestamp]
+        centsToDecimal(payoutCents), legalResult, JSON.stringify(resultData), timestamp]
     );
 
     if (casinoSession) {
@@ -898,6 +921,9 @@ function totalBlackjackWager(state, handWager) {
  *   blackjack     → 2.5× wager returned (net +1.5×)
  *   push          → 1× wager returned (net 0)
  *   loss          → 0 returned (net -1×)
+ * The 'blackjack' label is kept in responses/resultData for display, but is
+ * persisted to casino_game_history as 'win' by legalSettlementResult() at the
+ * settlement boundary (the column is CHECK-constrained to win/loss/push).
  */
 function resolveBlackjack(playerCards, dealerCards) {
   const playerTotal  = handTotal(playerCards);
@@ -3287,6 +3313,10 @@ router.get('/admin-stats', ensureAuthenticated, ensureAdmin, async (req, res) =>
 module.exports = router;
 module.exports._test = {
   settleCasinoBet,
+  settleAllSplitHands,
+  resolveBlackjack,
+  resolveSplitHand,
+  legalSettlementResult,
   lockCasinoSession,
   advanceCasinoSession,
   reserveAndAdvanceCasinoSession,

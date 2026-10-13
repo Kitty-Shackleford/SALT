@@ -1,5 +1,7 @@
 'use strict';
 
+const { ensureTestEncryptionKey } = require('./lib/test-env');
+ensureTestEncryptionKey();
 const assert = require('assert');
 const fs = require('fs');
 const path = require('path');

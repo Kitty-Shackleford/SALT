@@ -962,6 +962,77 @@ async function testFactionFlagUrlValidationRejectsAttributeInjection() {
   }
 }
 
+async function testFactionMapLocksDisclosureAuthorization() {
+  const { router, restore } = await loadFactionRouter();
+  const handler = finalHandler(router, '/:guildId/:factionId/map', 'get');
+  try {
+    for (const revoked of [false, true]) {
+      let transactionUsed = false;
+      let territoryRead = false;
+      const tx = {
+        async get(sql) {
+          const query = compact(sql);
+          if (query.includes('FROM servers s') && query.includes('FOR UPDATE OF s, g')) {
+            return { id: 11, guild_id: 1 };
+          }
+          if (query.includes('FROM server_features')) {
+            return { config: JSON.stringify({ enabledFeatures: ['factionTerritories'] }) };
+          }
+          if (query.includes('FROM factions') && query.includes('FOR UPDATE')) {
+            return { id: 20, guild_id: 1 };
+          }
+          if (query.includes('SELECT spm.id AS membership_id')) {
+            return { membership_id: 44, identity_id: 88, source_link_id: 33 };
+          }
+          if (query.includes('SELECT id FROM linked_accounts')) return { id: 33 };
+          if (query.includes('SELECT id AS server_membership_id')) {
+            return revoked ? null : { server_membership_id: 44, id: 88 };
+          }
+          if (query.includes('FROM faction_members') && query.includes('FOR UPDATE')) {
+            return { id: 55, faction_id: 20, guild_id: 1, identity_id: 88, rank: 'leader' };
+          }
+          throw new Error(`Unexpected faction-map get: ${query}`);
+        },
+        async all(sql) {
+          const query = compact(sql);
+          assert.match(query, /FROM faction_territories/);
+          territoryRead = true;
+          return [{
+            id: 7, server_id: 11, guild_id: 1, faction_id: 20,
+            map_name: 'chernarusplus', pole_east: 100, pole_north: 200,
+            status: 'approved', version: 2,
+          }];
+        },
+      };
+      const db = {
+        async get(sql) {
+          assert.match(compact(sql), /SELECT id FROM guilds WHERE discord_guild_id = \?/);
+          return { id: 1 };
+        },
+        async transaction(callback) {
+          transactionUsed = true;
+          return callback(tx);
+        },
+      };
+      const req = {
+        user: { id: 9, access_token: 'fixture-token' },
+        params: { guildId: 'guild-a', factionId: '20' },
+        query: { serverId: '11', mapName: 'chernarusplus' },
+        app: { locals: { db } },
+      };
+      const res = responseRecorder();
+      await handler(req, res);
+      assert.strictEqual(transactionUsed, true, 'map disclosure must run inside a transaction');
+      assert.strictEqual(res.statusCode, revoked ? 403 : 200);
+      assert.strictEqual(territoryRead, !revoked,
+        'territory data must not be read after exact-server authorization is revoked');
+      if (!revoked) assert.strictEqual(res.body.territories.length, 1);
+    }
+  } finally {
+    restore();
+  }
+}
+
 async function run() {
   await testFactionMutationsRejectFactionFromAnotherGuild();
   await testFactionUiEscapesUntrustedValues();
@@ -979,6 +1050,7 @@ async function run() {
   await testFactionCreationPropagatesMembershipFailureFromTransaction();
   await testFactionWritesUseScopedTransactionsAndTenantColumns();
   await testFactionFlagUrlValidationRejectsAttributeInjection();
+  await testFactionMapLocksDisclosureAuthorization();
 }
 
 run()

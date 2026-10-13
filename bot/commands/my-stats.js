@@ -8,7 +8,7 @@ module.exports = {
     .addStringOption(opt => opt
       .setName('server')
       .setDescription('Nitrado service ID (required when this guild has multiple servers)')),
-
+  
   async execute(interaction) {
     await interaction.deferReply({ flags: MessageFlags.Ephemeral });
 
@@ -57,7 +57,7 @@ module.exports = {
       // Fetch all server activities for all linked accounts in one query
       const accountIds = linkedAccounts.map(a => a.id);
       const activityRes = await pool.query(`
-        SELECT
+        SELECT 
           psa.identity_id,
           s.name as server_name,
           g.name as guild_name,
@@ -87,13 +87,13 @@ module.exports = {
         .setTimestamp();
 
       for (const account of linkedAccounts) {
-        const lastSeen = account.last_seen_at
+        const lastSeen = account.last_seen_at 
           ? new Date(account.last_seen_at).toLocaleDateString()
           : 'Never';
 
         let statsText = `**Platform:** ${account.platform}\n` +
                        `**Last Seen:** ${lastSeen}\n`;
-
+        
         const kills = Number(account.total_kills) || 0;
         const deaths = Number(account.total_deaths) || 0;
         const playtime = Number(account.total_playtime) || 0;
@@ -109,7 +109,7 @@ module.exports = {
         if (serverActivity.length > 0) {
           statsText += `\n**Servers (${serverActivity.length}):**\n`;
           serverActivity.forEach((activity, idx) => {
-            const serverLastSeen = activity.last_seen
+            const serverLastSeen = activity.last_seen 
               ? new Date(activity.last_seen).toLocaleDateString()
               : 'Never';
             const guild = activity.guild_name ? ` (${activity.guild_name})` : '';

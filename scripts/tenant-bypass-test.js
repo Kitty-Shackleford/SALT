@@ -189,7 +189,7 @@ function testRegisteredServersHasNoGlobalAdminBypass() {
 function testGuildsWithServersHasNoBypassAndUsesTrustedMembership() {
   const source = read('src/app/registerRoutes.js');
   const start = source.indexOf("app.get('/api/user/guilds-with-servers'");
-  const end = source.indexOf('// Public server list placeholder', start);
+  const end = source.indexOf('// Unimplemented opt-in server directory', start);
   const route = source.slice(start, end);
   assert.ok(start >= 0 && end > start);
   assert.doesNotMatch(route, /is_admin|\?\s*=\s*1/);

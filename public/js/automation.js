@@ -12,7 +12,7 @@ function addActivityLog(message, type = 'info') {
     error: 'text-red-400',
     warning: 'text-yellow-400'
   };
-
+  
   activityLogs.unshift({
     message,
     timestamp,
@@ -43,7 +43,7 @@ async function loadAutomationSettings() {
       document.getElementById('autoLogSyncToggle').checked = data.autoLogSync.enabled;
       document.getElementById('syncInterval').value = data.autoLogSync.interval || 15;
       document.getElementById('autoScanAfterSync').checked = data.autoLogSync.autoScan !== false;
-
+      
       if (data.autoLogSync.enabled) {
         document.getElementById('autoLogSyncSettings').style.display = 'block';
       }
@@ -56,7 +56,7 @@ async function loadAutomationSettings() {
     if (data.autoTracking) {
       document.getElementById('autoTrackingToggle').checked = data.autoTracking.enabled;
       document.getElementById('trackingInterval').value = data.autoTracking.interval || 60;
-
+      
       if (data.autoTracking.enabled) {
         document.getElementById('autoTrackingSettings').style.display = 'block';
       }
@@ -84,7 +84,7 @@ async function loadServers() {
 
     if (!guildsData.success || !guildsData.guilds || guildsData.guilds.length === 0) {
       console.warn('⚠️ [AUTOMATION] No guilds available');
-      document.getElementById('serverCheckboxes').innerHTML = '<p class="text-gray-400">No guilds available</p>';
+      document.getElementById('serverCheckboxes').innerHTML = '<div class="dzc-empty"><div class="dzc-empty-title">No guilds available</div></div>';
       return;
     }
 
@@ -147,7 +147,7 @@ async function loadServers() {
 async function toggleAutoLogSync() {
   const enabled = document.getElementById('autoLogSyncToggle').checked;
   document.getElementById('autoLogSyncSettings').style.display = enabled ? 'block' : 'none';
-
+  
   if (enabled) {
     addActivityLog('Auto log sync enabled', 'success');
   } else {
@@ -160,7 +160,7 @@ async function toggleAutoLogSync() {
 async function toggleAutoTracking() {
   const enabled = document.getElementById('autoTrackingToggle').checked;
   document.getElementById('autoTrackingSettings').style.display = enabled ? 'block' : 'none';
-
+  
   if (enabled) {
     addActivityLog('Auto player tracking enabled', 'success');
   } else {
@@ -174,7 +174,7 @@ async function updateAutoLogSync() {
   const enabled = document.getElementById('autoLogSyncToggle').checked;
   const interval = parseFloat(document.getElementById('syncInterval').value);
   const autoScan = document.getElementById('autoScanAfterSync').checked;
-
+  
   const selectedServers = Array.from(document.querySelectorAll('.server-checkbox:checked'))
     .map(cb => cb.value);
 

@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { getUserGuilds, verifyGuildMembership } = require('../utils/discordAPI');
+const { getUserGuilds, verifyGuildMembership, classifyMembershipVerificationError } = require('../utils/discordAPI');
 const {
   buildAchievementProgress,
   calculatePlayerProgression,
@@ -199,7 +199,7 @@ router.get('/guilds', async (req, res) => {
     res.json({ success: true, guilds });
   } catch (error) {
     console.error('❌ Error fetching player guilds:', error);
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: 'Failed to load your communities. Please try again.' });
   }
 });
 
@@ -216,7 +216,17 @@ router.get('/discover/:guild_id', async (req, res) => {
   const guildId = req.params.guild_id;
 
   try {
-    if (!accessToken || !(await verifyGuildMembership(accessToken, guildId))) {
+    if (!accessToken) {
+      return res.status(401).json({ error: 'Your Discord session has expired or is invalid. Log out of the dashboard and sign in with Discord again.' });
+    }
+    let isMember;
+    try {
+      isMember = await verifyGuildMembership(accessToken, guildId);
+    } catch (membershipErr) {
+      const failure = classifyMembershipVerificationError(membershipErr);
+      return res.status(failure.status).json({ error: failure.error });
+    }
+    if (!isMember) {
       return res.status(403).json({ error: 'Discord guild membership required for account discovery' });
     }
     const guild = await db.get('SELECT id FROM guilds WHERE discord_guild_id = ? AND status = ?', [guildId, 'approved']);
@@ -274,7 +284,7 @@ router.get('/discover/:guild_id', async (req, res) => {
     });
   } catch (err) {
     console.error('❌ Error fetching player accounts:', err);
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ error: 'Failed to load your accounts. Please try again.' });
   }
 });
 
@@ -287,29 +297,34 @@ router.get('/search', async (req, res) => {
   const db = req.app.locals.db;
   const userId = req.user.id;
   const accessToken = req.user.access_token;
-
+  
   if (!guildId || !serverId || !gamertag) {
     return res.status(400).json({ error: 'guildId, serverId, and gamertag are required' });
   }
   if (!/^\d+$/.test(String(serverId)) || Number(serverId) < 1) {
     return res.status(400).json({ error: 'serverId must be a canonical server ID' });
   }
-
+  
   if (!accessToken) {
     return res.status(401).json({
-      error: 'Discord access token not found'
+      error: 'Your Discord session has expired or is invalid. Log out of the dashboard and sign in with Discord again.'
+    });
+  }
+
+  let isMember;
+  try {
+    isMember = await verifyGuildMembership(accessToken, guildId);
+  } catch (membershipErr) {
+    const failure = classifyMembershipVerificationError(membershipErr);
+    return res.status(failure.status).json({ error: failure.error });
+  }
+  if (!isMember) {
+    return res.status(403).json({
+      error: 'You are not a member of this Discord server'
     });
   }
 
   try {
-    // Verify user is a member of this guild
-    const isMember = await verifyGuildMembership(accessToken, guildId);
-    if (!isMember) {
-      return res.status(403).json({
-        error: 'You are not a member of this Discord server'
-      });
-    }
-
     // Convert Discord Guild ID to database ID
     const guild = await db.get(
       `SELECT g.id
@@ -324,11 +339,11 @@ router.get('/search', async (req, res) => {
     if (!guild) {
       return res.json({ success: true, accounts: [] });
     }
-
+    
     // Search for accounts — route through player_gamertags.server_id so players
     // whose player_server_activity row was wiped by a reset still appear.
     const query = `
-      SELECT
+      SELECT 
         pi.id,
         pi.platform,
         pg.gamertag,
@@ -360,9 +375,9 @@ router.get('/search', async (req, res) => {
       ORDER BY psa.last_seen DESC NULLS LAST, s.id
       LIMIT 20
     `;
-
+    
     const rows = await db.query(query, [guild.id, Number(serverId), `%${gamertag}%`]);
-
+    
     const accounts = rows.map(account => ({
       id: account.id,
       gamertag: account.gamertag,
@@ -375,14 +390,14 @@ router.get('/search', async (req, res) => {
       isAlreadyLinked: account.conflict_user_id === userId,
       linkedToOther: Boolean(account.conflict_user_id && account.conflict_user_id !== userId)
     }));
-
+    
     res.json({
       success: true,
       accounts
     });
   } catch (error) {
     console.error('❌ Error searching accounts:', error);
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: 'Failed to search accounts. Please try again.' });
   }
 });
 
@@ -398,9 +413,9 @@ router.get('/stats', requirePlayerServerMembership, async (req, res) => {
   const db = req.app.locals.db;
   const userId = req.user.id;
   const serverId = req.playerServer.id;
-
+  
   let query = `
-    SELECT
+    SELECT 
       pi.id as identity_id,
       pi.platform,
       pi.platform_user_id,
@@ -425,12 +440,12 @@ router.get('/stats', requirePlayerServerMembership, async (req, res) => {
     LEFT JOIN guilds g ON s.guild_id = g.id
     WHERE s.id = ?
   `;
-
+  
   const params = [serverId, serverId, serverId, serverId, userId, serverId];
-
+  
   query += ' GROUP BY pi.id, pi.platform, pi.platform_user_id, pg.gamertag, s.id, s.name, g.discord_guild_id, g.name';
   query += ' ORDER BY MAX(psa.last_seen) DESC';
-
+  
   try {
     const rows = await db.query(query, params);
     res.json({
@@ -475,11 +490,11 @@ router.get('/leaderboard/:guild_id', requirePlayerServerMembership, async (req, 
       'deaths': 'total_deaths',
       'playtime': 'total_playtime'
     };
-
+    
     const sortField = validSortFields[sortBy] || validSortFields['kills'];
-
+    
     const query = `
-      SELECT
+      SELECT 
         pi.id as identity_id,
         pi.platform,
         pg.gamertag,
@@ -511,7 +526,7 @@ router.get('/leaderboard/:guild_id', requirePlayerServerMembership, async (req, 
       ORDER BY ` + sortField + ` DESC
       LIMIT ?
     `;
-
+    
     const rows = await db.query(query, [serverId, serverId, serverId, serverId, serverId, serverId, parseInt(limit)]);
     res.json({
       success: true,
@@ -536,7 +551,7 @@ router.get('/sessions/:identity_id', async (req, res) => {
 
   try {
     let query = `
-      SELECT
+      SELECT 
         ps.*,
         s.name as server_name,
         s.platform
@@ -577,7 +592,7 @@ router.get('/sessions/:identity_id/stats', async (req, res) => {
 
   try {
     let query = `
-      SELECT
+      SELECT 
         COUNT(*) as total_sessions,
         SUM(duration) as total_playtime,
         AVG(duration) as avg_session_length,
@@ -619,7 +634,7 @@ router.get('/health/:identity_id', async (req, res) => {
 
   try {
     const rows = await db.query(
-      `SELECT
+      `SELECT 
         phs.*,
         s.name as server_name,
         s.platform
@@ -755,7 +770,7 @@ router.get('/damage/:identity_id/weapons', async (req, res) => {
     const orderBy = validSortOptions[sortBy] || 'COUNT(*)';
 
     let query = `
-      SELECT
+      SELECT 
         weapon,
         attacker_type,
         COUNT(*) as hit_count,
@@ -814,7 +829,7 @@ router.get('/damage/:identity_id/weapons/category', async (req, res) => {
 
   try {
     let query = `
-      SELECT
+      SELECT 
         attacker_type,
         COUNT(*) as hit_count,
         SUM(damage) as total_damage,
@@ -860,7 +875,7 @@ router.get('/damage/:identity_id/top-threats', async (req, res) => {
 
   try {
     let query = `
-      SELECT
+      SELECT 
         weapon,
         attacker_type,
         COUNT(*) as hit_count,
@@ -905,7 +920,7 @@ router.get('/damage/:identity_id/weapon-types', async (req, res) => {
 
   try {
     let query = `
-      SELECT
+      SELECT 
         CASE
           WHEN weapon LIKE '%Melee%' THEN 'Melee'
           WHEN weapon LIKE '%Bullet%' OR weapon LIKE '%Shot%' THEN 'Firearms'
@@ -957,7 +972,7 @@ router.get('/damage/:identity_id/bodyparts', async (req, res) => {
 
   try {
       let query = `
-        SELECT
+        SELECT 
           body_part,
           body_part_id,
           COUNT(*) as hit_count,
@@ -1012,7 +1027,7 @@ router.get('/damage/:identity_id/bodyparts/:body_part', async (req, res) => {
 
   try {
     let query = `
-      SELECT
+      SELECT 
         attacker_type,
         weapon,
         COUNT(*) as hit_count,
@@ -1049,7 +1064,7 @@ router.get('/health/:identity_id/:server_id', async (req, res) => {
 
   try {
     const row = await db.get(
-      `SELECT
+      `SELECT 
         phs.*,
         s.name as server_name,
         s.platform
@@ -1357,7 +1372,7 @@ router.get('/favorite-weapons/:identity_id', async (req, res) => {
 
   try {
     const query = `
-      SELECT
+      SELECT 
         weapon,
         COUNT(*) as kill_count,
         AVG(distance) as avg_distance,
@@ -1395,7 +1410,7 @@ router.get('/recent-kills/:identity_id', async (req, res) => {
 
   try {
     const query = `
-      SELECT
+      SELECT 
         ke.*,
         s.name as server_name
       FROM kill_events ke
@@ -1439,7 +1454,7 @@ router.get('/recent-deaths/:identity_id', async (req, res) => {
 
   try {
     const query = `
-      SELECT
+      SELECT 
         ke.*,
         s.name as server_name
       FROM kill_events ke
@@ -1510,7 +1525,7 @@ router.get('/playtime-breakdown/:identity_id', async (req, res) => {
 
   try {
     const query = `
-      SELECT
+      SELECT 
         EXTRACT(HOUR FROM login_at)::int as hour,
         COUNT(*) as sessions,
         SUM(duration) as totalTime
@@ -1603,7 +1618,7 @@ router.get('/performance-timeline/:identity_id', async (req, res) => {
 
   try {
     const query = `
-      SELECT
+      SELECT 
         DATE(timestamp) as date,
         COUNT(*) as kills
       FROM kill_events

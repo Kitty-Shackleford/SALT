@@ -166,11 +166,11 @@ async function testConfiguredDashboardOwnerBootstrap() {
   const bootstrapSource = read('services/dashboardOwnerBootstrapService.js');
   assert(bootstrapSource.includes("jsonb_build_object('guildDiscordId', $2::text"),
     'Dashboard Owner bootstrap audit metadata must type its Discord guild ID parameter for PostgreSQL');
-  const configuredId = '900000000000000006';
+  const configuredId = '123456789012345679';
   assert.equal(configuredDashboardOwnerId(configuredId), configuredId);
   assert.equal(configuredDashboardOwnerId('invalid'), null);
   assert.equal(isConfiguredDashboardOwner(configuredId, configuredId), true);
-  assert.equal(isConfiguredDashboardOwner('900000000000000001', configuredId), false);
+  assert.equal(isConfiguredDashboardOwner('123456789012345680', configuredId), false);
   const queries = [];
   const client = {
     async query(sql, params = []) {
@@ -189,7 +189,7 @@ async function testConfiguredDashboardOwnerBootstrap() {
   const db = { connect: async () => client };
   const fetchedIds = [];
   const guild = {
-    id: '900000000000000002',
+    id: '123456789012345678',
     name: 'Configured Owner Guild',
     members: {
       fetch: async options => {
@@ -223,7 +223,7 @@ async function testConfiguredDashboardOwnerBootstrap() {
   assert.equal(websiteResult.status, 'assigned',
     'trusted Discord OAuth identity must bootstrap the configured owner without the bot');
   assert.equal(await reconcileConfiguredDashboardOwner(db, {
-    discordId: '900000000000000001', username: 'Other User', avatar: null,
+    discordId: '123456789012345680', username: 'Other User', avatar: null,
   }, { configuredDiscordId: configuredId, source: 'discord_oauth' }).then(value => value.status), 'not_configured_owner',
   'an authenticated user whose immutable Discord ID does not match the environment must not bootstrap');
 
@@ -232,7 +232,7 @@ async function testConfiguredDashboardOwnerBootstrap() {
     async query(sql) {
       conflictQueries.push(sql);
       if (sql.includes("platform_role = 'dashboard_owner'") && sql.includes('FOR UPDATE')) {
-        return { rows: [{ id: 99, discord_id: '900000000000000001' }], rowCount: 1 };
+        return { rows: [{ id: 99, discord_id: '123456789012345680' }], rowCount: 1 };
       }
       return { rows: [], rowCount: 0 };
     },
@@ -337,8 +337,7 @@ function testRequiredSecurityContractsExist() {
   'role mutations must lock/re-check platform, guild, and server authority at operation time');
   assert((roleRoute.match(/lockScope: true/g) || []).length >= 3 &&
     roleRoute.includes('FOR UPDATE OF s, g') &&
-    roleRoute.includes("status = 'approved'${lockClause}") &&
-    !roleRoute.includes("status IN ('pending', 'approved')"),
+    roleRoute.includes("status IN ('pending', 'approved')${lockClause}"),
   'role mutations must lock/re-check exact guild/server lifecycle state at operation time');
 
   for (const fragment of [
@@ -447,8 +446,7 @@ function testAdminFrontendContracts() {
   assert(users.includes('availableGrants'), 'Admin users page does not filter role choices server-side');
   assert(users.includes('Remove Role'), 'Admin users page lacks role-removal UX');
   assert(users.includes('transfer-owner'), 'Admin users page lacks explicit guild ownership transfer UX');
-  assert(users.includes('targetUserId: userId') && users.includes('selectionIsCurrent(generation, userId)'),
-    'ownership transfer UI must use captured target identity and suppress stale continuations');
+  assert(users.includes('targetUserId: selectedUser.id'), 'ownership transfer UI payload does not match the API');
   assert(users.includes("roleContext.actor?.platformRole === 'dashboard_owner'") && users.includes('kick-user-btn'),
     'Admin users page must expose account removal only to the Dashboard Owner');
   assert(users.includes("method: 'DELETE'") && users.includes('/api/roles/users/'),

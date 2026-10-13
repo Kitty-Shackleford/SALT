@@ -25,33 +25,33 @@ async function fetchWithCsrf(url, options = {}) {
 
   // Legacy fallback (should be unused once api.js is loaded)
   const token = getCsrfToken();
-
+  
   // Require CSRF token for state-changing methods
   if (!token && ['POST', 'PUT', 'DELETE', 'PATCH'].includes(options.method?.toUpperCase())) {
     throw new Error('CSRF token missing. Please refresh the page.');
   }
-
+  
   // Add CSRF token to headers
   const headers = {
     'Content-Type': 'application/json',
     ...options.headers
   };
-
+  
   if (token) {
     headers['CSRF-Token'] = token;
   }
-
+  
   const response = await fetch(url, {
     ...options,
     headers,
     credentials: 'same-origin'
   });
-
+  
   // Handle CSRF errors gracefully
   if (response.status === 403) {
     // Clone response to allow multiple reads
     const responseClone = response.clone();
-
+    
     try {
       const data = await response.json();
       if (data.error?.toLowerCase().includes('csrf')) {
@@ -73,7 +73,7 @@ async function fetchWithCsrf(url, options = {}) {
       }
     }
   }
-
+  
   return response;
 }
 

@@ -31,6 +31,52 @@ const { createNitradoService } = require('./nitradoService');
 const DOWNLOAD_ROOT = path.join(__dirname, '..', 'downloads');
 const MAX_LOG_FILE_BYTES = 128 * 1024 * 1024;
 const MAX_LOG_BATCH_BYTES = 512 * 1024 * 1024;
+const FTPROOT_LISTING_WAF_COOLDOWN_MS = 60 * 60 * 1000;
+
+/**
+ * Circuit breaker for Nitrado ftproot RAW (un-normalized) directory
+ * listings. Nitrado's WAF 401s that endpoint per egress IP on some
+ * console servers; retrying it every few minutes deepens the ban. The
+ * breaker is keyed by guild token (each guild is an independent Nitrado
+ * account, so 15580969/guild-1 and 16000564/guild-15 keep separate
+ * state), and a single 401 suppresses raw listings for that guild for at
+ * least an hour. The file DOWNLOAD endpoint is not WAF-blocked, so the
+ * direct server.log transfer-token request is never gated by this
+ * breaker.
+ */
+function createFtprootListingBreaker({ cooldownMs = FTPROOT_LISTING_WAF_COOLDOWN_MS } = {}) {
+  const cooldown = Math.max(60 * 1000, Number(cooldownMs) || FTPROOT_LISTING_WAF_COOLDOWN_MS);
+  const trips = new Map();
+  function isTripped(key, now = Date.now()) {
+    const trip = trips.get(String(key));
+    if (!trip) return false;
+    if (Number(now) >= trip.retryAtMs) {
+      trips.delete(String(key));
+      return false;
+    }
+    return true;
+  }
+  function trip(key, now = Date.now()) {
+    const retryAtMs = Number(now) + cooldown;
+    trips.set(String(key), { retryAtMs });
+    return retryAtMs;
+  }
+  function reset(key) {
+    trips.delete(String(key));
+  }
+  function resetAll() {
+    trips.clear();
+  }
+  function retryAt(key) {
+    return trips.get(String(key))?.retryAtMs ?? null;
+  }
+  return { isTripped, trip, reset, resetAll, retryAt };
+}
+
+const ftprootListingBreaker = createFtprootListingBreaker();
+function resetFtprootListingBreaker() {
+  ftprootListingBreaker.resetAll();
+}
 const nitradoService = createNitradoService();
 if (!fs.existsSync(DOWNLOAD_ROOT)) fs.mkdirSync(DOWNLOAD_ROOT, { recursive: true });
 
@@ -256,8 +302,9 @@ class IncompleteLogDownloadError extends Error {
 }
 
 async function downloadLogFile(token, serverId, file, localPath) {
-  const expectedBytes = Number(file.size);
-  if (!Number.isSafeInteger(expectedBytes) || expectedBytes < 0 || expectedBytes > MAX_LOG_FILE_BYTES) {
+  const advertisedBytes = file.size == null ? null : Number(file.size);
+  if (advertisedBytes !== null &&
+      (!Number.isSafeInteger(advertisedBytes) || advertisedBytes < 0 || advertisedBytes > MAX_LOG_FILE_BYTES)) {
     throw new Error('Nitrado log file exceeds the transfer size limit');
   }
   return telemetry.timeAsync(`downloadLog:${serverId}:${file.name}`, async () => {
@@ -267,6 +314,7 @@ async function downloadLogFile(token, serverId, file, localPath) {
     );
 
     const { url: downloadUrl } = getNitradoTransferToken(tokenRes);
+    let expectedBytes = advertisedBytes;
 
     const fileRes = await http.get(downloadUrl, {
       responseType: 'arraybuffer',
@@ -277,7 +325,17 @@ async function downloadLogFile(token, serverId, file, localPath) {
     const fileBody = getNitradoBinaryBody(fileRes);
     const fileBodyBuffer = Buffer.isBuffer(fileBody) ? fileBody : Buffer.from(fileBody);
     const receivedBytes = Number(fileBodyBuffer.byteLength);
-    if (receivedBytes !== expectedBytes) {
+    if (expectedBytes === null) {
+      // Direct transfer-token requests bypass the (WAF-blocked) ftproot
+      // listing, so the file size is not advertised by a listing entry; use
+      // the file response's Content-Length for truncation validation when
+      // the provider offers one, otherwise trust the bounded maxContentLength
+      // on the axios request.
+      const contentLength = Number(fileRes?.headers?.['content-length']);
+      if (Number.isSafeInteger(contentLength) && contentLength >= 0 && receivedBytes !== contentLength) {
+        throw new IncompleteLogDownloadError(contentLength, receivedBytes);
+      }
+    } else if (receivedBytes !== expectedBytes) {
       throw new IncompleteLogDownloadError(expectedBytes, receivedBytes);
     }
     if (localFileMatchesBody(localPath, fileBodyBuffer)) {
@@ -301,6 +359,104 @@ function configListPathForStructure(structure) {
   return structure.platform === 'pc'
     ? rawConfigPath
     : normalizeNitradoFilePath(rawConfigPath);
+}
+
+/**
+ * Nitrado serves the same on-disk config directory under two namespaced
+ * paths (ftproot vs noftp) and does NOT expose every file under both: for
+ * Xbox/console DayZ servers the file_server list API only returns
+ * server.log under the RAW ftproot path and refuses noftp downloads with
+ * "Permission denied". The normal sync listing therefore misses it.
+ *
+ * Live-verified in production (2026-10-11): the RAW ftproot DIRECTORY
+ * LISTING is what Nitrado's WAF 401s per egress IP, while the
+ * file_server DOWNLOAD endpoint for the deterministic raw path
+ * (.../ftproot/<game>/config/server.log) issues a transfer token without
+ * a ban. The previous flow (raw listing -> 401 -> noftp fallback ->
+ * "not found" -> retry) therefore looped ~every few minutes, re-tripping
+ * the WAF ban each time.
+ *
+ * Resolution: request the download token for the KNOWN deterministic
+ * ftproot path directly (no listing required); only if that transfer is
+ * refused fall back to the raw ftproot listing, which is now best-effort
+ * and gated by a per-guild circuit breaker (a single 401 suppresses raw
+ * listings for that guild for at least an hour, so a banned egress IP
+ * stops hammering Nitrado into deeper bans).
+ */
+async function fetchServerLogEntryFromRawConfigPath(http, token, serverId, structure, {
+  breaker = ftprootListingBreaker,
+  breakerKey = `nitrado:${token}`,
+  nowMs = Date.now,
+} = {}) {
+  if (!structure || !structure.configPath) return null;
+  const rawConfigPath = structure.configPath.replace(/\/+$/, '');
+  const normalListedPath = configListPathForStructure(structure).replace(/\/+$/, '');
+  if (normalListedPath === rawConfigPath) {
+    // The normal sync listing already used this raw config directory (PC
+    // servers), so server.log is visible through it; there is no separate
+    // ftproot view to fall back to.
+    return null;
+  }
+
+  const rawServerLogPath = `${rawConfigPath}/server.log`;
+  const directEntry = { type: 'file', name: 'server.log', path: rawServerLogPath, size: null };
+  try {
+    await http.get(
+      `https://api.nitrado.net/services/${serverId}/gameservers/file_server/download?file=${encodeURIComponent(rawServerLogPath)}`,
+      { headers: { Authorization: 'Bearer ' + token }, timeout: 10000 }
+    );
+    console.log(`   🔁 server.log resolved via direct ftproot transfer token for ${serverId}`);
+    return directEntry;
+  } catch (error) {
+    // The transfer token endpoint was refused (e.g. Permission denied for
+    // noftp paths, or a missing file). The raw listing is the only other
+    // view that can confirm existence, but it is the WAF-blocked endpoint
+    // — run it best-effort behind the per-guild circuit breaker.
+    if (breaker.isTripped(breakerKey, nowMs())) {
+      const retryAtMs = breaker.retryAt(breakerKey);
+      console.log(
+        `   ⚠️  server.log ftproot fallback: raw listing suppressed by WAF backoff for ${serverId}`
+        + ` until ${new Date(retryAtMs).toISOString()}`
+      );
+      return null;
+    }
+    let listRes;
+    try {
+      listRes = await http.get(
+        `https://api.nitrado.net/services/${serverId}/gameservers/file_server/list?dir=${encodeURIComponent(rawConfigPath)}`,
+        { headers: { Authorization: 'Bearer ' + token }, timeout: 10000 }
+      );
+    } catch (error) {
+      const status = Number(error?.response?.status);
+      if (status === 401 || status === 403) {
+        // Nitrado WAF bans per egress IP: stop retrying raw listings for
+        // this guild token for the cooldown window instead of re-tripping
+        // the ban every few minutes.
+        const retryAtMs = breaker.trip(breakerKey, nowMs());
+        console.log(
+          `   ⚠️  server.log ftproot fallback: raw listing failed for ${serverId}: ${error.message}`
+          + ` — backing off raw listings until ${new Date(retryAtMs).toISOString()}`
+        );
+      } else {
+        console.log(`   ⚠️  server.log ftproot fallback: raw listing failed for ${serverId}: ${error.message}`);
+      }
+      return null;
+    }
+    const entries = getNitradoFileEntries(listRes);
+    const entry = entries.find(item => item?.type === 'file' && item.name === 'server.log');
+    if (!entry) {
+      console.log(`   ⚠️  server.log ftproot fallback: not present in raw listing for ${serverId} (${entries.length} entries)`);
+      return null;
+    }
+    try {
+      const validated = validateLogFileEntry(rawConfigPath, entry);
+      console.log(`   🔁 server.log found via ftproot fallback for ${serverId} (${validated.size} bytes)`);
+      return validated;
+    } catch (error) {
+      console.log(`   ⚠️  server.log ftproot fallback: entry validation failed for ${serverId}: ${error.message}`);
+      return null;
+    }
+  }
 }
 
 function getLogSyncConfigEntries(response) {
@@ -551,6 +707,7 @@ async function performLogSync(db, userId, token, serverIds, {
   let totalFilesUpdated = 0;
   let totalFilesSkipped = 0;
   const errors = [];
+  const blockingErrors = [];
   const failedServerIds = new Set();
   const parseBlockedServerIds = new Set();
   const rptBlockedServerIds = new Set();
@@ -563,6 +720,11 @@ async function performLogSync(db, userId, token, serverIds, {
     failedServerIds.add(String(serverId));
     if (blocksParsing) parseBlockedServerIds.add(String(serverId));
     if (blocksRptParsing) rptBlockedServerIds.add(String(serverId));
+    if (blocksParsing) blockingErrors.push(message);
+    // Log at the point of recording so a later "Sync run incomplete" can be
+    // traced back to its cause. Some call sites (preflight rejections, missing
+    // server.log, availability backoff) otherwise fail completely silently.
+    console.error(`   ⚠️  [logsync] server ${serverId} rejected: ${message}${blocksParsing ? '' : ' (non-blocking)'}`);
   };
   const serverLogPaths = {};
   const restartEvidence = {};
@@ -575,7 +737,11 @@ async function performLogSync(db, userId, token, serverIds, {
       const authorizedServer = await resolveOperationalServer(db, userId, serverId, token);
       if (!authorizedServer) { recordError(serverId, `Server ${serverId}: Could not authorize server credentials`); continue; }
       if (respectAvailabilityBackoff && !availabilityTracker.canAttempt(serverId, nowMs())) {
-        recordError(serverId, `Server ${serverId}: DayZ log storage is temporarily backed off`);
+        // A backoff is a temporary skip, not a failure: marking it non-blocking
+        // lets the run still complete (and advance lastRun) while the tracker
+        // expires on its own. Previously this was a blocking error, so a single
+        // transient provider failure parked the whole auto-sync forever.
+        recordError(serverId, `Server ${serverId}: DayZ log storage is temporarily backed off`, { blocksParsing: false });
         continue;
       }
       const guildDiscordId = authorizedServer.guildDiscordId;
@@ -617,12 +783,18 @@ async function performLogSync(db, userId, token, serverIds, {
         });
       }
       const logFiles = selectLogSyncBatch(configPath, preflight.accepted, { gameserver });
-      const serverLogEntry = configFiles.find(f => f.type === 'file' && f.name === 'server.log');
+      let serverLogEntry = configFiles.find(f => f.type === 'file' && f.name === 'server.log');
+      if (!serverLogEntry) {
+        // The noftp listing does not expose server.log on some console
+        // servers; try the raw ftproot view where the file_server API
+        // actually serves it.
+        serverLogEntry = await fetchServerLogEntryFromRawConfigPath(http, token, serverId, structure);
+      }
       if (preflight.accepted.length === 0) {
         recordError(serverId, `Server ${serverId}: No ADM/RPT log files found`);
       }
       if (!serverLogEntry) {
-        recordError(serverId, `Server ${serverId}: No server.log file found`, { blocksParsing: false });
+        recordError(serverId, `Server ${serverId}: No server.log file found (direct ftproot transfer refused and raw listing inconclusive)`, { blocksParsing: false });
       }
 
       let serverLogLocalPath = null;
@@ -696,6 +868,7 @@ async function performLogSync(db, userId, token, serverIds, {
     totalFilesUpdated,
     totalFilesSkipped,
     errors,
+    blockingErrors,
     failedServerIds: Array.from(failedServerIds),
     parseBlockedServerIds: Array.from(parseBlockedServerIds),
     rptBlockedServerIds: Array.from(rptBlockedServerIds),
@@ -724,6 +897,7 @@ async function performLogSyncConcurrent(
   let totalFilesUpdated = 0;
   let totalFilesSkipped = 0;
   const errors = [];
+  const blockingErrors = [];
   const failedServerIds = new Set();
   const parseBlockedServerIds = new Set();
   const rptBlockedServerIds = new Set();
@@ -736,6 +910,11 @@ async function performLogSyncConcurrent(
     failedServerIds.add(String(serverId));
     if (blocksParsing) parseBlockedServerIds.add(String(serverId));
     if (blocksRptParsing) rptBlockedServerIds.add(String(serverId));
+    if (blocksParsing) blockingErrors.push(message);
+    // Log at the point of recording so a later "Sync run incomplete" can be
+    // traced back to its cause (the concurrent path previously had no per-error
+    // log line for silent failures like preflight rejections).
+    console.error(`   ⚠️  [logsync] server ${serverId} rejected: ${message}${blocksParsing ? '' : ' (non-blocking)'}`);
   };
   const serverLogPaths = {};
   const restartEvidence = {};
@@ -766,7 +945,8 @@ async function performLogSyncConcurrent(
           await resolveOperationalServer(db, userId, serverId, token);
         if (!authorizedServer) { recordError(serverId, `Server ${serverId}: Could not authorize server credentials`); return; }
         if (respectAvailabilityBackoff && !availabilityTracker.canAttempt(serverId, nowMs())) {
-          recordError(serverId, `Server ${serverId}: DayZ log storage is temporarily backed off`);
+          // Backoff is a temporary skip, not a failure (see legacy path above).
+          recordError(serverId, `Server ${serverId}: DayZ log storage is temporarily backed off`, { blocksParsing: false });
           return;
         }
         const guildDiscordId = authorizedServer.guildDiscordId;
@@ -806,12 +986,18 @@ async function performLogSyncConcurrent(
           });
         }
         const logFiles = selectLogSyncBatch(configPath, preflight.accepted, { gameserver });
-        const serverLogEntry = configFiles.find(f => f.type === 'file' && f.name === 'server.log');
+        let serverLogEntry = configFiles.find(f => f.type === 'file' && f.name === 'server.log');
+        if (!serverLogEntry) {
+          // The noftp listing does not expose server.log on some console
+          // servers; try the raw ftproot view where the file_server API
+          // actually serves it.
+          serverLogEntry = await fetchServerLogEntryFromRawConfigPath(http, token, serverId, structure);
+        }
         if (preflight.accepted.length === 0) {
           recordError(serverId, `Server ${serverId}: No ADM/RPT log files found`);
         }
         if (!serverLogEntry) {
-          recordError(serverId, `Server ${serverId}: No server.log file found`, { blocksParsing: false });
+          recordError(serverId, `Server ${serverId}: No server.log file found (direct ftproot transfer refused and raw listing inconclusive)`, { blocksParsing: false });
         }
 
         let serverLogLocalPath = null;
@@ -890,6 +1076,7 @@ async function performLogSyncConcurrent(
     totalFilesUpdated,
     totalFilesSkipped,
     errors,
+    blockingErrors,
     failedServerIds: Array.from(failedServerIds),
     parseBlockedServerIds: Array.from(parseBlockedServerIds),
     rptBlockedServerIds: Array.from(rptBlockedServerIds),
@@ -993,6 +1180,9 @@ module.exports = {
   getDecryptedToken,
   downloadActiveServerLog,
   downloadLogFile,
+  fetchServerLogEntryFromRawConfigPath,
+  createFtprootListingBreaker,
+  resetFtprootListingBreaker,
   syncLatestAdmForExactServer,
   performLogSync,
   performLogSyncConcurrent,

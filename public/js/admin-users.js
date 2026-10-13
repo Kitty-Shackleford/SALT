@@ -9,10 +9,6 @@ let selectionGeneration = 0;
 let userLoadGeneration = 0;
 let searchTimer = null;
 
-function selectionIsCurrent(generation, userId) {
-  return generation === selectionGeneration && Number(selectedUser?.id) === Number(userId);
-}
-
 function esc(value) {
   return String(value ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;')
     .replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#x27;');
@@ -131,7 +127,7 @@ function scopeText(assignment) {
 function renderAssignments() {
   const container = document.getElementById('role-list');
   if (!selectedAssignments.length) {
-    container.innerHTML = '<p class="text-gray-400">No current application roles.</p>';
+    container.innerHTML = '<div class="dzc-empty"><div class="dzc-empty-title">No current application roles.</div></div>';
     return;
   }
   container.innerHTML = selectedAssignments.map(assignment => {
@@ -176,47 +172,38 @@ function renderGrantOptions() {
 
 async function transferOwnership() {
   if (!selectedUser) return;
-  const generation = selectionGeneration;
-  const userId = selectedUser.id;
-  const username = selectedUser.username;
   const guildId = Number(document.getElementById('transfer-owner-select').value);
   if (!guildId) return;
   const scope = roleContext.scopes.find(item => Number(item.guild_id) === guildId);
-  if (!confirm(`Transfer ownership of ${scope?.guild_name || `Guild ${guildId}`} to ${username}?\n\nThe current owner will retain Guild Admin access. Ownership cannot disappear during this transaction.`)) return;
+  if (!confirm(`Transfer ownership of ${scope?.guild_name || `Guild ${guildId}`} to ${selectedUser.username}?\n\nThe current owner will retain Guild Admin access. Ownership cannot disappear during this transaction.`)) return;
   try {
     await json(`/api/roles/guilds/${guildId}/transfer-owner`, {
-      method: 'POST', body: JSON.stringify({ targetUserId: userId }),
+      method: 'POST', body: JSON.stringify({ targetUserId: selectedUser.id }),
     });
-    if (!selectionIsCurrent(generation, userId)) return;
-    if (await openRoles(userId)) await loadPage();
-  } catch (error) {
-    if (selectionIsCurrent(generation, userId)) alert(error.message);
-  }
+    await openRoles(selectedUser.id);
+    await loadPage();
+  } catch (error) { alert(error.message); }
 }
 
 async function openRoles(userId) {
   const generation = ++selectionGeneration;
   try {
     const data = await json(`/api/roles/users/${userId}`);
-    if (generation !== selectionGeneration) return false;
+    if (generation !== selectionGeneration) return;
     selectedUser = data.user;
     selectedAssignments = data.assignments || [];
     document.getElementById('role-modal-title').textContent = `Roles — ${selectedUser.username || selectedUser.discord_id}`;
     renderAssignments();
     renderGrantOptions();
     document.getElementById('role-modal').classList.remove('hidden');
-    return true;
   } catch (error) {
-    if (generation !== selectionGeneration) return false;
+    if (generation !== selectionGeneration) return;
     alert(error.message);
-    return false;
   }
 }
 
 async function grantRole() {
   if (!selectedUser) return;
-  const generation = selectionGeneration;
-  const userId = selectedUser.id;
   const raw = document.getElementById('grant-select').value;
   if (!raw) return;
   const grant = JSON.parse(raw);
@@ -228,27 +215,23 @@ async function grantRole() {
   const button = document.getElementById('grant-role-btn');
   button.disabled = true;
   try {
-    await json(`/api/roles/users/${userId}`, { method: 'POST', body: JSON.stringify(grant) });
-    if (!selectionIsCurrent(generation, userId)) return;
-    button.disabled = false;
-    if (await openRoles(userId)) await loadPage();
+    await json(`/api/roles/users/${selectedUser.id}`, { method: 'POST', body: JSON.stringify(grant) });
+    await openRoles(selectedUser.id);
+    await loadPage();
   } catch (error) {
-    if (selectionIsCurrent(generation, userId)) alert(error.message);
+    alert(error.message);
   } finally {
-    if (selectionIsCurrent(generation, userId)) button.disabled = false;
+    button.disabled = false;
   }
 }
 
 async function removeRole(assignmentId) {
   const assignment = selectedAssignments.find(item => Number(item.id) === assignmentId);
   if (!assignment || !selectedUser) return;
-  const generation = selectionGeneration;
-  const userId = selectedUser.id;
-  const username = selectedUser.username;
-  const warning = `${username || 'This user'} will lose ${roleLabel(assignment.role)} access to ${scopeText(assignment)}. This may immediately remove access to moderation tools and server data.`;
+  const warning = `${selectedUser.username || 'This user'} will lose ${roleLabel(assignment.role)} access to ${scopeText(assignment)}. This may immediately remove access to moderation tools and server data.`;
   if (!confirm(`Remove ${roleLabel(assignment.role)}?\n\n${warning}`)) return;
   try {
-    await json(`/api/roles/users/${userId}/roles/${assignment.id}`, {
+    await json(`/api/roles/users/${selectedUser.id}/roles/${assignment.id}`, {
       method: 'DELETE',
       body: JSON.stringify({
         assignmentType: assignment.assignment_type,
@@ -257,10 +240,10 @@ async function removeRole(assignmentId) {
         serverId: assignment.server_id,
       }),
     });
-    if (!selectionIsCurrent(generation, userId)) return;
-    if (await openRoles(userId)) await loadPage();
+    await openRoles(selectedUser.id);
+    await loadPage();
   } catch (error) {
-    if (selectionIsCurrent(generation, userId)) alert(error.message);
+    alert(error.message);
   }
 }
 

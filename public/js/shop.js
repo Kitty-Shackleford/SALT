@@ -252,7 +252,7 @@ async function loadItems(serverId) {
   const requestId = nextShopRequestId('items');
   const grid = document.getElementById('items-grid');
   displayedCatalogServerId = null;
-  grid.innerHTML = '<p class="text-gray-400 col-span-full text-center py-8">Loading items…</p>';
+  grid.innerHTML = '<div class="dzc-skeleton" style="height:1.25rem;width:220px"></div>';
 
   try {
     const res  = await fetch(`/api/shop/items/${serverId}`);
@@ -263,7 +263,7 @@ async function loadItems(serverId) {
     displayedCatalogServerId = serverId;
 
     if (!items.length) {
-      grid.innerHTML = '<p class="text-gray-400 col-span-full text-center py-8">No items available.</p>';
+      grid.innerHTML = '<div class="dzc-empty"><div class="dzc-empty-title">No items available.</div></div>';
       return;
     }
 
@@ -910,7 +910,7 @@ async function loadActiveRentals() {
     return;
   }
 
-  listEl.innerHTML = '<p class="text-gray-400 col-span-full text-center py-8">Loading…</p>';
+  listEl.innerHTML = '<div class="dzc-skeleton" style="height:1.25rem;width:220px"></div>';
 
   try {
     const res  = await fetch(`/api/shop/active-rentals/${identityId}/${serverId}`);
@@ -921,7 +921,7 @@ async function loadActiveRentals() {
     const rentals = json.data || [];
 
     if (!rentals.length) {
-      listEl.innerHTML = '<p class="text-gray-400 col-span-full text-center py-12">No active rentals.</p>';
+      listEl.innerHTML = '<div class="dzc-empty"><div class="dzc-empty-title">No active rentals.</div></div>';
       return;
     }
 

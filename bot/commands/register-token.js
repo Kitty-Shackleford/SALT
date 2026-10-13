@@ -23,7 +23,7 @@ module.exports = {
         .setDescription('Your Nitrado API token')
         .setRequired(true))
     .setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
-
+  
   async execute(interaction) {
     const setupPermission = await getDiscordSetupPermission(interaction);
     if (!isEligibleInitialGuildOwner(setupPermission)) {
@@ -45,7 +45,7 @@ module.exports = {
     const guildId = interaction.guild.id;
     const guildName = interaction.guild.name;
     const guildIcon = interaction.guild.iconURL();
-
+    
     const discordId = interaction.user.id;
     const username = interaction.user.username;
     const avatar = interaction.user.avatar;
@@ -53,10 +53,29 @@ module.exports = {
     let client;
     let releaseError;
     try {
-      const [dayzServers, nitradoUser] = await Promise.all([
-        nitradoService.listGameServers(token),
-        nitradoService.getAuthenticatedUser(token),
-      ]);
+      // Validate the token's OAuth scopes before the provider read calls so a
+      // token that is valid but missing user_info/service gets a specific,
+      // actionable reply instead of a confusing 502 from /user or /services.
+      const tokenValidation = await nitradoService.validateRegistrationToken(token);
+      if (tokenValidation.status === 'invalid') {
+        return interaction.editReply({
+          content: '❌ This Nitrado token could not be used to sign in to your account. ' +
+            'Please check that you copied the full token and try again.',
+        });
+      }
+      if (tokenValidation.status === 'valid' && tokenValidation.missingScopes.length > 0) {
+        const scopeList = tokenValidation.missingScopes.map(scope => `\`${scope}\``).join(' and ');
+        return interaction.editReply({
+          content: '❌ This Nitrado token is missing the permission scope(s): ' + scopeList + '.\n\n' +
+            'To fix this, go to **My Account → API Tokens** in the Nitrado panel, ' +
+            'edit (or recreate) the token, and make sure the following permissions are enabled:\n' +
+            '  • `user_info` — lets the bot confirm which account the token belongs to\n' +
+            '  • `service` — lets the bot find your DayZ servers\n\n' +
+            'Save the token, then re-run this command with the updated token.',
+        });
+      }
+
+      const { dayzServers, user: nitradoUser } = await nitradoService.getRegistrationData(token);
       const nitradoUserId = nitradoUser.id;
 
       console.log(`✅ Found ${dayzServers.length} DayZ server(s) across all platforms`);
@@ -361,8 +380,16 @@ module.exports = {
         }
       }
       console.error('❌ Error registering token:', error);
+      // Distinguish "Nitrado is having a bad moment" (5xx, timeouts, network,
+      // or the 502 edge-outage body that reports as invalid_response) from a
+      // token/permission problem. The former should tell users to retry rather
+      // than re-copy their token.
+      const transientCategories = ['upstream', 'timeout', 'network', 'invalid_response'];
+      const isTransient = transientCategories.includes(error?.category);
       await interaction.editReply({
-        content: `❌ **Error:** ${error.message}\n\nPlease check your token and try again.`
+        content: isTransient
+          ? '⚠️ Nitrado is temporarily unavailable — please try again in a few minutes.'
+          : `❌ **Error:** ${error.message}\n\nPlease check your token and try again.`,
       });
     } finally {
       client?.release(releaseError);

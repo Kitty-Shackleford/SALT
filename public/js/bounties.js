@@ -60,7 +60,7 @@ function bountyTargetLabel(bounty) {
 }
 
 function renderBountyCards(bounties) {
-  if (!bounties.length) return '<p class="text-gray-400">No active bounties.</p>';
+  if (!bounties.length) return '<div class="dzc-empty"><div class="dzc-empty-title">No active bounties.</div></div>';
   return bounties.map(bounty => {
     const factionProgress = bounty.targetType === 'faction'
       ? `<p class="text-sm text-gray-300 mt-2">Objective: ${bounty.requiredKills} unique eligible members · ${bounty.eligibleMemberCount} snapshotted targets</p>`
@@ -247,7 +247,7 @@ function initBounties(serverId, guildId, identityId) {
   bountyContext = { serverId: Number(serverId), guildId: String(guildId), identityId: Number(identityId), generation: bountyGeneration };
   const context = bountyContext;
   const container = document.getElementById('bounties-tab');
-  container.innerHTML = '<p class="text-gray-400">Loading bounties…</p>';
+  container.innerHTML = '<div class="dzc-skeleton" style="height:1.25rem;width:220px"></div>';
   loadBountyBoard(context).catch(error => {
     if (bountyContext?.generation === context.generation) {
       container.textContent = `Failed to load bounties: ${error.message}`;

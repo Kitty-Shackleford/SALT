@@ -1787,6 +1787,36 @@ function testTenantOwnershipMigrationConstraints() {
   }
 }
 
+function testBotDockerfileShipsAllRequiredPublicJs() {
+  const fs = require('fs');
+  const path = require('path');
+  // Any public/js module required (directly or via services/utils) by bot code
+  // must be COPY'd into Dockerfile.bot — the bot image does not ship public/.
+  const dockerfile = fs.readFileSync(path.join(__dirname, '..', 'Dockerfile.bot'), 'utf8');
+  const roots = ['bot', 'services', 'utils', 'db', 'workers'];
+  const required = new Set();
+  const walk = dir => {
+    for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+      if (entry.name === 'node_modules') continue;
+      const full = path.join(dir, entry.name);
+      if (entry.isDirectory()) walk(full);
+      else if (entry.name.endsWith('.js')) {
+        const src = fs.readFileSync(full, 'utf8');
+        for (const m of src.matchAll(/require\(['"](\.\.\/)+(public\/js\/[a-z0-9-]+\.js)['"]\)/g)) {
+          required.add(m[1].replace(/^(?:\.\.\/)+/, ''));
+        }
+      }
+    }
+  };
+  for (const root of roots) walk(path.join(__dirname, '..', root));
+  for (const mod of required) {
+    if (!dockerfile.includes(`COPY public/js/${path.basename(mod)}`) &&
+        !dockerfile.includes(`COPY public/`)) {
+      throw new Error(`Dockerfile.bot must ship public/js module ${mod} required by bot-reachable code`);
+    }
+  }
+}
+
 function testRegisterTokenNeverReassignsServerGuilds() {
   const fs = require('fs');
   const source = fs.readFileSync(path.join(__dirname, '..', 'bot/commands/register-token.js'), 'utf8');
@@ -1794,7 +1824,11 @@ function testRegisterTokenNeverReassignsServerGuilds() {
   if (/DO UPDATE SET[\s\S]{0,200}\n\s+guild_id\s*=\s*EXCLUDED\.guild_id/.test(source)) {
     throw new Error('Register-token still reassigns existing servers across guilds');
   }
-  if (!source.includes('nitradoService.getAuthenticatedUser(token)')) {
+  // The stable Nitrado user ID is resolved via getRegistrationData (which
+  // wraps getAuthenticatedUser + listGameServers with bounded 5xx backoff)
+  // and bound into guild_tokens.nitrado_user_id below.
+  if (!source.includes('nitradoService.getRegistrationData(token)') ||
+      !source.includes('nitrado_user_id')) {
     throw new Error('Register-token does not bind the stable Nitrado user ID');
   }
   if (!source.includes('FOR UPDATE') || !source.includes('getDiscordSetupPermission(interaction)') ||
@@ -2472,7 +2506,7 @@ function testErrorHandlerOnlyClassifiesPostgresSqlState() {
 function testProductionRequiresPostgresPassword() {
   const script = `
     process.env.NODE_ENV = 'production';
-    process.env.DISCORD_CLIENT_ID = '900000000000000002';
+    process.env.DISCORD_CLIENT_ID = '123456789012345678';
     process.env.DISCORD_CLIENT_SECRET = '${'s'.repeat(16)}';
     process.env.SESSION_SECRET = '${'x'.repeat(32)}';
     process.env.ENCRYPTION_KEY = '${'a'.repeat(64)}';
@@ -3307,7 +3341,7 @@ async function testDiscordPostingHasFiniteTimeout() {
 
 async function testFeedWorkerUsesDiscordGuildNamespaceForQueuedEvents() {
   const { processFeedEvents } = require('../workers/feedProcessor');
-  const discordGuildId = '900000000000000002';
+  const discordGuildId = '123456789012345678';
   let serverLookup = null;
   let queueLookup = null;
   const db = {
@@ -3356,7 +3390,7 @@ async function testFeedWorkerUsesDiscordGuildNamespaceForQueuedEvents() {
 
 async function testFeedWorkerDoesNotRouteFactionEventsToKillFeed() {
   const { processFeedEvents } = require('../workers/feedProcessor');
-  const discordGuildId = '900000000000000002';
+  const discordGuildId = '123456789012345678';
   let routedToKillFeed = false;
   let eventStatusWrites = 0;
   let pendingRead = null;
@@ -3532,7 +3566,7 @@ function testADMConnectingFormat() {
 }
 
 // Minimal valid environment for validateEnv()
-process.env.DISCORD_CLIENT_ID = process.env.DISCORD_CLIENT_ID || '900000000000000002';
+process.env.DISCORD_CLIENT_ID = process.env.DISCORD_CLIENT_ID || '123456789012345678';
 const testCrypto = require('crypto');
 process.env.DISCORD_CLIENT_SECRET = process.env.DISCORD_CLIENT_SECRET || testCrypto.randomBytes(16).toString('hex');
 process.env.SESSION_SECRET = process.env.SESSION_SECRET || testCrypto.randomBytes(32).toString('hex');
@@ -3665,6 +3699,9 @@ process.env.PORT = process.env.PORT || '3000';
 
     testRegisterTokenNeverReassignsServerGuilds();
     console.log('✅ Register-token server ownership binding passed');
+
+    testBotDockerfileShipsAllRequiredPublicJs();
+    console.log('✅ Bot Dockerfile ships all required public JS modules passed');
 
     testWebsiteServerRegistrationRequiresBoundAccountService();
     console.log('✅ Website server registration account binding passed');

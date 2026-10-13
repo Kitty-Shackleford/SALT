@@ -1,5 +1,8 @@
 'use strict';
 
+const { ensureTestEncryptionKey } = require('./lib/test-env');
+ensureTestEncryptionKey();
+
 const assert = require('assert');
 const fs = require('fs');
 const path = require('path');
@@ -1390,7 +1393,9 @@ function responseRecorder() {
   await test('scheduler expires bounty escrow through bounded exact-server transactions', async () => {
     const scheduler = source('scheduler.js');
     assert.match(scheduler, /expireBounties/);
-    assert.match(scheduler, /SELECT id FROM servers[\s\S]*status = 'active'/i);
+    // The bounty expirer must only touch servers that have an economy config —
+    // servers without one cannot settle wallet bounties and would throw.
+    assert.match(scheduler, /SELECT s\.id FROM servers[\s\S]*?JOIN guild_economy_config[\s\S]*status = 'active'/i);
     assert.match(scheduler, /db\.transaction[\s\S]*expireBounties\(db,\s*server\.id/i);
     assert.match(scheduler, /wallet credited[\s\S]*deferred claims/i,
       'scheduler must report immediate credits separately from deferred obligations');

@@ -116,10 +116,48 @@ class PostgreSQLAdapter {
 
   /**
    * Convert legacy question-mark placeholders to PostgreSQL parameters.
+   *
+   * A bare `sql.replace(/\?/g, ...)` corrupts any SQL whose single-quoted
+   * string literal contains a literal `?` (e.g. a DayZ coordinate validator
+   * regex like '^[+-]?[0-9]+([.][0-9]+)?$'): the `?` inside the literal gets
+   * rewritten to `$n`, shifting the real parameters and making PostgreSQL
+   * report "could not determine data type of parameter $1". We therefore
+   * walk the string and only rewrite `?` that sit outside single-quoted
+   * string literals. `''` (escaped quote) inside a literal is preserved.
    */
   _convertPlaceholders(sql) {
     let index = 0;
-    return sql.replace(/\?/g, () => `$${++index}`);
+    let out = '';
+    let inString = false;
+    for (let i = 0; i < sql.length; i += 1) {
+      const ch = sql[i];
+      if (inString) {
+        if (ch === "'") {
+          // Handle '' escaped quote: a doubled quote does NOT end the literal.
+          if (sql[i + 1] === "'") {
+            out += "''";
+            i += 1;
+          } else {
+            inString = false;
+            out += "'";
+          }
+        } else {
+          out += ch;
+        }
+        continue;
+      }
+      if (ch === "'") {
+        inString = true;
+        out += "'";
+        continue;
+      }
+      if (ch === '?') {
+        out += `$${++index}`;
+        continue;
+      }
+      out += ch;
+    }
+    return out;
   }
 
   /**
@@ -241,7 +279,7 @@ class PostgreSQLAdapter {
     const values = Object.values(data);
     const placeholders = keys.map((_, i) => `$${i + 1}`).join(', ');
     const sql = `INSERT INTO ${table} (${keys.join(', ')}) VALUES (${placeholders}) RETURNING id`;
-
+    
     return this._withClient(async client => {
       const result = await client.query(sql, values);
       return result.rows[0]?.id || null;
@@ -262,7 +300,7 @@ class PostgreSQLAdapter {
     const whereClause = whereKeys.map((key, i) => `${key} = $${setKeys.length + i + 1}`).join(' AND ');
     const sql = `UPDATE ${table} SET ${setClause} WHERE ${whereClause}`;
     const params = [...Object.values(data), ...Object.values(where)];
-
+    
     return this._withClient(async client => {
       const result = await client.query(sql, params);
       return result.rowCount || 0;
@@ -279,7 +317,7 @@ class PostgreSQLAdapter {
     const whereKeys = Object.keys(where);
     const whereClause = whereKeys.map((key, i) => `${key} = $${i + 1}`).join(' AND ');
     const sql = `DELETE FROM ${table} WHERE ${whereClause}`;
-
+    
     return this._withClient(async client => {
       const result = await client.query(sql, Object.values(where));
       return result.rowCount || 0;

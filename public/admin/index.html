@@ -2,7 +2,9 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Admin Dashboard - DayZ Dashboard</title>
+  <link rel="stylesheet" href="/css/theme.css">
   <link rel="stylesheet" href="/css/tailwind.css">
   <style>
     @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
@@ -24,18 +26,6 @@
       </div>
     </div>
 
-    <!-- Admin Navigation -->
-    <nav class="bg-gray-800 rounded-lg p-4 mb-6">
-      <div class="flex gap-2 flex-wrap">
-        <a href="/admin" class="bg-orange-600 px-4 py-2 rounded font-semibold">Dashboard</a>
-        <a href="/admin/guilds" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">Discord Communities</a>
-        <a href="/admin/guilds-approval" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">Guild Approval</a>
-        <a href="/admin/servers" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">All Servers</a>
-        <a href="/admin/users" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">Users</a>
-        <a href="/admin/audit" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">Audit Log</a>
-        <a href="/admin/database" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">Database Tools</a>
-      </div>
-    </nav>
 
     <!-- Overview Stats Cards -->
     <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
@@ -80,7 +70,7 @@
         <div class="flex items-start justify-between">
           <div class="flex-1">
             <p class="text-gray-400 text-sm mb-1">System Health</p>
-            <p class="text-xl font-bold mb-3" id="health-status">-</p>
+            <p class="text-xl font-bold mb-3" id="health-status" aria-live="polite">-</p>
             <div class="space-y-1 text-sm" id="health-checks">
               <p class="text-gray-500">Loading...</p>
             </div>

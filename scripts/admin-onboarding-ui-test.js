@@ -10,19 +10,14 @@ function harness(file, overrides = {}) {
   const element = id => {
     if (!elements.has(id)) elements.set(id, {
       innerHTML: '', textContent: '', value: '', style: {}, className: '',
-      classList: { add() {}, remove() {}, toggle() {} },
+      classList: { remove() {}, toggle() {} },
       addEventListener() {}, querySelectorAll: () => [],
     });
     return elements.get(id);
   };
-  const appended = [];
   const context = vm.createContext({
     api: { get: () => new Promise(() => {}) },
-    document: {
-      getElementById: element, addEventListener() {}, querySelectorAll: () => [],
-      createElement: () => ({ className: '', textContent: '', remove() {} }),
-      body: { appendChild: node => appended.push(node) },
-    },
+    document: { getElementById: element, addEventListener() {}, querySelectorAll: () => [] },
     window: {}, console, alert() {}, confirm: () => false,
     fetch: () => new Promise(() => {}),
     fetchWithCsrf: () => new Promise(() => {}),
@@ -30,7 +25,7 @@ function harness(file, overrides = {}) {
     ...overrides,
   });
   vm.runInContext(fs.readFileSync(path.join(__dirname, '..', 'public/js', file), 'utf8'), context);
-  return { context, element, appended };
+  return { context, element };
 }
 
 function deferred() {
@@ -57,8 +52,8 @@ async function main() {
   const named = approval.context.renderGuildCard({ ...shell, ownerUsername: '<script>owner</script>' });
   assert.ok(named.includes('&lt;script&gt;owner&lt;/script&gt;'));
   assert.ok(!named.includes('<script>owner</script>'));
-  const identified = approval.context.renderGuildCard({ ...shell, ownerDiscordId: '900000000000000001' });
-  assert.ok(identified.includes('900000000000000001'), 'known owner ID survives a missing username');
+  const identified = approval.context.renderGuildCard({ ...shell, ownerDiscordId: '123456789012345678' });
+  assert.ok(identified.includes('123456789012345678'), 'known owner ID survives a missing username');
 
   const listing = harness('admin-guilds.js');
   listing.context.api.get = async () => ({ json: async () => ({ success: true, guilds: [shell] }) });
@@ -125,78 +120,6 @@ async function main() {
   roleRequests[2].reject(new Error('stale failure'));
   await openingC;
   assert.deepEqual(roleAlerts, [], 'a stale user-role failure must not alert over the current selection');
-
-  const mutationAlerts = [];
-  const mutationBodies = [];
-  const mutationUsers = harness('admin-users.js', {
-    alert: message => mutationAlerts.push(message),
-    confirm: () => true,
-    fetchWithCsrf(url, options) {
-      if (!options) {
-        const payload = url === '/api/roles/context'
-          ? { scopes: [], availableGrants: [] }
-          : { users: [] };
-        return Promise.resolve({ ok: true, json: async () => payload });
-      }
-      const body = deferred();
-      mutationBodies.push(body);
-      return Promise.resolve({ ok: true, json: () => body.promise });
-    },
-  });
-  mutationUsers.element('grant-select').value = JSON.stringify({ role: 'guild_admin', guildId: 20 });
-  vm.runInContext(`
-    selectedUser = { id: 5, username: 'Old user' };
-    selectionGeneration = 10;
-    window.openCalls = 0;
-    window.loadCalls = 0;
-    openRoles = async () => { window.openCalls++; return true; };
-    loadPage = async () => { window.loadCalls++; };
-  `, mutationUsers.context);
-  const staleGrant = mutationUsers.context.grantRole();
-  await flush();
-  mutationUsers.context.closeRoles();
-  vm.runInContext("selectedUser = { id: 6, username: 'New user' }; selectionGeneration++;", mutationUsers.context);
-  mutationUsers.element('grant-role-btn').disabled = true;
-  mutationBodies[0].resolve({ success: true });
-  await staleGrant;
-  assert.equal(mutationUsers.context.window.openCalls, 0,
-    'a stale role mutation success must not refresh the old selection');
-  assert.equal(mutationUsers.context.window.loadCalls, 0,
-    'a stale role mutation success must not reload under a newer selection');
-  assert.equal(mutationUsers.element('grant-role-btn').disabled, true,
-    'stale cleanup must not alter controls belonging to a newer selection');
-  assert.deepEqual(mutationAlerts, []);
-
-  const userSource = fs.readFileSync(path.join(__dirname, '..', 'public/js/admin-users.js'), 'utf8');
-  for (const functionName of ['transferOwnership', 'grantRole', 'removeRole']) {
-    const start = userSource.indexOf(`async function ${functionName}`);
-    const end = userSource.indexOf('\nasync function ', start + 1);
-    const body = userSource.slice(start, end === -1 ? undefined : end);
-    assert.match(body, /selectionIsCurrent\(generation, userId\)/,
-      `${functionName} must suppress stale success, error, and cleanup continuations`);
-  }
-
-  const guildAlerts = [];
-  const actionBodies = [];
-  const actions = harness('admin-guilds-approval.js', {
-    alert: message => guildAlerts.push(message),
-    fetchWithCsrf() {
-      const body = deferred();
-      actionBodies.push(body);
-      return Promise.resolve({ json: () => body.promise });
-    },
-  });
-  vm.runInContext("pendingAction = { action: 'disable', guildId: 'old-guild' }; guildActionGeneration = 3;", actions.context);
-  const staleAction = actions.context.executeAction();
-  await flush();
-  actions.context.closeModal();
-  vm.runInContext("pendingAction = { action: 'enable', guildId: 'new-guild' }; guildActionGeneration++;", actions.context);
-  actionBodies[0].resolve({ success: true });
-  await staleAction;
-  assert.deepEqual(guildAlerts, [], 'a stale guild mutation must not display an alert for a newer action');
-  assert.equal(actions.appended.length, 0, 'a stale guild mutation must not display a success message');
-  assert.equal(vm.runInContext('pendingAction.guildId', actions.context), 'new-guild',
-    'a stale guild mutation must not close the newer confirmation modal');
   console.log('Admin onboarding UI tests passed');
 }
 

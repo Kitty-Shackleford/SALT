@@ -6,7 +6,7 @@ on:
   workflow_dispatch: {}
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   changelog:
@@ -20,16 +20,16 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '22'
+          node-version: 22
 
       - name: Run Merry changelog generator
         run: |
           node scripts/merry-changelog.js
 
-      - name: Upload generated changelog
-        uses: actions/upload-artifact@v4
+      - name: Commit CHANGELOG.md if changed
+        uses: stefanzweifel/git-auto-commit-action@v4
         with:
-          name: merry-changelog-${{ github.sha }}
-          path: CHANGELOG.md
-          if-no-files-found: error
-          retention-days: 14
+          commit_message: "chore(merry): update CHANGELOG.md [skip ci]"
+          file_pattern: CHANGELOG.md
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -43,6 +43,12 @@ const { verifyGuildMembership } = require('../utils/discordAPI');
 const { ensurePlayerGuildAccess } = require('../middleware/serverAccess');
 const { admTupleToWorld } = require('../utils/dayzCoordinates');
 const { isPlayerMapFeatureEnabled, parsePlayerMapSettings } = require('../utils/playerMapPolicy');
+const {
+  FLAG_POLE_RADIUS_METERS,
+  validateTerritorySubmission,
+  serializeTerritory,
+} = require('../services/factionTerritoryService');
+const { lockUserRoleMutations } = require('../utils/roleMutationLocks');
 
 router.param('guildId', ensurePlayerGuildAccess);
 
@@ -132,6 +138,39 @@ async function getCallerIdentityForServer(
   return row ? row.id : null;
 }
 
+async function lockCallerTerritoryAuthority(db, userId, internalGuildId, serverId) {
+  const candidate = await db.get(
+    `SELECT spm.id AS membership_id, spm.identity_id, spm.source_link_id
+       FROM server_player_memberships spm
+       JOIN linked_accounts la
+         ON la.id = spm.source_link_id
+        AND la.identity_id = spm.identity_id
+        AND la.user_id = spm.user_id
+      WHERE spm.user_id = ? AND spm.guild_id = ? AND spm.server_id = ?
+        AND spm.status = 'active'
+        AND la.verification_method IN ('emote_challenge', 'admin_approved', 'self_asserted')
+      LIMIT 1`,
+    [userId, internalGuildId, serverId]
+  );
+  if (!candidate) return null;
+  const proof = await db.get(
+    `SELECT id FROM linked_accounts
+      WHERE id = ? AND user_id = ? AND identity_id = ?
+        AND verification_method IN ('emote_challenge', 'admin_approved', 'self_asserted')
+      FOR UPDATE`,
+    [candidate.source_link_id, userId, candidate.identity_id]
+  );
+  if (!proof) return null;
+  return db.get(
+    `SELECT id AS server_membership_id, identity_id AS id FROM server_player_memberships
+      WHERE id = ? AND server_id = ? AND guild_id = ? AND user_id = ?
+        AND identity_id = ? AND source_link_id = ? AND status = 'active'
+      FOR UPDATE`,
+    [candidate.membership_id, serverId, internalGuildId, userId,
+      candidate.identity_id, candidate.source_link_id]
+  );
+}
+
 async function lockActiveServer(db, serverId, internalGuildId) {
   return db.get(
     `SELECT s.id
@@ -139,7 +178,7 @@ async function lockActiveServer(db, serverId, internalGuildId) {
      JOIN guilds g ON g.id = s.guild_id
      WHERE s.id = ? AND s.guild_id = ?
        AND s.status = 'active' AND g.status = 'approved'
-     FOR UPDATE OF s`,
+     FOR UPDATE OF s, g`,
     [serverId, internalGuildId]
   );
 }
@@ -1122,55 +1161,27 @@ router.get('/:guildId/:factionId/map', async (req, res) => {
     const internalGuildId = await resolveGuild(db, guildId);
     if (!internalGuildId) return res.status(404).json({ error: 'Guild not found' });
 
-    const server = await db.get(
-      `SELECT s.id
-       FROM servers s
-       JOIN guilds g ON g.id = s.guild_id
-       WHERE s.id = ? AND s.guild_id = ?
-         AND s.status = 'active' AND g.status = 'approved'`,
-      [serverId, internalGuildId]
-    );
-    if (!server) return res.status(404).json({ error: 'Server not found' });
-
-    const policyRow = await db.get(
-      "SELECT config FROM server_features WHERE server_id = ? AND feature_name = 'player_map'",
-      [server.id]
-    );
-    const playerMapSettings = parsePlayerMapSettings(policyRow?.config);
-
-    // Verify faction belongs to guild
-    const faction = await db.get(
-      'SELECT id FROM factions WHERE id = ? AND guild_id = ?',
-      [factionId, internalGuildId]
-    );
-    if (!faction) return res.status(404).json({ error: 'Faction not found' });
-
-    // Caller must have trusted membership on the exact active server.
-    const callerRow = await db.get(
-      `SELECT spm.identity_id AS id
-       FROM server_player_memberships spm
-       JOIN linked_accounts la
-         ON la.id = spm.source_link_id
-        AND la.identity_id = spm.identity_id
-        AND la.user_id = spm.user_id
-        AND la.verification_method IN ('emote_challenge', 'admin_approved', 'self_asserted')
-       WHERE spm.user_id = ? AND spm.guild_id = ? AND spm.server_id = ?
-         AND spm.status = 'active'
-       LIMIT 1`,
-      [userId, internalGuildId, server.id]
-    );
-    const callerIdentityId = callerRow?.id || null;
-    if (!callerIdentityId) {
-      return res.status(403).json({ error: 'You must have a linked account in this guild' });
-    }
-    const callerMembership = await getCallerMembership(db, factionId, callerIdentityId);
-    if (!callerMembership) {
-      return res.status(403).json({ error: 'You are not a member of this faction' });
-    }
+    const result = await db.transaction(async tx => {
+      // Parent-first locks keep server state, player-map policy, link proof, exact-server
+      // membership, and faction membership stable until the projection is complete.
+      const server = await lockActiveServer(tx, Number(serverId), internalGuildId);
+      if (!server) return { rejection: { status: 404, error: 'Server not found' } };
+      const playerMapSettings = await lockPlayerMapPolicy(tx, server.id);
+      const faction = await lockFactionInGuild(tx, Number(factionId), internalGuildId);
+      if (!faction) return { rejection: { status: 404, error: 'Faction not found' } };
+      const caller = await lockCallerTerritoryAuthority(tx, userId, internalGuildId, server.id);
+      if (!caller) {
+        return { rejection: { status: 403, error: 'You must have a linked account in this guild' } };
+      }
+      const callerMembership = await getFactionMembershipForUpdate(tx, faction.id, caller.id);
+      if (!callerMembership) {
+        return { rejection: { status: 403, error: 'You are not a member of this faction' } };
+      }
+      const callerIdentityId = caller.id;
 
     // Fetch markers only when the exact server policy permits them.
     const markers = isPlayerMapFeatureEnabled(playerMapSettings, 'factionMarkers')
-      ? await db.all(
+      ? await tx.all(
       `SELECT fm.*,
               COALESCE(pg.gamertag, pi.platform_username) AS creator_name
        FROM faction_markers fm
@@ -1185,10 +1196,22 @@ router.get('/:guildId/:factionId/map', async (req, res) => {
       [factionId, server.id, mapName]
     ) : [];
 
+    // Approved territory is a deliberate, server-side player disclosure. Pending,
+    // rejected, revoked, other-server, and other-faction rows never cross this API.
+    const territories = isPlayerMapFeatureEnabled(playerMapSettings, 'factionTerritories')
+      ? await tx.all(
+        `SELECT ft.*
+           FROM faction_territories ft
+          WHERE ft.faction_id = ? AND ft.guild_id = ? AND ft.server_id = ?
+            AND ft.map_name = ? AND ft.status = 'approved'
+          ORDER BY ft.updated_at DESC, ft.id DESC`,
+        [factionId, internalGuildId, server.id, String(mapName).trim().toLowerCase()]
+      ) : [];
+
     // Fetch newest regular PlayerList position for each faction member only when
     // health timestamps are intentionally separate from location freshness.
     const members = isPlayerMapFeatureEnabled(playerMapSettings, 'factionMembers')
-      ? await db.all(
+      ? await tx.all(
       `SELECT ps.identity_id,
               ps.pos_x,
               ps.pos_y,
@@ -1220,22 +1243,112 @@ router.get('/:guildId/:factionId/map', async (req, res) => {
       [server.id, internalGuildId, server.id, server.id, factionId]
     ) : [];
 
-    res.json({
-      success: true,
-      mapName,
-      markers,
-      members: members.map(member => ({
-        ...member,
-        position: member.pos_x == null || member.pos_y == null
-          ? null
-          : admTupleToWorld(member),
-      })),
-      callerIdentityId,
-      callerRank: callerMembership.rank,
+      return {
+        payload: {
+          success: true,
+          mapName,
+          markers,
+          territories: territories.map(serializeTerritory),
+          members: members.map(member => ({
+            ...member,
+            position: member.pos_x == null || member.pos_y == null
+              ? null
+              : admTupleToWorld(member),
+          })),
+          callerIdentityId,
+          callerRank: callerMembership.rank,
+        },
+      };
     });
+    if (result.rejection) {
+      return res.status(result.rejection.status).json({ error: result.rejection.error });
+    }
+    return res.json(result.payload);
   } catch (err) {
     console.error('GET /api/factions/:guildId/:factionId/map error:', err);
     res.status(500).json({ error: 'Failed to load faction map data' });
+  }
+});
+
+// ---------------------------------------------------------------------------
+// POST /:guildId/:factionId/territories — Submit an explicit flag-pole claim
+// Body: { serverId, mapName, poleEast, poleNorth }
+// Auth: exact-server faction leader; staff approval is required for publication
+// ---------------------------------------------------------------------------
+
+router.post('/:guildId/:factionId/territories', async (req, res) => {
+  const db = req.app.locals.db;
+  const { guildId, factionId } = req.params;
+  const serverId = req.body?.serverId;
+  const userId = req.user.id;
+  if (!/^\d+$/.test(String(serverId || '')) || !/^\d+$/.test(String(factionId || ''))) {
+    return res.status(400).json({ error: 'serverId and factionId must be positive integers' });
+  }
+
+  let submission;
+  try {
+    submission = validateTerritorySubmission(req.body);
+  } catch (error) {
+    return res.status(400).json({ error: error.message });
+  }
+
+  try {
+    const isMember = await verifyGuildMembership(req.user.access_token, guildId);
+    if (!isMember) return res.status(403).json({ error: 'You are not a member of this guild' });
+    const internalGuildId = await resolveGuild(db, guildId);
+    if (!internalGuildId) return res.status(404).json({ error: 'Guild not found' });
+
+    const result = await db.transaction(async tx => {
+      await lockUserRoleMutations(tx, [userId]);
+      const lockedServer = await lockActiveServer(tx, Number(serverId), internalGuildId);
+      if (!lockedServer) return { rejection: { status: 404, error: 'Server not found' } };
+      const playerMapSettings = await lockPlayerMapPolicy(tx, lockedServer.id);
+      if (!isPlayerMapFeatureEnabled(playerMapSettings, 'factionTerritories')) {
+        return { rejection: { status: 403, error: 'Faction territory submissions are disabled' } };
+      }
+      const lockedFaction = await lockFactionInGuild(tx, Number(factionId), internalGuildId);
+      if (!lockedFaction) return { rejection: { status: 404, error: 'Faction not found' } };
+      const caller = await lockCallerTerritoryAuthority(
+        tx, userId, internalGuildId, lockedServer.id
+      );
+      if (!caller) return { rejection: { status: 403, error: 'Access denied' } };
+      const membership = await getFactionMembershipForUpdate(tx, lockedFaction.id, caller.id);
+      if (!membership || membership.rank !== 'leader') {
+        return { rejection: { status: 403, error: 'Only the faction leader may submit territory' } };
+      }
+
+      const territory = await tx.get(
+        `INSERT INTO faction_territories
+           (server_id, guild_id, faction_id, map_name, pole_east, pole_north, radius_m,
+            submitted_by_user_id, submitted_by_identity_id,
+            submitted_by_server_membership_id, submitted_by_faction_membership_id)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+         RETURNING *`,
+        [lockedServer.id, internalGuildId, lockedFaction.id, submission.mapName,
+          submission.poleEast, submission.poleNorth, FLAG_POLE_RADIUS_METERS,
+          userId, caller.id, caller.server_membership_id, membership.id]
+      );
+      await tx.run(
+        `INSERT INTO security_audit_events
+           (guild_id, server_id, actor_user_id, action, result, target_type, target_id, metadata)
+         VALUES (?, ?, ?, 'faction_territory.submitted', 'allowed',
+                 'faction_territory', ?, ?::jsonb)`,
+        [internalGuildId, lockedServer.id, userId, String(territory.id),
+          JSON.stringify({ factionId: lockedFaction.id, mapName: submission.mapName })]
+      );
+      return { territory };
+    });
+
+    if (result.rejection) {
+      return res.status(result.rejection.status).json({ error: result.rejection.error });
+    }
+    return res.status(201).json({ success: true, territory: serializeTerritory(result.territory) });
+  } catch (error) {
+    if (error.code === '23505') {
+      return res.status(409).json({ error: 'This faction already has a pending or approved territory' });
+    }
+    console.error('POST /territories error:', error.message);
+    return res.status(500).json({ error: 'Failed to submit faction territory' });
   }
 });
 

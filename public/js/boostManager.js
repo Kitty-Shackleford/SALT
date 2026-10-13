@@ -154,7 +154,7 @@ async function onToggleBoost() {
 async function loadBoostHistory(page) {
   currentPage = page;
   const wrap = document.getElementById('historyWrap');
-  wrap.innerHTML = '<p class="text-gray-400 text-sm">Loading…</p>';
+  wrap.innerHTML = '<div class="dzc-skeleton" style="height:1.25rem;width:220px"></div>';
 
   try {
     const res = await fetch(`/api/boost/${currentServerId}/history?page=${page}`);
@@ -173,7 +173,7 @@ function renderBoostHistory(data) {
   countBadge.textContent = `${data.boosts_count} total boost${data.boosts_count !== 1 ? 's' : ''}`;
 
   if (!data.boosts || data.boosts.length === 0) {
-    wrap.innerHTML = '<p class="text-gray-400 text-sm">No boosts yet. Share your boost code to get started!</p>';
+    wrap.innerHTML = '<div class="dzc-empty"><div class="dzc-empty-title">No boosts yet. Share your boost code to get started!</div></div>';
     document.getElementById('paginationWrap').classList.add('hidden');
     return;
   }

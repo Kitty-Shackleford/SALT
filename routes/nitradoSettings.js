@@ -37,9 +37,9 @@ router.get('/:serverId', async (req, res) => {
 
   try {
     const token = await getGuildToken(db, req.platformServerAccess.guildId);
-
+    
     if (!token) {
-      return res.status(404).json({
+      return res.status(404).json({ 
         error: 'No Nitrado token found for this guild',
         message: 'Use /register-token in Discord to register your token'
       });

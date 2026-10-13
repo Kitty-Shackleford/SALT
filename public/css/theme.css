@@ -1,0 +1,422 @@
+/* ============================================================================
+ * DayZ Dashboard — Design tokens (B1.1 + Card 2/9 theme foundation)
+ * ----------------------------------------------------------------------------
+ * This file is the single source of truth for the visual theme. Every
+ * color, font, radius, and elevation used by the dashboard must come from
+ * these variables (directly or via the Tailwind theme extension in
+ * styles/input.css). Tailwind utility classes stay as they are; this layer
+ * is variables-only.
+ *
+ * Theme selection (5 base themes, pure variable swaps on data-theme):
+ *   - <html data-theme="livonia">       (DEFAULT — Soviet TTsKO Forest, dark)
+ *   - <html data-theme="chernarus">     (U.S. Woodland, dark, earthier)
+ *   - <html data-theme="sakhal">        (Digital Winter — THE LIGHT THEME)
+ *   - <html data-theme="nasadra">       (Desert MultiCam, dark warm)
+ *   - <html data-theme="high-contrast"> (WCAG AAA-ish, black/white)
+ *
+ *   Legacy names are aliases of the new set so persisted preferences from
+ *   the B1.2 era keep working without a migration of user data:
+ *     data-theme="dark"  ≡ livonia
+ *     data-theme="light" ≡ sakhal
+ *
+ * Two-role accent discipline (never swap roles):
+ *   --dzc-accent  — identity / selection / brand color only.
+ *   --dzc-stat    — "act": primary actions, live indicators, positive
+ *                   deltas (DayZ phosphor family).
+ * Each base theme pins its OWN identity accent; nothing downstream keys off
+ * theme *names*, only off these variables.
+ *
+ * Per-guild accent overrides are injected at render time as a <style> block
+ * that re-declares `--dzc-accent*` on :root — nothing in this file, and no
+ * JS logic, keys off theme names, only off these variables.
+ *
+ * Naming convention: --dzc-* ("DayZ Console").
+ * ==========================================================================*/
+
+/* -- Self-hosted display face (stencil/military) ---------------------------
+ * Subset to printable ASCII (U+0020-007E); license: OFL (see
+ * public/fonts/blackopsone-OFL.txt). Used for display headings, stat
+ * readouts, and large numerals only — never for body copy. */
+@font-face {
+  font-family: 'DayZ Display';
+  src: url('/fonts/blackopsone-regular.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* -- Token inventory --------------------------------------------------------
+ * Theme-dependent (re-declared in EVERY base theme block below):
+ *   bg, bg-tint, surface, surface-2, surface-3,
+ *   border, border-strong,
+ *   text, text-muted, text-faint,
+ *   accent, accent-olive (identity alias used by splash wash/icons),
+ *   accent-khaki (secondary identity hue),
+ *   accent-contrast, stat, stat-dim,
+ *   warning, danger, info,
+ *   shadow-md, shadow-lg
+ * Theme-invariant (declared ONCE on :root below, inherited by all themes):
+ *   accent-hover (derived from accent), font-*, letter-spacing-display,
+ *   space-*, radius-*
+ * ==========================================================================*/
+
+/* -- Theme-invariant tokens (declared once, inherited by every theme) ------ */
+:root {
+  /* Typography */
+  --dzc-font-display: 'DayZ Display', 'Arial Narrow', system-ui, sans-serif;
+  --dzc-font-body: Inter, system-ui, 'Segoe UI', Arial, sans-serif;
+  --dzc-font-mono: 'JetBrains Mono', ui-monospace, 'Courier New', monospace;
+  --dzc-letter-spacing-display: 0.06em;
+
+  /* Spacing scale (keep multiples of the 4px base grid) */
+  --dzc-space-1: 4px;
+  --dzc-space-2: 8px;
+  --dzc-space-3: 12px;
+  --dzc-space-4: 16px;
+  --dzc-space-5: 24px;
+  --dzc-space-6: 32px;
+  --dzc-space-7: 48px;
+  --dzc-space-8: 64px;
+
+  /* Radius + elevation (elevation shadows are theme-dependent — see blocks) */
+  --dzc-radius-sm: 4px;
+  --dzc-radius-md: 8px;
+  --dzc-radius-lg: 12px;
+
+  /* Accent hover is derived from whichever accent is active (theme, guild,
+   * or holiday pack), so it is declared once, here. */
+  --dzc-accent-hover: color-mix(in srgb, var(--dzc-accent) 85%, #ffffff 15%);
+  /* Soft accent wash: selected-row fill and other selection tints. Resolves
+   * against the active accent at use time, so guild overrides track it. */
+  --dzc-accent-soft: color-mix(in srgb, var(--dzc-accent) 14%, transparent);
+}
+
+/* -- livonia (DEFAULT) — Soviet TTsKO Forest, dark -------------------------
+ * The :root block carries the livonia palette as the fallback token set:
+ * any page that somehow renders without the data-theme attribute (render
+ * paths bypass the theme injection) still resolves to the default theme,
+ * the same way B1.2's :root carried the dark palette. The
+ * html[data-theme='livonia'] selector re-declares the same set explicitly
+ * so livonia never depends on the fallback. */
+:root,
+html[data-theme='livonia'] {
+  --dzc-bg: #0c120d;
+  --dzc-bg-tint: #101711;
+  --dzc-surface: #121a13;
+  --dzc-surface-2: #172019;
+  --dzc-surface-3: #1f2a1f;
+
+  --dzc-border: #24331f;
+  --dzc-border-strong: #37492f;
+
+  --dzc-text: #eaf2e9;
+  --dzc-text-muted: #a7b8a4;
+  --dzc-text-faint: #6d7f6a;
+
+  /* Identity (accent) / secondary identity hue */
+  --dzc-accent: #6f9a3d;
+  --dzc-accent-olive: var(--dzc-accent);
+  --dzc-accent-khaki: #a89a5e;
+
+  /* Act — primary actions / positive / DayZ phosphor */
+  --dzc-stat: #34e07a;
+  --dzc-stat-dim: color-mix(in srgb, var(--dzc-stat) 55%, var(--dzc-bg) 45%);
+
+  /* Semantic */
+  --dzc-warning: #e6b23a;
+  --dzc-danger: #e05252;
+  --dzc-info: #5cc8a0;
+
+  --dzc-accent-contrast: #0c120d;
+  --dzc-shadow-md: 0 4px 12px rgba(0, 0, 0, 0.45);
+  --dzc-shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.55);
+}
+
+/* -- chernarus — U.S. Woodland, dark, earthier / multi-tonal --------------- */
+html[data-theme='chernarus'] {
+  --dzc-bg: #0e0d08;
+  --dzc-bg-tint: #13120b;
+  --dzc-surface: #14130c;
+  --dzc-surface-2: #1a1810;
+  --dzc-surface-3: #242116;
+
+  --dzc-border: #2d2a1c;
+  --dzc-border-strong: #44402a;
+
+  --dzc-text: #f2efe3;
+  --dzc-text-muted: #b4ad92;
+  --dzc-text-faint: #7c7560;
+
+  --dzc-accent: #9a8439;
+  --dzc-accent-olive: var(--dzc-accent);
+  --dzc-accent-khaki: #b3a36a;
+
+  --dzc-stat: #7fa33a;
+  --dzc-stat-dim: color-mix(in srgb, var(--dzc-stat) 55%, var(--dzc-bg) 45%);
+
+  --dzc-warning: #e6b23a;
+  --dzc-danger: #e05252;
+  --dzc-info: #9db86a;
+
+  --dzc-accent-contrast: #0e0d08;
+  --dzc-shadow-md: 0 4px 12px rgba(0, 0, 0, 0.45);
+  --dzc-shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.55);
+}
+
+/* -- sakhal — Digital Winter, THE LIGHT THEME ------------------------------ */
+html[data-theme='sakhal'] {
+  --dzc-bg: #e8edf3;
+  --dzc-bg-tint: #eef2f7;
+  --dzc-surface: #ffffff;
+  --dzc-surface-2: #f2f5fa;
+  --dzc-surface-3: #e2e9f1;
+
+  --dzc-border: #ccd5e0;
+  --dzc-border-strong: #a3b1c4;
+
+  --dzc-text: #14181f;
+  --dzc-text-muted: #485364;
+  --dzc-text-faint: #7a879a;
+
+  --dzc-accent: #3a63d6;
+  --dzc-accent-olive: var(--dzc-accent);
+  --dzc-accent-khaki: #5a7db8;
+
+  --dzc-stat: #2f9e6f;
+  --dzc-stat-dim: color-mix(in srgb, var(--dzc-stat) 55%, var(--dzc-bg) 45%);
+
+  --dzc-warning: #96660a;
+  --dzc-danger: #c0392b;
+  --dzc-info: #3a63d6;
+
+  --dzc-accent-contrast: #ffffff;
+  /* Light shadows for the light theme. */
+  --dzc-shadow-md: 0 4px 12px rgba(20, 24, 31, 0.12);
+  --dzc-shadow-lg: 0 8px 24px rgba(20, 24, 31, 0.16);
+}
+
+/* -- nasadra — Desert MultiCam, dark warm ----------------------------------- */
+html[data-theme='nasadra'] {
+  --dzc-bg: #14100a;
+  --dzc-bg-tint: #18130c;
+  --dzc-surface: #1b150d;
+  --dzc-surface-2: #221b11;
+  --dzc-surface-3: #2d2517;
+
+  --dzc-border: #372d1c;
+  --dzc-border-strong: #4f412b;
+
+  --dzc-text: #f4efe6;
+  --dzc-text-muted: #bdb098;
+  --dzc-text-faint: #877a62;
+
+  --dzc-accent: #c29a4a;
+  --dzc-accent-olive: var(--dzc-accent);
+  --dzc-accent-khaki: #b3a36a;
+
+  --dzc-stat: #d9822f;
+  --dzc-stat-dim: color-mix(in srgb, var(--dzc-stat) 55%, var(--dzc-bg) 45%);
+
+  --dzc-warning: #f5b93f;
+  --dzc-danger: #f0564f;
+  --dzc-info: #4ea1ff;
+
+  --dzc-accent-contrast: #14100a;
+  --dzc-shadow-md: 0 4px 12px rgba(0, 0, 0, 0.5);
+  --dzc-shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.6);
+}
+
+/* -- high-contrast — separate accessibility theme, WCAG AAA-ish ------------ */
+html[data-theme='high-contrast'] {
+  --dzc-bg: #000000;
+  --dzc-bg-tint: #060606;
+  --dzc-surface: #0d0d0d;
+  --dzc-surface-2: #161616;
+  --dzc-surface-3: #232323;
+
+  --dzc-border: #5a5a5a;
+  --dzc-border-strong: #8f8f8f;
+
+  --dzc-text: #ffffff;
+  --dzc-text-muted: #dcdcdc;
+  --dzc-text-faint: #adadad;
+
+  --dzc-accent: #46ff90;
+  --dzc-accent-olive: var(--dzc-accent);
+  --dzc-accent-khaki: #a0ffb8;
+
+  --dzc-stat: #46ff90;
+  --dzc-stat-dim: #2ab865;
+
+  --dzc-warning: #ffd23f;
+  --dzc-danger: #ff7575;
+  --dzc-info: #9fdcff;
+
+  --dzc-accent-contrast: #000000;
+  --dzc-shadow-md: 0 4px 12px rgba(0, 0, 0, 0.9);
+  --dzc-shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.95);
+}
+
+/* High-contrast structural enhancements: 2px borders on cards/tables/nav,
+ * 3px focus rings on every interactive element. Scoped to the theme so the
+ * other themes keep their 1px borders and 2px focus outlines. */
+html[data-theme='high-contrast'] .border,
+html[data-theme='high-contrast'] .dzc-nav,
+html[data-theme='high-contrast'] .dzc-skeleton,
+html[data-theme='high-contrast'] .dzc-empty {
+  border-width: 2px;
+}
+html[data-theme='high-contrast'] a:focus-visible,
+html[data-theme='high-contrast'] button:focus-visible,
+html[data-theme='high-contrast'] input:focus-visible,
+html[data-theme='high-contrast'] select:focus-visible,
+html[data-theme='high-contrast'] textarea:focus-visible,
+html[data-theme='high-contrast'] [tabindex]:focus-visible,
+html[data-theme='high-contrast'] [role='button']:focus-visible {
+  outline: 3px solid var(--dzc-accent);
+  outline-offset: 2px;
+}
+
+/* -- Legacy aliases (B1.2 era) ---------------------------------------------
+ * "dark" was the pre-card-2 default dark palette — livonia is its direct
+ * successor, so the old name maps to livonia. "light" maps to sakhal, the
+ * new light theme. Declared AFTER the canonical blocks so the alias blocks
+ * win for the legacy attribute values without affecting the new names. */
+html[data-theme='dark'] {
+  --dzc-bg: #0c120d;
+  --dzc-bg-tint: #101711;
+  --dzc-surface: #121a13;
+  --dzc-surface-2: #172019;
+  --dzc-surface-3: #1f2a1f;
+
+  --dzc-border: #24331f;
+  --dzc-border-strong: #37492f;
+
+  --dzc-text: #eaf2e9;
+  --dzc-text-muted: #a7b8a4;
+  --dzc-text-faint: #6d7f6a;
+
+  --dzc-accent: #6f9a3d;
+  --dzc-accent-olive: var(--dzc-accent);
+  --dzc-accent-khaki: #a89a5e;
+
+  --dzc-stat: #34e07a;
+  --dzc-stat-dim: color-mix(in srgb, var(--dzc-stat) 55%, var(--dzc-bg) 45%);
+
+  --dzc-warning: #e6b23a;
+  --dzc-danger: #e05252;
+  --dzc-info: #5cc8a0;
+
+  --dzc-accent-contrast: #0c120d;
+  --dzc-shadow-md: 0 4px 12px rgba(0, 0, 0, 0.45);
+  --dzc-shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.55);
+}
+
+html[data-theme='light'] {
+  --dzc-bg: #e8edf3;
+  --dzc-bg-tint: #eef2f7;
+  --dzc-surface: #ffffff;
+  --dzc-surface-2: #f2f5fa;
+  --dzc-surface-3: #e2e9f1;
+
+  --dzc-border: #ccd5e0;
+  --dzc-border-strong: #a3b1c4;
+
+  --dzc-text: #14181f;
+  --dzc-text-muted: #485364;
+  --dzc-text-faint: #7a879a;
+
+  --dzc-accent: #3a63d6;
+  --dzc-accent-olive: var(--dzc-accent);
+  --dzc-accent-khaki: #5a7db8;
+
+  --dzc-stat: #2f9e6f;
+  --dzc-stat-dim: color-mix(in srgb, var(--dzc-stat) 55%, var(--dzc-bg) 45%);
+
+  --dzc-warning: #96660a;
+  --dzc-danger: #c0392b;
+  --dzc-info: #3a63d6;
+
+  --dzc-accent-contrast: #ffffff;
+  --dzc-shadow-md: 0 4px 12px rgba(20, 24, 31, 0.12);
+  --dzc-shadow-lg: 0 8px 24px rgba(20, 24, 31, 0.16);
+}
+
+/* Display-font helper. B1.3 migrates existing <h1>/<h2>/stat readouts to
+ * this class one page at a time; until then it is available to any page. */
+.dzc-display {
+  font-family: var(--dzc-font-display);
+  letter-spacing: var(--dzc-letter-spacing-display);
+  text-transform: uppercase;
+}
+
+/* Stat readout helper: phosphor green, tabular numerals. */
+.dzc-stat {
+  color: var(--dzc-stat);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Skeleton loaders (B1.3 consistency). Apply to any block that is waiting on
+ * async data; remove the class (or the node) when content lands. */
+.dzc-skeleton {
+  background: linear-gradient(
+    90deg,
+    var(--dzc-surface-2) 25%,
+    var(--dzc-surface) 37%,
+    var(--dzc-surface-2) 63%
+  );
+  background-size: 400% 100%;
+  animation: dzc-shimmer 1.4s ease-in-out infinite;
+  border-radius: var(--dzc-radius-md);
+  color: transparent;
+  user-select: none;
+}
+@keyframes dzc-shimmer {
+  0% { background-position: 100% 0; }
+  100% { background-position: -100% 0; }
+}
+
+/* Empty state (B1.3). Consistent centered "nothing here yet" block. */
+.dzc-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--dzc-space-2);
+  padding: var(--dzc-space-6) var(--dzc-space-4);
+  color: var(--dzc-text-muted);
+  text-align: center;
+}
+.dzc-empty .dzc-empty-icon { font-size: 2rem; opacity: 0.7; }
+.dzc-empty .dzc-empty-title { font-size: 1.1rem; color: var(--dzc-text); }
+
+/* Shared dashboard nav (B1.3). Rendered by shared-nav.js into .dzc-nav-slot. */
+.dzc-nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--dzc-space-2);
+  padding: var(--dzc-space-3);
+  background: var(--dzc-surface);
+  border: 1px solid var(--dzc-border);
+  border-radius: var(--dzc-radius-lg);
+  margin-bottom: var(--dzc-space-5);
+}
+.dzc-nav a {
+  padding: var(--dzc-space-1) var(--dzc-space-3);
+  border-radius: var(--dzc-radius-md);
+  color: var(--dzc-text-muted);
+  text-decoration: none;
+  font-size: 0.95rem;
+  transition: background 0.15s, color 0.15s;
+}
+.dzc-nav a:hover { background: var(--dzc-surface-2); color: var(--dzc-text); }
+.dzc-nav a.active { background: var(--dzc-accent); color: var(--dzc-accent-contrast); font-weight: 600; }
+
+/* Respect reduced motion once, globally, for everything the theme adds. */
+@media (prefers-reduced-motion: reduce) {
+  .dzc-display,
+  .dzc-stat {
+    animation: none;
+    transition: none;
+  }
+}

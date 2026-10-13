@@ -14,6 +14,8 @@ COPY bot/ .
 COPY utils/ ../utils/
 # Shared day/night estimator also consumed by the browser settings preview.
 COPY public/js/dayz-time.js /app/public/js/dayz-time.js
+# Map bounds definitions required by utils/teleportPolicy (teleport commands).
+COPY public/js/dayz-map-coordinates.js /app/public/js/dayz-map-coordinates.js
 # Copy shared business logic imported by bot commands.
 COPY services/ ../services/
 # Copy shared schema initialization so bot-only deployments can start fresh.

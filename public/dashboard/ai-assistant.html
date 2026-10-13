@@ -2,7 +2,9 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>AI Assistant - DayZ Dashboard</title>
+  <link rel="stylesheet" href="/css/theme.css">
   <link rel="stylesheet" href="/css/tailwind.css">
   <script src="/js/instance-config.js" defer></script>
   <script src="/js/ai-assistant.js" defer></script>
@@ -14,29 +16,6 @@
       <a href="/dashboard" class="bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded">← Back</a>
     </div>
 
-    <!-- Dashboard Navigation -->
-    <nav class="bg-gray-800 rounded-lg p-3 mb-6 border border-gray-700">
-      <div class="flex gap-2 flex-wrap">
-        <a href="/dashboard" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">🎮 Servers</a>
-        <a href="/dashboard/economy" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">💰 Economy</a>
-        <a href="/map" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">🗺️ Map</a>
-        <a href="/dashboard/feeds" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">📢 Feeds</a>
-        <a href="/dashboard/automation" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">⚙️ Automation</a>
-        <a href="/dashboard/tasks" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">🕒 Tasks</a>
-        <a href="/dashboard/server-control" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">🎮 Control</a>
-        <a href="/dashboard/backups" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">💾 Backups</a>
-        <a href="/dashboard/rotation" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">🔄 Rotation</a>
-        <a href="/dashboard/ai-assistant" class="bg-blue-600 px-4 py-2 rounded font-semibold">🤖 AI</a>
-        <a href="/dashboard/server-stats" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">📊 Stats</a>
-        <a href="/dashboard/activity-log" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">📋 Activity</a>
-        <a href="/dashboard/console" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">🖥️ Console</a>
-        <a href="/dashboard/boost" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">🚀 Boost</a>
-        <a href="/dashboard/support" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">🎫 Support</a>
-        <a href="/dashboard/settings" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">🔧 Settings</a>
-        <a href="/player-portal" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">👤 Player Portal</a>
-        <a href="/dashboard/shop-admin" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">🛒 Shop</a>
-      </div>
-    </nav>
 
     <!-- GitHub Connection Banner -->
     <div id="ghBanner" class="bg-yellow-900 border border-yellow-600 rounded-lg p-4 mb-6 hidden">
@@ -105,6 +84,8 @@
     <div class="flex gap-2 mb-4 border-b border-gray-700 pb-2" id="tabBar">
       <button data-action="switch-tab" data-tab="chat"       id="tab-chat"        class="tab-btn active px-4 py-2 rounded-t">💬 Chat</button>
       <button data-action="switch-tab" data-tab="suggestions" id="tab-suggestions" class="tab-btn px-4 py-2 rounded-t">💡 Suggestions</button>
+      <button data-action="switch-tab" data-tab="config"       id="tab-config"        class="tab-btn px-4 py-2 rounded-t">⚙️ Config Intelligence</button>
+      <button data-action="switch-tab" data-tab="logs"        id="tab-logs"        class="tab-btn px-4 py-2 rounded-t">📉 Log Intelligence</button>
       <button data-action="switch-tab" data-tab="repo"        id="tab-repo"        class="tab-btn px-4 py-2 rounded-t">📁 GitHub Repo</button>
     </div>
 
@@ -117,15 +98,10 @@
           <h3 class="font-bold text-lg mb-3">Load a Config File</h3>
           <p class="text-sm text-gray-400 mb-3">Load a file from your Nitrado server to chat about it. The AI will have the file content as context.</p>
           <select id="fileNameSelect" class="bg-gray-700 border border-gray-600 rounded px-3 py-2 w-full mb-3">
-            <option value="types.xml">types.xml</option>
-            <option value="events.xml">events.xml</option>
-            <option value="cfgGameplay.json">cfgGameplay.json</option>
-            <option value="cfgspawnabletypes.xml">cfgspawnabletypes.xml</option>
-            <option value="randompresets.xml">randompresets.xml</option>
-            <option value="mapgrouppos.xml">mapgrouppos.xml</option>
+            <option value="">Select a server, then pick a file</option>
           </select>
           <button data-action="load-file" id="loadFileBtn" class="bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded w-full mb-2">Load File from Server</button>
-          <div id="fileStatus" class="text-sm text-gray-400"></div>
+          <div id="fileStatus" class="text-sm text-gray-400" aria-live="polite"></div>
 
           <!-- Server context summary -->
           <div id="contextSummary" class="mt-4 hidden">
@@ -169,9 +145,7 @@
         <h2 class="text-xl font-bold">💡 AI Suggestions</h2>
         <div class="flex gap-2">
           <select id="analyzeFileSelect" class="bg-gray-700 border border-gray-600 rounded px-3 py-2 text-sm">
-            <option value="types.xml">types.xml</option>
-            <option value="events.xml">events.xml</option>
-            <option value="cfgGameplay.json">cfgGameplay.json</option>
+            <option value="">Select a server, then pick a file</option>
           </select>
           <button data-action="run-analysis" id="analyzeBtn" class="bg-purple-600 hover:bg-purple-700 px-4 py-2 rounded">
             🔍 Analyze Now
@@ -185,7 +159,139 @@
       </div>
     </div>
 
-    <!-- ── Tab: GitHub Repo ──────────────────────────────────────────── -->
+    <!-- ── Tab: Config Intelligence ─────────────────────────────────────── -->
+    <div id="pane-config" class="tab-pane hidden">
+      <div class="mb-4">
+        <h2 class="text-xl font-bold mb-1">⚙️ Config Intelligence</h2>
+        <p class="text-sm text-gray-400">Multi-file AI editing via small validated patches, balance passes, config validation and
+          plain-language diff explanations. Patches are checked against the real working copy before anything is stored —
+          apply them from the Suggestions tab.</p>
+      </div>
+
+      <!-- Multi-file edit -->
+      <div class="bg-gray-800 border border-gray-700 rounded-lg p-4 mb-4">
+        <h3 class="font-bold mb-2">✏️ Multi-file edit</h3>
+        <p class="text-sm text-gray-400 mb-3">Pick up to 5 working-copy files and give one instruction that may span several of them
+          (e.g. "lower the spawn rate of all military weapons in both the Chernarus and Enoch types files").</p>
+        <div class="flex flex-wrap gap-2 mb-3" id="configFilePicker"></div>
+        <div class="flex gap-2">
+          <textarea id="configEditInstruction" rows="2"
+            placeholder='e.g. "Add 2 to the nominal value of every type that ends in _F and is under 10, in both files"'
+            class="flex-1 bg-gray-700 border border-gray-600 rounded px-3 py-2 text-sm resize-none"></textarea>
+          <button data-action="run-config-edit" id="configEditBtn" class="bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded font-semibold self-end">Run edit</button>
+        </div>
+        <div id="configEditStatus" class="text-sm text-gray-500 mt-2" aria-live="polite"></div>
+        <div id="configEditResult" class="hidden mt-3 space-y-2"></div>
+      </div>
+
+      <!-- Balance pass -->
+      <div class="bg-gray-800 border border-gray-700 rounded-lg p-4 mb-4">
+        <h3 class="font-bold mb-2">⚖️ Balance pass</h3>
+        <p class="text-sm text-gray-400 mb-3">Give a goal (e.g. "make early game harder") and pick 2-4 files to coordinate —
+          typically types.xml, events.xml and randompresets.xml. Each suggested patch carries its own rationale.</p>
+        <div class="flex flex-wrap gap-2 mb-3" id="balanceFilePicker"></div>
+        <div class="flex gap-2 mb-3">
+          <input id="balanceGoal" type="text" placeholder="e.g. make early game harder, keep late game as-is"
+            class="flex-1 bg-gray-700 border border-gray-600 rounded px-3 py-2 text-sm" />
+          <button data-action="run-balance-pass" id="balanceBtn" class="bg-teal-600 hover:bg-teal-500 px-4 py-2 rounded font-semibold">Run pass</button>
+        </div>
+        <div id="balanceStatus" class="text-sm text-gray-500 mb-2" aria-live="polite"></div>
+        <div id="balanceResult" class="hidden space-y-2"></div>
+      </div>
+
+      <!-- Config validation -->
+      <div class="bg-gray-800 border border-gray-700 rounded-lg p-4 mb-4">
+        <h3 class="font-bold mb-2">✅ Config validation</h3>
+        <p class="text-sm text-gray-400 mb-3">Validate a working copy against the known-good schema + DayZ invariants
+          (unique type/event names, numeric children, sane ranges). The AI explanation is optional — the deterministic
+          report works without any provider.</p>
+        <div class="flex flex-wrap gap-2 mb-3" id="validateFilePicker"></div>
+        <div class="flex flex-wrap gap-2 mb-2">
+          <input id="validateQuestion" type="text" placeholder="optional: what are you worried about in this file?"
+            class="flex-1 min-w-[240px] bg-gray-700 border border-gray-600 rounded px-3 py-2 text-sm" />
+          <button data-action="run-config-validate" id="validateBtn" class="bg-purple-600 hover:bg-purple-700 px-4 py-2 rounded font-semibold">Validate</button>
+        </div>
+        <div id="validateStatus" class="text-sm text-gray-500 mb-2" aria-live="polite"></div>
+        <div id="validateResult" class="hidden space-y-2"></div>
+      </div>
+
+      <!-- Suggestion groups -->
+      <div class="bg-gray-800 border border-gray-700 rounded-lg p-4">
+        <div class="flex items-center justify-between mb-2">
+          <h3 class="font-bold mb-2">📚 Recent multi-file edit groups</h3>
+          <button data-action="reload-suggestion-groups" id="reloadGroupsBtn" class="text-xs text-blue-400 hover:underline">Refresh</button>
+        </div>
+        <div id="configGroupsList" class="space-y-3">
+          <p class="text-gray-500 text-center py-4">No multi-file edit groups yet.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Tab: Log Intelligence ──────────────────────────────────────────── -->
+    <div id="pane-logs" class="tab-pane hidden">
+      <div class="mb-4">
+        <h2 class="text-xl font-bold mb-1">📉 Log Intelligence</h2>
+        <p class="text-sm text-gray-400">Deterministic analysis of this server's ingested RPT / ADM / crash logs.
+          Clusters exceptions into crash windows, ranks root-cause candidates, and maps recurring warnings to
+          known DayZ issues. The optional AI explanation is grounded in the computed data — not a free-form guess.</p>
+      </div>
+
+      <div class="flex flex-wrap items-center gap-3 mb-4">
+        <button data-action="run-log-summary" id="logSummaryBtn" class="bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded font-semibold">📊 Analyze RPT/ADM</button>
+        <span class="text-xs text-gray-500">Analysis runs locally from ingested files — no AI provider needed for the deterministic view.</span>
+      </div>
+
+      <!-- Deterministic summary (always available) -->
+      <div id="logSummaryEmpty" class="bg-gray-800 border border-gray-700 rounded-lg p-6 text-center text-gray-500 mb-4">
+        Select a server, then click <strong>Analyze RPT/ADM</strong> to build the log summary.
+      </div>
+      <div id="logSummaryPanel" class="hidden space-y-4 mb-4">
+        <!-- CE Loop / tick stats -->
+        <div id="logCeLoopCard" class="bg-gray-800 border border-gray-700 rounded-lg p-4 hidden">
+          <h3 class="font-bold mb-2">⏱️ Server tick (CE Loop)</h3>
+          <div id="logCeLoopBody" class="text-sm text-gray-300"></div>
+          <div id="logCeLoopSlowest" class="text-xs text-gray-400 mt-2"></div>
+        </div>
+        <!-- Crash / restart windows -->
+        <div id="logCrashCard" class="bg-gray-800 border border-gray-700 rounded-lg p-4 hidden">
+          <h3 class="font-bold mb-2">💥 Crash / restart windows</h3>
+          <div id="logCrashBody" class="space-y-2"></div>
+        </div>
+        <!-- Repeated warning offenders -->
+        <div id="logOffendersCard" class="bg-gray-800 border border-gray-700 rounded-lg p-4 hidden">
+          <h3 class="font-bold mb-2">⚠️ Repeated warnings / config drift</h3>
+          <div id="logOffendersBody" class="space-y-2"></div>
+        </div>
+      </div>
+
+      <!-- AI explanation (optional) -->
+      <div class="bg-gray-800 border border-gray-700 rounded-lg p-4">
+        <h3 class="font-bold mb-2">✨ AI explanation</h3>
+        <p class="text-sm text-gray-400 mb-2">Ask a grounded question about the analysis (uses your AI provider; shared router counts against the daily budget).</p>
+        <div class="flex gap-2 mb-3">
+          <input id="logQuestionInput" type="text"
+            placeholder="e.g. What is most likely causing the lag spikes?"
+            class="flex-1 bg-gray-700 border border-gray-600 rounded px-3 py-2 text-sm" />
+          <button data-action="run-log-explain" id="logExplainBtn" class="bg-purple-600 hover:bg-purple-700 px-4 rounded font-semibold">Explain</button>
+        </div>
+        <div id="logExplainStatus" class="text-sm text-gray-500 mb-2"></div>
+        <div id="logExplainAnswer" class="hidden bg-gray-900 rounded p-3 text-sm text-gray-200 whitespace-pre-wrap"></div>
+      </div>
+
+      <!-- "Why at X" correlation -->
+      <div class="bg-gray-800 border border-gray-700 rounded-lg p-4 mt-4">
+        <h3 class="font-bold mb-2">🔎 Why did it crash / lag at a moment?</h3>
+        <p class="text-sm text-gray-400 mb-2">Correlates RPT warnings/ticks with ADM tick telemetry, sessions and deaths around an instant.</p>
+        <div class="flex flex-wrap gap-2 mb-3">
+          <input id="logWhyAtInput" type="datetime-local" class="bg-gray-700 border border-gray-600 rounded px-3 py-2 text-sm" />
+          <button data-action="run-log-why" id="logWhyBtn" class="bg-teal-600 hover:bg-teal-500 px-4 py-2 rounded font-semibold">Analyze moment</button>
+        </div>
+        <div id="logWhyStatus" class="text-sm text-gray-500 mb-2"></div>
+        <div id="logWhyAnswer" class="hidden bg-gray-900 rounded p-3 text-sm text-gray-200"></div>
+      </div>
+    </div>
+
+    <!-- ── Tab: GitHub Repo ──────────────────────────────────────────────── -->
     <div id="pane-repo" class="tab-pane hidden">
       <div class="bg-gray-800 rounded-lg p-6 border border-gray-700 max-w-2xl">
         <h2 class="text-xl font-bold mb-2">📁 GitHub Repo Link</h2>
@@ -203,7 +309,7 @@
             <span class="font-semibold">DayZ Actions integration</span>
             <span id="githubIntegrationStatus" class="text-gray-400">Unknown</span>
           </div>
-          <div id="githubOpsStatus" class="mt-2 text-sm text-gray-400">Canonical integration status has not been loaded.</div>
+          <div id="githubOpsStatus" class="mt-2 text-sm text-gray-400" aria-live="polite">Canonical integration status has not been loaded.</div>
           <div id="githubActionsList" class="mt-2 space-y-1 text-sm text-gray-400"></div>
         </div>
 
@@ -297,6 +403,13 @@
     <div class="bg-gray-800 rounded-lg p-6 w-full max-w-4xl max-h-screen overflow-y-auto border border-gray-600">
       <h2 class="text-xl font-bold mb-2" id="diffTitle">Apply Suggestion</h2>
       <p class="text-sm text-gray-400 mb-4" id="diffExplanation"></p>
+      <div id="diffExplanationPanel" class="hidden bg-teal-900/30 border border-teal-800 rounded p-3 mb-4 text-sm text-teal-200">
+        <div class="flex items-center justify-between mb-1">
+          <span class="font-semibold">Plain-language delta</span>
+          <button data-action="refresh-diff-explain" id="refreshDiffExplainBtn" class="text-xs text-teal-300 hover:underline">Refresh</button>
+        </div>
+        <p id="diffExplanationText" class="whitespace-pre-wrap"></p>
+      </div>
       <div class="bg-gray-900 rounded p-3 mb-4 max-h-96 overflow-y-auto">
         <pre id="diffContent" class="text-xs text-green-300 whitespace-pre-wrap"></pre>
       </div>

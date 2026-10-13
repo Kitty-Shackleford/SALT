@@ -30,6 +30,9 @@ let currentFactionId = null;
 let currentFactionGuildId = null;
 let factionPollInterval = null;
 let factionMapRequestId = 0;
+let enabledPlayerFeatures = new Set();
+let currentFactionRank = null;
+let territoryPlacementMode = false;
 // Pending marker placement — stores clicked game coords until user confirms
 let pendingMarkerCoords = null;
 
@@ -44,6 +47,9 @@ const layers = {
   purchases: null,
   factionMembers: null,
   factionMarkers: null,
+  factionTerritories: null,
+  settlementLabels: null,
+  settlementExtents: null,
   radar: null,
   radarHeat: null,
 };
@@ -148,6 +154,33 @@ function addCoordinateGrid(mapName) {
   }
 }
 
+function renderStaticGeography(mapName) {
+  layers.settlementLabels.clearLayers();
+  layers.settlementExtents.clearLayers();
+  const staticLayers = DayzMapLayerCatalog.getSettlementLayers(mapName);
+  const cfg = mapConfigs[mapName] || mapConfigs.chernarusplus;
+  const radiusScale = cfg.imageWidth / cfg.worldWidth;
+  staticLayers.extents.forEach(function(extent) {
+    L.circle(gameToLeaflet(extent.position.east, extent.position.north, mapName), {
+      radius: extent.radiusMeters * radiusScale,
+      color: '#94a3b8', fillColor: '#64748b', weight: 1, fillOpacity: 0.08,
+      dashArray: '5 5', interactive: false,
+    }).addTo(layers.settlementExtents);
+  });
+  staticLayers.labels.forEach(function(settlement) {
+    const label = escapeHtml(settlement.names.en) + '<br><span lang="ru">' +
+      escapeHtml(settlement.names.cy) + '</span>';
+    L.marker(gameToLeaflet(settlement.position.east, settlement.position.north, mapName), {
+      icon: L.divIcon({
+        className: '',
+        html: '<span style="display:block;text-align:center;color:#fff;font-size:11px;font-weight:600;line-height:1.15;text-shadow:0 1px 3px #000,1px 0 3px #000;white-space:nowrap;">' + label + '</span>',
+        iconSize: [120, 30], iconAnchor: [60, 15],
+      }),
+      interactive: false,
+    }).addTo(layers.settlementLabels);
+  });
+}
+
 // ---------------------------------------------------------------------------
 // Initialise Leaflet — called once immediately at page load
 // ---------------------------------------------------------------------------
@@ -187,11 +220,15 @@ function initMap(mapName) {
   layers.purchases = L.layerGroup().addTo(map);
   layers.factionMembers = L.layerGroup().addTo(map);
   layers.factionMarkers = L.layerGroup().addTo(map);
+  layers.factionTerritories = L.layerGroup().addTo(map);
+  layers.settlementLabels = L.layerGroup().addTo(map);
+  layers.settlementExtents = L.layerGroup();
   layers.radar = L.layerGroup().addTo(map);
   layers.radarHeat = L.layerGroup().addTo(map);
 
   addCoordinateGrid(mapName);
   loadTiles(mapName);
+  renderStaticGeography(mapName);
 
   currentMapName = mapName;
 }
@@ -202,13 +239,18 @@ function initMap(mapName) {
 function switchMap(mapName) {
   if (!map) return;
   exitPlacementMode();
+  exitTerritoryPlacementMode();
+  currentFactionRank = null;
   currentMapName = mapName;
   loadTiles(mapName);
   addCoordinateGrid(mapName);
+  renderStaticGeography(mapName);
+  applyTerritorySubmissionVisibility();
   clearPlayerMapLayers();
 
   layers.factionMembers.clearLayers();
   layers.factionMarkers.clearLayers();
+  layers.factionTerritories.clearLayers();
   loadFactionMapData(mapName);
 
   // Re-plot any data if already loaded (reload will re-fetch + re-plot)
@@ -231,6 +273,9 @@ function bindLayerToggles() {
     'layer-purchases': 'purchases',
     'layer-faction-members': 'factionMembers',
     'layer-faction-markers': 'factionMarkers',
+    'layer-faction-territories': 'factionTerritories',
+    'layer-settlement-labels': 'settlementLabels',
+    'layer-settlement-extents': 'settlementExtents',
     'layer-radar': 'radar',
     'layer-radar-heat': 'radarHeat',
   };
@@ -248,8 +293,17 @@ function bindLayerToggles() {
   });
 }
 
+function applyTerritorySubmissionVisibility() {
+  const button = document.getElementById('submit-territory-btn');
+  const allowed = currentFactionRank === 'leader' &&
+    enabledPlayerFeatures.has('factionTerritories') && currentMapName === 'chernarusplus';
+  if (button) button.style.display = allowed ? '' : 'none';
+  if (!allowed && territoryPlacementMode) exitTerritoryPlacementMode();
+}
+
 function applyEnabledFeatures(enabledFeatures) {
   const enabled = new Set(Array.isArray(enabledFeatures) ? enabledFeatures : []);
+  enabledPlayerFeatures = enabled;
   if (typeof document.querySelectorAll === 'function') {
     document.querySelectorAll('[data-player-map-feature]').forEach(function(element) {
       element.style.display = enabled.has(element.dataset.playerMapFeature) ? '' : 'none';
@@ -264,6 +318,7 @@ function applyEnabledFeatures(enabledFeatures) {
     lastPosition: ['lastpos'],
     factionMembers: ['factionMembers'],
     factionMarkers: ['factionMarkers'],
+    factionTerritories: ['factionTerritories'],
   };
   Object.entries(featureLayers).forEach(function([feature, layerKeys]) {
     if (enabled.has(feature)) return;
@@ -271,6 +326,7 @@ function applyEnabledFeatures(enabledFeatures) {
       if (layers[layerKey]) layers[layerKey].clearLayers();
     });
   });
+  applyTerritorySubmissionVisibility();
 }
 
 // ---------------------------------------------------------------------------
@@ -639,21 +695,47 @@ function initPanel() {
  * faction layers.  Called on initial load and by the 30-second poll.
  */
 async function loadFactionMapData(mapName) {
-  if (!currentFactionId || !currentFactionGuildId) return;
+  if (!currentFactionId || !currentFactionGuildId || !currentServerId) return;
   const requestId = ++factionMapRequestId;
+  const context = {
+    mapName,
+    serverId: String(currentServerId),
+    guildId: String(currentFactionGuildId),
+    factionId: String(currentFactionId),
+  };
+  const isCurrent = function() {
+    return requestId === factionMapRequestId && context.mapName === currentMapName &&
+      context.serverId === String(currentServerId) && context.guildId === String(currentFactionGuildId) &&
+      context.factionId === String(currentFactionId);
+  };
 
   try {
     const res = await fetch(
-      `/api/factions/${currentFactionGuildId}/${currentFactionId}/map?mapName=${encodeURIComponent(mapName)}&serverId=${encodeURIComponent(currentServerId)}`
+      `/api/factions/${context.guildId}/${context.factionId}/map?mapName=${encodeURIComponent(context.mapName)}&serverId=${encodeURIComponent(context.serverId)}`
     );
-    if (!res.ok) return;
-    const data = await res.json();
-    if (!data.success) return;
-    if (requestId !== factionMapRequestId || mapName !== currentMapName) return;
+    const data = await res.json().catch(() => ({}));
+    if (!isCurrent()) return;
+    if (!res.ok || !data.success) {
+      currentFactionRank = null;
+      applyTerritorySubmissionVisibility();
+      layers.factionMembers.clearLayers();
+      layers.factionMarkers.clearLayers();
+      layers.factionTerritories.clearLayers();
+      return;
+    }
 
-    plotFactionMembers(data.members, data.callerIdentityId, mapName);
-    plotFactionMarkers(data.markers, data.callerIdentityId, data.callerRank, mapName);
+    plotFactionMembers(data.members || [], data.callerIdentityId, mapName);
+    plotFactionMarkers(data.markers || [], data.callerIdentityId, data.callerRank, mapName);
+    plotFactionTerritories(data.territories || [], mapName);
+    currentFactionRank = data.callerRank || null;
+    applyTerritorySubmissionVisibility();
   } catch (err) {
+    if (!isCurrent()) return;
+    currentFactionRank = null;
+    applyTerritorySubmissionVisibility();
+    layers.factionMembers.clearLayers();
+    layers.factionMarkers.clearLayers();
+    layers.factionTerritories.clearLayers();
     console.warn('Failed to load faction map data:', err);
   }
 }
@@ -743,6 +825,33 @@ function plotFactionMarkers(markers, callerIdentityId, callerRank, mapName) {
   if (el) el.textContent = markers.length;
 }
 
+function plotFactionTerritories(territories, mapName) {
+  if (!layers.factionTerritories) return;
+  layers.factionTerritories.clearLayers();
+  const cfg = mapConfigs[mapName] || mapConfigs.chernarusplus;
+  const radiusScale = cfg.imageWidth / cfg.worldWidth;
+  let count = 0;
+  territories.filter(item => item.status === 'approved' && item.mapName === mapName)
+    .forEach(function(territory) {
+      const latlng = gameToLeaflet(territory.pole.east, territory.pole.north, mapName);
+      const circle = L.circle(latlng, {
+        radius: territory.radiusMeters * radiusScale,
+        color: '#22c55e', fillColor: '#16a34a', weight: 2, fillOpacity: 0.12,
+      }).bindPopup(
+        '<strong>🚩 Approved faction territory</strong><br>' +
+        escapeMapHtml(territory.radiusMeters + ' m flag protection radius') + '<br>' +
+        '<span style="color:#9ca3af;font-size:11px;">Explicit approved flag-pole marker</span>'
+      );
+      circle.addTo(layers.factionTerritories);
+      L.marker(latlng, {
+        icon: L.divIcon({ html: '<span style="font-size:22px">🚩</span>', className: '', iconSize: [24, 24] }),
+      }).addTo(layers.factionTerritories);
+      count++;
+    });
+  const countElement = document.getElementById('count-faction-territories');
+  if (countElement) countElement.textContent = count;
+}
+
 /**
  * Deletes a faction marker via the API and refreshes the markers layer.
  * Exposed on window for compatibility with existing map integrations.
@@ -798,6 +907,8 @@ function initFactionLayers(mapName) {
   loadFactionMapData(mapName);
   startFactionPoll();
   bindPlacementMode();
+  const territoryButton = document.getElementById('submit-territory-btn');
+  if (territoryButton) territoryButton.addEventListener('click', enterTerritoryPlacementMode);
 }
 
 /**
@@ -927,6 +1038,70 @@ async function saveMarker() {
     loadFactionMapData(currentMapName);
   } catch {
     alert('Failed to save marker.');
+  }
+}
+
+async function submitFactionTerritoryAt(position, context) {
+  const response = await fetchWithCsrf(
+    `/api/factions/${context.guildId}/${context.factionId}/territories`,
+    {
+      method: 'POST',
+      body: JSON.stringify({
+        serverId: context.serverId,
+        mapName: context.mapName,
+        poleEast: position.east,
+        poleNorth: position.north,
+      }),
+    }
+  );
+  const data = await response.json().catch(() => ({}));
+  const stillCurrent = context.serverId === String(currentServerId) &&
+    context.guildId === String(currentFactionGuildId) &&
+    context.factionId === String(currentFactionId) && context.mapName === currentMapName;
+  if (!stillCurrent) return;
+  if (!response.ok || !data.success) throw new Error(data.error || 'Territory submission failed');
+  alert('Flag-pole territory submitted for staff approval.');
+  loadFactionMapData(currentMapName);
+}
+
+function exitTerritoryPlacementMode() {
+  territoryPlacementMode = false;
+  if (map) {
+    map.off('click', onTerritoryMapClick);
+    map.getContainer().style.cursor = '';
+  }
+  const button = document.getElementById('submit-territory-btn');
+  if (button) button.textContent = '🚩 Submit Flag Pole for Approval';
+}
+
+function enterTerritoryPlacementMode() {
+  if (!map || currentMapName !== 'chernarusplus' || currentFactionRank !== 'leader' ||
+      !enabledPlayerFeatures.has('factionTerritories')) return;
+  exitPlacementMode();
+  territoryPlacementMode = true;
+  const button = document.getElementById('submit-territory-btn');
+  if (button) button.textContent = 'Click the exact flag-pole center…';
+  map.getContainer().style.cursor = 'crosshair';
+  map.on('click', onTerritoryMapClick);
+}
+
+async function onTerritoryMapClick(event) {
+  if (!territoryPlacementMode) return;
+  const position = DayzMapCoordinates.leafletToWorld(event.latlng, currentMapName);
+  const context = {
+    serverId: String(currentServerId), guildId: String(currentFactionGuildId),
+    factionId: String(currentFactionId), mapName: currentMapName,
+  };
+  exitTerritoryPlacementMode();
+  if (!confirm(`Submit flag pole at X ${position.east.toFixed(1)}, Z ${position.north.toFixed(1)} with the fixed 60 m radius?`)) return;
+  try {
+    await submitFactionTerritoryAt(position, context);
+  } catch (error) {
+    const stillCurrent = context.serverId === String(currentServerId) &&
+      context.guildId === String(currentFactionGuildId) &&
+      context.factionId === String(currentFactionId) && context.mapName === currentMapName;
+    if (!stillCurrent) return;
+    alert(error.message);
   }
 }
 

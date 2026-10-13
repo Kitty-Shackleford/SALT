@@ -110,8 +110,8 @@ function renderFileTree() {
 
         // Skip log files and other non-editable files
         const fileName = parts[parts.length - 1].toLowerCase();
-        if (fileName.endsWith('.log') ||
-            fileName.endsWith('.rpt') ||
+        if (fileName.endsWith('.log') || 
+            fileName.endsWith('.rpt') || 
             fileName.endsWith('.adm') ||
             fileName.endsWith('.mdmp') ||
             fileName.startsWith('console_')) {
@@ -238,7 +238,7 @@ async function selectFile(fileName, clickedElement) {
 
     currentFile = fileName;
     statusText.textContent = 'Loading...';
-
+    
     try {
         // Read file
         const response = await fetch(`/api/mission-files/${serverId}/${encodedFilePath(fileName)}`);
@@ -402,6 +402,7 @@ saveBtn.addEventListener('click', async () => {
             conflictServerHash = null;
             hasUnsavedChanges = false;
             statusText.textContent = '✅ Saved and verified on Nitrado';
+            
             currentSource = undefined;
             // Show success indicator
             refreshIndicator.classList.add('active');

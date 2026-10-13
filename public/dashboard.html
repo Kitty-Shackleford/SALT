@@ -2,7 +2,9 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Dashboard - DayZ Dashboard</title>
+  <link rel="stylesheet" href="/css/theme.css">
   <link rel="stylesheet" href="/css/tailwind.css">
   <style>
     .server-card { transition: all 0.3s; }
@@ -11,108 +13,186 @@
     .spinner { animation: spin 1s linear infinite; }
     @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
     .pulse { animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite; }
+
+    /* ── Dashboard layout (card 4/9) — token-based, all 5 themes ── */
+    .dzc-dash-header { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 16px; }
+    .dzc-dash-header h1 { font-size: 1.5rem; margin: 0; }
+    /* Legacy tailwind residue (pre-card-4): token-based so all 5 themes stay
+     * readable. Fixed-color buttons need explicit white text. The dark gray
+     * "island" containers (bg-gray-700) stay dark on every theme, so force
+     * light text inside them — otherwise themed text on light bases (sakhal)
+     * is invisible. Gray labels on white token panels map to the muted token. */
+    #adminLink { color: #fff; }
+    #refresh-nitrado-account-servers { color: #fff; }
+    #loadSyncJobsBtn, .edit-mission-btn { color: #fff; }
+    #nitrado-account-servers select { background: var(--dzc-surface-2); border-color: var(--dzc-border-strong); color: var(--dzc-text); }
+    .bg-gray-700 { color: #e5e7eb; }
+    .bg-gray-700 .text-gray-300, .bg-gray-700 .text-gray-400 { color: #d1d5db; }
+    .dzc-panel-head .text-gray-300, .dzc-panel-head .text-gray-400,
+    #activity-feed .text-gray-400 { color: var(--dzc-text-muted); }
+    #sync-jobs-container .text-gray-400 { color: var(--dzc-text-muted); }
+    #sync-jobs-container .bg-gray-700 .text-gray-400 { color: #d1d5db; }
+
+    .dzc-attention { display: flex; flex-wrap: wrap; align-items: center; gap: 8px;
+      background: var(--dzc-surface); border: 1px solid var(--dzc-border);
+      border-radius: var(--dzc-radius-lg); padding: 12px 16px; margin-bottom: 16px; }
+    .dzc-attention-label { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--dzc-text-muted); }
+    .dzc-attention-item { display: inline-flex; align-items: center; gap: 6px; font-size: 0.85rem;
+      padding: 3px 10px; border-radius: 999px; border: 1px solid var(--dzc-border-strong);
+      color: var(--dzc-text); }
+    .dzc-attention-item[data-severity='danger']  { border-color: var(--dzc-danger);  color: var(--dzc-danger); }
+    .dzc-attention-item[data-severity='warning'] { border-color: var(--dzc-warning); color: var(--dzc-warning); }
+    .dzc-attention-item[data-severity='info']    { border-color: var(--dzc-info);    color: var(--dzc-info); }
+    .dzc-attention-allclear { font-size: 0.85rem; color: var(--dzc-text-faint); }
+
+    .dzc-kpi-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 12px; margin-bottom: 16px; }
+    .dzc-kpi { position: relative; background: var(--dzc-surface); border: 1px solid var(--dzc-border);
+      border-radius: var(--dzc-radius-lg); padding: 12px 16px; overflow: hidden; }
+    .dzc-kpi::before { content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 3px;
+      background: var(--dzc-kpi-rail, var(--dzc-accent)); }
+    .dzc-kpi--players { --dzc-kpi-rail: var(--dzc-stat); }
+    .dzc-kpi--guilds  { --dzc-kpi-rail: var(--dzc-info); }
+    .dzc-kpi--daily   { --dzc-kpi-rail: var(--dzc-accent-khaki); }
+    .dzc-kpi--warn    { --dzc-kpi-rail: var(--dzc-warning); }
+    .dzc-kpi--crit    { --dzc-kpi-rail: var(--dzc-danger); }
+    .dzc-kpi-label { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--dzc-text-muted); }
+    .dzc-kpi-value { font-family: var(--dzc-font-display); font-size: 1.75rem; letter-spacing: 0.04em;
+      font-variant-numeric: tabular-nums; color: var(--dzc-text); margin: 2px 0; line-height: 1.2; }
+    .dzc-kpi-delta { font-size: 0.75rem; color: var(--dzc-text-muted); font-variant-numeric: tabular-nums; min-height: 1em; }
+    .dzc-kpi-delta.up   { color: var(--dzc-stat); }
+    .dzc-kpi-delta.down { color: var(--dzc-danger); }
+    .dzc-sparkline { display: block; width: 100%; height: 28px; margin-top: 4px; color: var(--dzc-stat); }
+
+    .dzc-panel { background: var(--dzc-surface); border: 1px solid var(--dzc-border);
+      border-radius: var(--dzc-radius-lg); padding: 16px 20px; margin-bottom: 16px; }
+    .dzc-panel-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 12px; }
+    .dzc-panel-head h2 { font-size: 1.1rem; margin: 0; }
+    .dzc-panel-head-actions { display: flex; align-items: center; gap: 8px; }
+    .dzc-freshness { font-size: 0.75rem; color: var(--dzc-text-muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
+    .dzc-freshness.is-stale { color: var(--dzc-warning); }
+    .dzc-error-row { font-size: 0.85rem; color: var(--dzc-danger); margin-bottom: 8px; padding: 8px 12px;
+      border: 1px solid var(--dzc-danger); border-radius: var(--dzc-radius-md);
+      background: color-mix(in srgb, var(--dzc-danger) 12%, transparent); }
+
+    .dzc-dash-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+    @media (max-width: 960px) { .dzc-dash-grid { grid-template-columns: 1fr; } }
+
+    .dzc-toast { position: fixed; right: 16px; bottom: 16px; z-index: 100; max-width: 320px;
+      background: var(--dzc-surface-2); border: 1px solid var(--dzc-border-strong); color: var(--dzc-text);
+      border-radius: var(--dzc-radius-md); padding: 10px 14px; font-size: 0.9rem; box-shadow: var(--dzc-shadow-md); }
+    .dzc-toast[data-severity='danger'] { border-color: var(--dzc-danger); }
+    .dzc-toast[data-severity='info']   { border-color: var(--dzc-info); }
+
+    /* ── Operations alerts panel (AI 7c) — tokens only, all 5 themes ── */
+    .dzc-sev { display: inline-flex; align-items: center; gap: 4px; font-size: 0.7rem; font-weight: 700;
+      letter-spacing: 0.05em; padding: 1px 7px; border-radius: 999px; border: 1px solid var(--dzc-border-strong);
+      color: var(--dzc-text); text-transform: uppercase; white-space: nowrap; }
+    .dzc-sev[data-tier='danger']  { border-color: var(--dzc-danger);  color: var(--dzc-danger); }
+    .dzc-sev[data-tier='warning'] { border-color: var(--dzc-warning); color: var(--dzc-warning); }
+    .dzc-ops-server { border: 1px solid var(--dzc-border); border-radius: var(--dzc-radius-md);
+      padding: 12px 14px; margin-bottom: 12px;
+      background: color-mix(in srgb, var(--dzc-surface-2) 55%, transparent); }
+    .dzc-ops-server:last-child { margin-bottom: 0; }
+    .dzc-ops-server-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; margin-bottom: 6px; }
+    .dzc-ops-server-head strong { font-size: 0.95rem; }
+    .dzc-ops-sub { font-size: 0.7rem; color: var(--dzc-text-faint); font-variant-numeric: tabular-nums; }
+    .dzc-ops-section-label { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.06em;
+      color: var(--dzc-text-muted); margin: 8px 0 4px; }
+    .dzc-ops-warn { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; font-size: 0.85rem; margin-bottom: 4px; }
+    .dzc-ops-warn-text { color: var(--dzc-text); }
+    .dzc-ops-warn-detail { color: var(--dzc-text-muted); font-size: 0.8rem; font-variant-numeric: tabular-nums; }
+    .dzc-ops-context { margin: 2px 0 4px; }
+    .dzc-ops-emptyline { font-size: 0.85rem; color: var(--dzc-text-faint); margin-bottom: 4px; }
+    .dzc-ops-suggest { font-size: 0.8rem; color: var(--dzc-text-muted); margin-bottom: 4px; }
+    .dzc-ops-link { font-size: 0.8rem; color: var(--dzc-info); display: inline-block; margin-bottom: 4px; }
+
+    /* High-contrast theme: match the 2px border treatment from theme.css. */
+    html[data-theme='high-contrast'] .dzc-kpi,
+    html[data-theme='high-contrast'] .dzc-panel,
+    html[data-theme='high-contrast'] .dzc-attention { border-width: 2px; }
   </style>
   <script src="/js/instance-config.js" defer></script>
 </head>
-<body class="bg-gray-900 text-white">
+<body>
   <div class="container mx-auto p-6 max-w-7xl">
-    <!-- Header -->
-    <div class="flex justify-between items-center mb-6">
-    <h1 class="text-4xl font-bold">Welcome, <span id="username">...</span></h1>
-    <div class="flex gap-2">
+    <!-- (a) Header row — the shell topbar above carries the guild context pill + logout -->
+    <div class="dzc-dash-header">
+      <h1>Welcome, <span id="username">...</span></h1>
+      <div class="flex gap-2">
         <a href="/admin/guilds" id="adminLink" class="bg-indigo-600 hover:bg-indigo-700 px-4 py-2 rounded hidden">🛡️ Admin</a>
-        <a href="/logout" class="bg-red-600 hover:bg-red-700 px-4 py-2 rounded">Logout</a>
-    </div>
-    </div>
-
-    <!-- Dashboard Navigation -->
-    <nav class="bg-gray-800 rounded-lg p-3 mb-6 border border-gray-700">
-      <div class="flex gap-2 flex-wrap">
-        <a href="/dashboard" class="bg-blue-600 px-4 py-2 rounded font-semibold">🎮 Servers</a>
-        <a href="/dashboard/economy" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">💰 Economy</a>
-        <a href="/map" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">🗺️ Map</a>
-        <a href="/loot-finder" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">🔍 Loot Finder</a>
-        <a href="/dashboard/feeds" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">📢 Feeds</a>
-        <a href="/dashboard/automation" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">⚙️ Automation</a>
-        <a href="/dashboard/tasks" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">🕒 Tasks</a>
-        <a href="/dashboard/server-control" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">🎮 Control</a>
-        <a href="/dashboard/backups" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">💾 Backups</a>
-        <a href="/dashboard/rotation" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">🔄 Rotation</a>
-        <a href="/dashboard/ai-assistant" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">🤖 AI</a>
-        <a href="/dashboard/server-stats" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">📊 Stats</a>
-        <a href="/dashboard/activity-log" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">📋 Activity</a>
-        <a href="/dashboard/console" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">🖥️ Console</a>
-        <a href="/dashboard/settings" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">🔧 Settings</a>
-        <a href="/player-portal" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">👤 Player Portal</a>
-        <a href="/dashboard/shop-admin" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">🛒 Shop</a>
-        <a href="/dashboard/spawn-exclusions" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">🛡️ Exclusions</a>
-        <a href="/server-players" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">👥 Players</a>
-        <a href="/server-lists" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">📋 Lists</a>
-      </div>
-    </nav>
-
-    <!-- Dashboard Stats Overview -->
-    <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-      <!-- Total Servers -->
-      <div class="bg-gray-800 p-6 rounded-lg border border-gray-700">
-        <div class="flex items-center gap-3 mb-2">
-          <span class="text-3xl">🖥️</span>
-          <h3 class="text-gray-400 font-semibold">Total Servers</h3>
-        </div>
-        <p class="text-3xl font-bold text-blue-400" id="stat-total-servers">-</p>
-        <p class="text-xs text-gray-500 mt-1">Registered servers</p>
-      </div>
-
-      <!-- Total Players -->
-      <div class="bg-gray-800 p-6 rounded-lg border border-gray-700">
-        <div class="flex items-center gap-3 mb-2">
-          <span class="text-3xl">👥</span>
-          <h3 class="text-gray-400 font-semibold">Total Players</h3>
-        </div>
-        <p class="text-3xl font-bold text-green-400" id="stat-total-players">-</p>
-        <p class="text-xs text-gray-500 mt-1">Linked accounts</p>
-      </div>
-
-      <!-- Active Guilds -->
-      <div class="bg-gray-800 p-6 rounded-lg border border-gray-700">
-        <div class="flex items-center gap-3 mb-2">
-          <span class="text-3xl">🏰</span>
-          <h3 class="text-gray-400 font-semibold">Active Guilds</h3>
-        </div>
-        <p class="text-3xl font-bold text-purple-400" id="stat-active-guilds">-</p>
-        <p class="text-xs text-gray-500 mt-1">Discord communities</p>
-      </div>
-
-      <!-- Server Health -->
-      <div class="bg-gray-800 p-6 rounded-lg border border-gray-700">
-        <div class="flex items-center gap-3 mb-2">
-          <span class="text-3xl">💚</span>
-          <h3 class="text-gray-400 font-semibold">Health Status</h3>
-        </div>
-        <p class="text-3xl font-bold text-green-400" id="stat-health-status">✅</p>
-        <p class="text-xs text-gray-500 mt-1" id="stat-health-text">All systems operational</p>
       </div>
     </div>
 
-    <!-- Recent Activity -->
-    <div class="bg-gray-800 p-6 rounded-lg mb-6 border border-gray-700 mt-8">
-      <div class="flex justify-between items-center mb-4">
-        <h2 class="text-2xl font-bold">🕐 Recent Activity</h2>
-        <button id="refresh-activity" class="bg-gray-700 hover:bg-gray-600 px-3 py-1 rounded text-sm">🔄 Refresh</button>
+    <!-- (b) Attention strip — items needing action, severity-badged -->
+    <section aria-label="Needs attention" class="dzc-attention">
+      <span class="dzc-attention-label">⚠ Attention</span>
+      <div id="attention-items" class="flex flex-wrap gap-2 items-center" aria-live="polite">
+        <div class="dzc-skeleton h-6 w-48"></div>
       </div>
-      <div id="activity-feed" class="space-y-2">
-        <div class="text-center py-8 text-gray-400">
-          <div class="spinner border-4 border-blue-600 border-t-transparent rounded-full w-8 h-8 mx-auto mb-2"></div>
-          <p class="text-sm">Loading activity...</p>
+    </section>
+
+    <!-- (b2) Operations alerts — per-server ops intelligence (AI 7c);
+         ambient refresh rides the shared polling loop, per-server failure
+         isolation keeps the panel up when one server's fetch fails -->
+    <section aria-label="Operations alerts" class="dzc-panel">
+      <div class="dzc-panel-head">
+        <h2>🚨 Operations alerts</h2>
+        <div class="dzc-panel-head-actions">
+          <span class="dzc-freshness" id="dzc-freshness-ops"></span>
         </div>
       </div>
-    </div>
+      <div id="ops-alerts-body">
+        <div class="dzc-skeleton h-14"></div>
+        <div class="dzc-skeleton h-14"></div>
+      </div>
+    </section>
+
+    <!-- (c) KPI row — shared card primitive, accent left-rail by semantic role -->
+    <section aria-label="Key metrics">
+      <div class="dzc-panel-head" style="margin-bottom: 8px;">
+        <h2 class="text-sm uppercase tracking-wide" style="color: var(--dzc-text-muted); font-size: 0.8rem;">Overview</h2>
+        <span class="dzc-freshness" id="dzc-freshness-stats"></span>
+      </div>
+      <div class="dzc-kpi-row">
+        <!-- Total Servers -->
+        <article class="dzc-kpi">
+          <p class="dzc-kpi-label">Total Servers</p>
+          <p class="dzc-kpi-value" id="stat-total-servers">—</p>
+          <p class="dzc-kpi-delta" id="kpi-servers-delta"></p>
+        </article>
+        <!-- Total Players -->
+        <article class="dzc-kpi dzc-kpi--players">
+          <p class="dzc-kpi-label">Total Players</p>
+          <p class="dzc-kpi-value" id="stat-total-players">—</p>
+          <p class="dzc-kpi-delta" id="kpi-players-delta"></p>
+        </article>
+        <!-- Active Guilds -->
+        <article class="dzc-kpi dzc-kpi--guilds">
+          <p class="dzc-kpi-label">Active Guilds</p>
+          <p class="dzc-kpi-value" id="stat-active-guilds">—</p>
+          <p class="dzc-kpi-delta" id="kpi-guilds-delta"></p>
+        </article>
+        <!-- Server Health -->
+        <article class="dzc-kpi" id="kpi-health">
+          <p class="dzc-kpi-label">Health Status</p>
+          <p class="dzc-kpi-value" id="stat-health-status" style="font-family: var(--dzc-font-body);">✅</p>
+          <p class="dzc-kpi-delta" id="stat-health-text">All systems operational</p>
+        </article>
+        <!-- Daily Active Players (7d) — only KPI with a real series; vanilla SVG sparkline -->
+        <article class="dzc-kpi dzc-kpi--daily">
+          <p class="dzc-kpi-label">Daily Active (7d)</p>
+          <p class="dzc-kpi-value" id="kpi-daily-value">—</p>
+          <p class="dzc-kpi-delta" id="kpi-daily-delta"></p>
+          <svg id="kpi-daily-spark" class="dzc-sparkline" viewBox="0 0 100 28" preserveAspectRatio="none" aria-hidden="true" hidden></svg>
+        </article>
+      </div>
+    </section>
 
     <!-- Nitrado account server selection -->
-    <section id="nitrado-account-servers" class="bg-gray-800 p-6 rounded-lg shadow-lg mt-8 border border-gray-700">
-      <div class="flex flex-col md:flex-row md:items-end md:justify-between gap-4 mb-4">
-        <div>
-          <h2 class="text-2xl font-semibold">🎚️ Nitrado Account Servers</h2>
+    <section id="nitrado-account-servers" class="dzc-panel">
+      <div class="dzc-panel-head" style="flex-wrap: wrap;">
+        <div class="flex-1">
+          <h2>🎚️ Nitrado Account Servers</h2>
           <p class="text-sm text-gray-400 mt-1">Enable only the servers this guild should manage. You can also set a custom dashboard name.</p>
         </div>
         <div class="flex flex-col sm:flex-row gap-2">
@@ -129,23 +209,55 @@
       <div id="nitrado-account-servers-list" class="grid grid-cols-1 lg:grid-cols-2 gap-4"></div>
     </section>
 
-    <!-- Servers Section -->
-    <div class="bg-gray-800 p-6 rounded-lg shadow-lg mt-8">
-      <div class="flex justify-between items-center mb-4">
-        <h2 class="text-2xl font-semibold">🖥️ Your Registered Servers</h2>
-        <button id="loadRegisteredServersBtn" class="bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded">
-          🔄 Refresh
-        </button>
-      </div>
-      <div id="servers-container" class="space-y-4"></div>
+    <!-- (d) Recent activity + sync jobs side by side -->
+    <div class="dzc-dash-grid">
+      <section class="dzc-panel" style="margin-bottom: 0;">
+        <div class="dzc-panel-head">
+          <h2>🕐 Recent Activity</h2>
+          <div class="dzc-panel-head-actions">
+            <span class="dzc-freshness" id="dzc-freshness-activity"></span>
+            <button id="refresh-activity" class="bg-gray-700 hover:bg-gray-600 px-3 py-1 rounded text-sm">🔄 Refresh</button>
+          </div>
+        </div>
+        <div id="activity-feed" class="space-y-2">
+          <div class="dzc-skeleton h-14"></div>
+          <div class="dzc-skeleton h-14"></div>
+          <div class="dzc-skeleton h-14"></div>
+        </div>
+      </section>
+
+      <section class="dzc-panel" style="margin-bottom: 0;">
+        <div class="dzc-panel-head">
+          <h2>📊 Sync Jobs</h2>
+          <div class="dzc-panel-head-actions">
+            <span class="dzc-freshness" id="dzc-freshness-syncjobs"></span>
+            <button id="loadSyncJobsBtn" class="bg-purple-600 hover:bg-purple-700 px-3 py-1 rounded text-sm">🔄 Refresh</button>
+          </div>
+        </div>
+        <div id="sync-jobs-container">
+          <div class="dzc-skeleton h-24"></div>
+          <div class="dzc-skeleton h-24"></div>
+        </div>
+      </section>
     </div>
 
+    <!-- (e) Registered servers -->
+    <section class="dzc-panel">
+      <div class="dzc-panel-head">
+        <h2>🖥️ Your Registered Servers</h2>
+        <div class="dzc-panel-head-actions">
+          <button id="loadRegisteredServersBtn" class="bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded">🔄 Refresh</button>
+        </div>
+      </div>
+      <div id="servers-container" class="space-y-4"></div>
+    </section>
+
     <!-- 📊 Session Analytics -->
-    <div class="bg-gray-800 p-6 rounded-lg shadow-lg mt-8 border border-gray-700" id="session-analytics-section">
-      <div class="flex justify-between items-center mb-4">
-        <h2 class="text-2xl font-bold">📊 Session Analytics</h2>
+    <section class="dzc-panel" id="session-analytics-section">
+      <div class="dzc-panel-head">
+        <h2>📊 Session Analytics</h2>
         <div class="flex items-center gap-2">
-          <label class="text-sm text-gray-400">Server:</label>
+          <label class="text-sm text-gray-400" for="analytics-server-select">Server:</label>
           <select id="analytics-server-select"
                   class="bg-gray-700 px-3 py-2 rounded text-sm focus:ring-2 focus:ring-blue-500 outline-none">
             <option value="">— Select server —</option>
@@ -186,22 +298,13 @@
           <span>00:00</span><span>06:00</span><span>12:00</span><span>18:00</span><span>23:00</span>
         </div>
       </div>
-    </div>
-
-    <!-- Sync Jobs -->
-    <div class="bg-gray-800 p-6 rounded-lg shadow-lg mt-8">
-      <div class="flex justify-between items-center mb-4">
-        <h2 class="text-2xl font-semibold">📊 Sync Jobs</h2>
-        <button id="loadSyncJobsBtn" class="bg-purple-600 hover:bg-purple-700 px-4 py-2 rounded text-sm">
-          Refresh
-        </button>
-      </div>
-      <div id="sync-jobs-container"></div>
-    </div>
+    </section>
   </div>
 
   <script src="/js/api.js"></script>
   <script src="/js/csrf-helper.js"></script>
+  <script src="/js/dashboard-poll.js"></script>
+  <script src="/js/dashboard-ops.js"></script>
   <script src="/js/dashboard.js"></script>
 </body>
 </html>

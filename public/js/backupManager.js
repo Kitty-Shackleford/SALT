@@ -54,8 +54,8 @@ async function onServerChange() {
 async function loadBackups() {
   if (!currentServerId) return;
 
-  document.getElementById('gameserverBackupsWrap').innerHTML = '<p class="text-gray-400 animate-pulse">Loading…</p>';
-  document.getElementById('databaseBackupsWrap').innerHTML   = '<p class="text-gray-400 animate-pulse">Loading…</p>';
+  document.getElementById('gameserverBackupsWrap').innerHTML = '<div class="dzc-skeleton" style="height:1.25rem;width:220px"></div>';
+  document.getElementById('databaseBackupsWrap').innerHTML   = '<div class="dzc-skeleton" style="height:1.25rem;width:220px"></div>';
 
   try {
     const res = await fetch(`/api/backups/${currentServerId}`);
@@ -80,7 +80,7 @@ function renderGameserverBackups(gsBackups) {
   const folders = Object.keys(gsBackups);
 
   if (!folders.length) {
-    wrap.innerHTML = '<p class="text-gray-400">No gameserver backups found.</p>';
+    wrap.innerHTML = '<div class="dzc-empty"><div class="dzc-empty-title">No gameserver backups found.</div></div>';
     return;
   }
 
@@ -137,7 +137,7 @@ function renderDatabaseBackups(dbBackups) {
   const dbs = Object.keys(dbBackups);
 
   if (!dbs.length) {
-    wrap.innerHTML = '<p class="text-gray-400">No database backups found.</p>';
+    wrap.innerHTML = '<div class="dzc-empty"><div class="dzc-empty-title">No database backups found.</div></div>';
     return;
   }
 

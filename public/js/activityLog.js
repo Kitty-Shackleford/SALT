@@ -85,7 +85,7 @@ async function loadLogs(page = 1) {
   hideBanner();
   currentPage = page;
 
-  document.getElementById('logWrap').innerHTML = '<p class="text-gray-400 animate-pulse">Loading logs…</p>';
+  document.getElementById('logWrap').innerHTML = '<div class="dzc-skeleton" style="height:1.25rem;width:220px"></div>';
 
   try {
     const res = await fetch(`/api/activity/${currentServerId}?page=${page}`);
@@ -104,7 +104,7 @@ function renderTable(data) {
   const { logs, currentPage: pg, pageCount, logCount } = data;
 
   if (!logs || !logs.length) {
-    document.getElementById('logWrap').innerHTML = '<p class="text-gray-400">No log entries found.</p>';
+    document.getElementById('logWrap').innerHTML = '<div class="dzc-empty"><div class="dzc-empty-title">No log entries found.</div></div>';
     return;
   }
 

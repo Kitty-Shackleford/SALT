@@ -47,7 +47,7 @@ bot/                    Entirely separate Node process
 
 db/                     Database schema and migrations
   db/schema.js          initializeDatabase() — runs on every backend start
-  db/migrations/        Numbered migrations (004 baseline plus incremental files; enumerate before adding one)
+  db/migrations/        Numbered migrations (004 baseline; incremental files currently extend through 081)
 
 public/                 Static HTML and assets served through Express
   public/*.html          HTML documents rendered/served by application routes

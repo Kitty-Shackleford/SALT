@@ -1,5 +1,8 @@
 'use strict';
 
+const { ensureTestEncryptionKey } = require('./lib/test-env');
+ensureTestEncryptionKey();
+
 const assert = require('assert');
 const { loadCommands } = require('../bot/deploy-commands');
 const { handleServerAutocomplete } = require('../bot/utils/serverAutocomplete');

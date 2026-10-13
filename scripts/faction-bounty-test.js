@@ -229,10 +229,10 @@ function source(relativePath) {
     assert.match(html, /\/js\/bounties\.js\?v=faction-bounty-idempotency-v1/,
       'the bounty financial client must use a cache-busting asset URL');
     assert.match(appRoutes,
-      /app\.get\('\/player'[\s\S]*?Cache-Control', 'no-store'[\s\S]*?renderWithCsrf\(pub\('player-portal\.html'/,
+      /app\.get\('\/player'[\s\S]*?Cache-Control', 'no-store'[\s\S]*?render(WithCsrf|ShellPage)\(pub\('player-portal\.html'/,
       'the authenticated player document must not be reused across bounty contract deployments');
     assert.match(appRoutes,
-      /app\.get\('\/player-portal'[\s\S]*?Cache-Control', 'no-store'[\s\S]*?renderWithCsrf\(pub\('player-portal\.html'/,
+      /app\.get\('\/player-portal'[\s\S]*?Cache-Control', 'no-store'[\s\S]*?render(WithCsrf|ShellPage)\(pub\('player-portal\.html'/,
       'the player-portal alias must not reuse a stale financial client');
     assert.match(bountyRoutes, /parseIdempotencyKey\(req\)/,
       'missing bounty idempotency keys must use the actionable shared parser');

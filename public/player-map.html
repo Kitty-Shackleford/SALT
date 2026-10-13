@@ -2,7 +2,9 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Player Map - DayZ Dashboard</title>
+  <link rel="stylesheet" href="/css/theme.css">
   <link rel="stylesheet" href="/css/tailwind.css">
   <link rel="stylesheet" href="/vendor/leaflet/leaflet.css" />
   <script src="/vendor/leaflet/leaflet.js"></script>
@@ -173,6 +175,20 @@
         </div>
         <div class="filter-content" id="panel-body">
 
+          <div class="filter-section">
+            <h3>Geography</h3>
+            <label class="layer-row">
+              <input type="checkbox" id="layer-settlement-labels" checked>
+              <span class="color-dot" style="background:#e5e7eb;"></span>
+              <span>Settlement names (EN / Cyrillic)</span>
+            </label>
+            <label class="layer-row">
+              <input type="checkbox" id="layer-settlement-extents">
+              <span class="color-dot" style="background:#64748b;"></span>
+              <span>Illustrative settlement radii (not official boundaries)</span>
+            </label>
+          </div>
+
           <div class="filter-section" data-player-map-feature="structures">
             <h3>Structures</h3>
             <p class="text-xs text-gray-500 mb-2">Decay health is unavailable from retained logs; markers show observed actions only.</p>
@@ -261,6 +277,16 @@
               <span>Markers</span>
               <span id="count-faction-markers" class="ml-auto text-gray-400 text-xs">0</span>
             </label>
+            <label class="layer-row" data-player-map-feature="factionTerritories">
+              <input type="checkbox" id="layer-faction-territories" checked>
+              <span class="color-dot" style="background:#22c55e;"></span>
+              <span>Approved territory / 60 m flag radius</span>
+              <span id="count-faction-territories" class="ml-auto text-gray-400 text-xs">0</span>
+            </label>
+            <button id="submit-territory-btn"
+              class="mt-2 w-full text-xs bg-green-700 hover:bg-green-600 px-2 py-1.5 rounded" style="display:none;">
+              🚩 Submit Flag Pole for Approval
+            </button>
             <button id="place-marker-btn" data-player-map-feature="factionMarkers"
               class="mt-2 w-full text-xs bg-yellow-700 hover:bg-yellow-600 px-2 py-1.5 rounded flex items-center justify-center gap-1">
               📍 Place Marker
@@ -303,6 +329,7 @@
   <script src="/js/api.js"></script>
   <script src="/js/csrf-helper.js"></script>
   <script src="/js/dayz-map-coordinates.js"></script>
+  <script src="/js/map-layer-catalog.js"></script>
   <script src="/js/dayz-map-tiles.js"></script>
   <script src="/js/player-map-standalone.js"></script>
 </body>

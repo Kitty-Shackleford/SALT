@@ -68,7 +68,7 @@ async function getUserGuilds(encryptedToken) {
 
   // Decrypt token only when needed
   const accessToken = decrypt(encryptedToken);
-
+  
   if (!accessToken) {
     throw new Error('Failed to decrypt access token');
   }
@@ -91,15 +91,15 @@ async function getUserGuilds(encryptedToken) {
 
     const guilds = response.data || [];
     console.log(`✅ Fetched ${guilds.length} guilds from Discord`);
-
+    
     setCache(cacheKey, guilds);
     return guilds;
   } catch (error) {
     console.error('❌ Error fetching user guilds:', error.message);
-
+    
     if (error.response) {
       const status = error.response.status;
-
+      
       if (status === 401) {
         throw new Error('Discord access token expired. Please log out and log back in.');
       } else if (status === 429) {
@@ -108,7 +108,7 @@ async function getUserGuilds(encryptedToken) {
         throw new Error(`Discord API error: ${error.response.statusText}`);
       }
     }
-
+    
     throw new Error('Unable to verify Discord membership. Please try again later.');
   }
 }
@@ -123,14 +123,14 @@ async function verifyGuildMembership(encryptedToken, guildId) {
   if (!encryptedToken) {
     throw new Error('Access token is required');
   }
-
+  
   if (!guildId) {
     throw new Error('Guild ID is required');
   }
 
   // Decrypt token only when needed
   const accessToken = decrypt(encryptedToken);
-
+  
   if (!accessToken) {
     throw new Error('Failed to decrypt access token');
   }
@@ -145,9 +145,9 @@ async function verifyGuildMembership(encryptedToken, guildId) {
   try {
     const guilds = await getUserGuilds(encryptedToken);
     const isMember = guilds.some(guild => guild.id === guildId);
-
+    
     console.log(`${isMember ? '✅' : '❌'} User ${isMember ? 'is' : 'is not'} a member of guild ${guildId}`);
-
+    
     setCache(cacheKey, isMember);
     return isMember;
   } catch (error) {
@@ -175,9 +175,28 @@ function clearCache() {
   console.log('🧹 Discord API cache cleared');
 }
 
+/**
+ * Map a getUserGuilds/verifyGuildMembership failure to a user-facing status
+ * and message: Discord rate limits are retryable (503), bad or expired
+ * sessions need a re-login (401), anything else is a transient
+ * verification failure (502). Routes previously returned a bare 502,
+ * which left users at a dead end with no next step.
+ */
+function classifyMembershipVerificationError(error) {
+  const message = String(error && error.message ? error.message : '');
+  if (/rate limit/i.test(message)) {
+    return { status: 503, error: 'Discord is rate-limiting membership checks right now. Please try again in a minute.' };
+  }
+  if (/expired|decrypt|token is required/i.test(message)) {
+    return { status: 401, error: 'Your Discord session has expired or is invalid. Log out of the dashboard and sign in with Discord again.' };
+  }
+  return { status: 502, error: 'Could not verify your Discord membership right now. Please try again in a few minutes.' };
+}
+
 module.exports = {
   getUserGuilds,
   verifyGuildMembership,
+  classifyMembershipVerificationError,
   getGuildIconUrl,
   clearCache
 };

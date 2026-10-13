@@ -481,3 +481,4 @@ module.exports = {
   fetchVictimTimeAlive,
   fetchWalletBalance,
 };
+

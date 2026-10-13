@@ -1,4 +1,4 @@
-/* global document, alert, confirm, fetchWithCsrf, DayZTime */
+/* global document, alert, confirm, fetchWithCsrf, DayZTime, window */
 
 let currentSettings = null;
 let originalSettings = null;
@@ -22,7 +22,21 @@ function renderSettingsSaveState() {
 
 document.addEventListener('DOMContentLoaded', function() {
   // Event listeners
-  document.getElementById('serverSelect').addEventListener('change', loadSettings);
+  // Live context pill: the shell displays the selected server's snapshot
+  // (internal id from the option; authorization stays with the page's routes)
+  function updateShellServerPill(select) {
+    if (typeof window.dzcShellPollServer !== 'function') return;
+    var opt = select.options[select.selectedIndex];
+    if (opt && opt.dataset.internalServerId) {
+      window.dzcShellPollServer(opt.dataset.internalServerId, opt.textContent.split(' (')[0]);
+    } else {
+      window.dzcShellPollServerStop();
+    }
+  }
+  document.getElementById('serverSelect').addEventListener('change', function() {
+    updateShellServerPill(document.getElementById('serverSelect'));
+    loadSettings();
+  });
   document.getElementById('resetBtn').addEventListener('click', resetChanges);
   document.getElementById('saveBtn').addEventListener('click', saveAllSettings);
   document.getElementById('saveDisplayNameBtn').addEventListener('click', saveDisplayName);
@@ -126,7 +140,7 @@ async function loadSettings() {
   document.getElementById('settingsContainer').classList.add('hidden');
   document.getElementById('linkSettingsCard')?.classList.add('hidden');
   document.getElementById('playerMapSettingsCard')?.classList.add('hidden');
-
+  
   if (!serverId) {
     document.getElementById('settingsContainer').classList.add('hidden');
     document.getElementById('noServerMessage').classList.remove('hidden');
@@ -157,7 +171,7 @@ async function loadSettings() {
       currentSettings = data.settings;
       originalSettings = JSON.parse(JSON.stringify(data.settings));
       changedSettings = {};
-
+      
       renderSettings();
       await loadServerNaming(serverId, guildId, loadGeneration);
       if (loadGeneration !== settingsLoadGeneration) return;
@@ -169,7 +183,7 @@ async function loadSettings() {
         await loadPlayerMapSettings(selectedOption.dataset.internalServerId, loadGeneration);
         if (loadGeneration !== settingsLoadGeneration) return;
       }
-
+      
       document.getElementById('settingsContainer').classList.remove('hidden');
     } else {
       alert('Failed to load settings: ' + (data.error || 'Unknown error'));
@@ -214,7 +228,7 @@ function renderCategory(category, containerId) {
   container.innerHTML = '';
 
   const settings = currentSettings[category] || {};
-
+  
   if (Object.keys(settings).length === 0) {
     container.innerHTML = '<p class="text-gray-500">No settings available in this category</p>';
     return;
@@ -270,9 +284,9 @@ function markChanged(category, key, newValue) {
   if (!changedSettings[category]) {
     changedSettings[category] = {};
   }
-
+  
   const originalValue = originalSettings[category]?.[key];
-
+  
   if (newValue !== originalValue) {
     changedSettings[category][key] = newValue;
   } else {
@@ -281,7 +295,7 @@ function markChanged(category, key, newValue) {
       delete changedSettings[category];
     }
   }
-
+  
   renderTimePreview();
 }
 
@@ -300,7 +314,7 @@ async function saveAllSettings() {
   const saveGeneration = settingsLoadGeneration;
   const select = document.getElementById('serverSelect');
   const serverId = select.value;
-
+  
   if (Object.keys(changedSettings).length === 0) {
     alert('No changes to save');
     return;

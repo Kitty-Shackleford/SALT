@@ -2,6 +2,7 @@
 
 const crypto = require('crypto');
 const { encryptToken, decryptToken } = require('../utils/encryption');
+const aiSharedRouterService = require('./aiSharedRouterService');
 
 const OPENAI_COMPATIBLE = 'openai-compatible';
 const COPILOT = 'copilot';
@@ -119,6 +120,13 @@ async function resolveUserProvider(db, userId, env = process.env) {
     delete provider.expectedCredentialHash;
     return provider;
   }
+  // Shared free router: operator-configured fallback that beats the
+  // operator's paid key when the user has nothing connected of their own.
+  // Callers must consume the per-user daily quota (aiSharedRouterService
+  // .consumeCall) before using this provider.
+  if (aiSharedRouterService.isEnabled(env)) {
+    return aiSharedRouterService.provider(env);
+  }
   if (env.AI_API_KEY) {
     return {
       type: OPENAI_COMPATIBLE,
@@ -157,6 +165,14 @@ async function getUserProviderStatus(db, userId, env = process.env) {
       model: row.model || 'auto',
       requiresGitHub: !github,
       requiresGitHubReconnect: Boolean(github) && !supported,
+    };
+  }
+  if (aiSharedRouterService.isEnabled(env)) {
+    return {
+      configured: true,
+      type: OPENAI_COMPATIBLE,
+      source: 'shared-router',
+      model: env.AI_SHARED_ROUTER_MODEL || 'auto',
     };
   }
   if (env.AI_API_KEY) {

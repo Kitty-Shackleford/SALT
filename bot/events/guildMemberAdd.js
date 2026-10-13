@@ -6,6 +6,8 @@ const {
   enqueueRoleReconciliationJob,
   runRoleReconciliationJob,
 } = require('../../utils/linkRoleReconciler');
+const { postMemberEvent } = require('../services/memberPostService');
+const { postOnboarding, recordMemberEvent } = require('../services/onboardingService');
 
 async function applyGuildJoinRoles(member, db = pool) {
   const result = await db.query(
@@ -59,6 +61,13 @@ module.exports = {
         }
       }
       await applyGuildJoinRoles(member, db);
+      // Phase 1: per-guild welcome message (off by default). The client is
+      // attached to this module by the event loader in bot/index.js.
+      await postMemberEvent(module.exports.client, member, 'join').catch(() => {});
+      // Player-facing AI: record the join for digests + post the optional
+      // AI onboarding welcome (off by default, per-guild config).
+      await recordMemberEvent(member.guild.id, member.id, 'join', db).catch(() => {});
+      await postOnboarding(module.exports.client, member, db).catch(() => {});
     } catch (error) {
       console.error(`❌ Failed to apply join roles in guild ${member.guild.id}:`, error.message);
     }

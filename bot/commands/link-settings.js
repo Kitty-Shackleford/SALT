@@ -78,7 +78,7 @@ module.exports = {
 
     try {
       const subcommand = interaction.options.getSubcommand();
-      const mutationContext = change => mutateBotLinkSettings(pool, {
+      const mutationContext = (change, availableRoleIds) => mutateBotLinkSettings(pool, {
         serverId,
         discordGuildId: interaction.guild.id,
         actor: {
@@ -94,6 +94,7 @@ module.exports = {
           };
         },
         change,
+        availableRoleIds,
       });
       if (subcommand === 'verification') {
         const mode = interaction.options.getString('mode', true);
@@ -104,8 +105,10 @@ module.exports = {
       }
 
       if (subcommand === 'role-add' || subcommand === 'role-remove') {
-        const role = interaction.options.getRole('role', true);
-        if (role.id === interaction.guild.id || role.managed || role.editable === false) {
+        const selectedRole = interaction.options.getRole('role', true);
+        const currentRoles = await interaction.guild.roles.fetch();
+        const role = currentRoles.get(selectedRole.id);
+        if (!role || role.id === interaction.guild.id || role.managed || role.editable === false) {
           return interaction.editReply('❌ That role cannot be managed by this bot.');
         }
         const action = interaction.options.getString('action', true);
@@ -117,7 +120,7 @@ module.exports = {
           operation: subcommand === 'role-add' ? 'add' : 'remove',
           roleKey,
           roleId: role.id,
-        });
+        }, new Set(currentRoles.keys()));
         return interaction.editReply(
           `✅ ${subcommand === 'role-add' ? 'Added' : 'Removed'} ${role} ` +
           `for **${action.replaceAll('_', ' ')}** on the selected server.`
