@@ -36,7 +36,7 @@ jobs:
       IMAGE_TAG: ${{ inputs.tag || github.sha }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
@@ -155,7 +155,7 @@ jobs:
 
       - name: Checkout
         if: steps.deploy-config.outputs.configured == 'true'
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Setup SSH key
         if: steps.deploy-config.outputs.configured == 'true'
