@@ -38,7 +38,7 @@
     "test:rpt-telemetry": "node scripts/rpt-telemetry-foundation-test.js"
   },
   "dependencies": {
-    "@github/copilot": "1.0.79",
+    "@github/copilot": "1.0.98",
     "@github/copilot-sdk": "1.0.19",
     "axios": "^1.20.0",
     "blessed": "^0.1.81",
