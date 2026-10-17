@@ -23,6 +23,7 @@ const MAP_FOLDER_SUFFIX = {
   chernarusplus: 'dayzOffline.chernarusplus',
   enoch:         'dayzOffline.enoch',
   sakhal:        'dayzOffline.sakhal',
+  nasdara:       'dayzOffline.nasdara',
 };
 
 const SUPPORTED_MAPS = Object.keys(MAP_FOLDER_SUFFIX);

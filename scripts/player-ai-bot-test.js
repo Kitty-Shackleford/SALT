@@ -3,7 +3,7 @@
 /*
  * scripts/player-ai-bot-test.js
  *
- * Player-facing Discord AI (feature 6/7):
+ * Player-facing Discord AI:
  *   1. /ask + /setup-ai commands load and are classified
  *      (ask: general, setup-ai: guild_admin).
  *   2. botAiRouterService: per-user daily quota (atomic increment +
@@ -496,6 +496,16 @@ async function testMigration105() {
     return;
   }
   try {
+    // Migration 105 FKs into guilds/users — only present in a fully
+    // initialised app database. A bare test database (CI service,
+    // throwaway) skips the live check instead of failing on the FK.
+    const prereq = await pool.query(`
+      SELECT (SELECT to_regclass('guilds') IS NOT NULL)  AS g,
+             (SELECT to_regclass('users')  IS NOT NULL) AS u`);
+    if (!prereq.rows[0].g || !prereq.rows[0].u) {
+      console.log('   (prereq tables guilds/users absent — bare test DB, live migration check skipped)');
+      return;
+    }
     await migration.up(pool);
     const check = await pool.query(
       `SELECT (SELECT to_regclass('guild_ai_settings') IS NOT NULL) AS a,

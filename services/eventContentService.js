@@ -65,6 +65,7 @@ const MAP_BOUNDS = {
   enoch:         { width: 12800, origin: 0 },
   chernarusplus: { width: 15360, origin: 0 },
   sakhal:        { width: 15360, origin: 0 },
+  nasdara:       { width: 16350, origin: 0 },
 };
 
 function mapBounds(mapName) {

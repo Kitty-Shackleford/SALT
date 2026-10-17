@@ -39,6 +39,7 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('emote-capture-enabled').addEventListener('change', toggleEmoteCaptureFields);
   document.getElementById('preset-item-select').addEventListener('change', onPresetItemChange);
   document.getElementById('add-preset-btn').addEventListener('click', addPreset);
+  document.getElementById('record-owner-restart-btn').addEventListener('click', recordOwnerRestart);
 
   // Hide rental restarts and event config panel by default
   toggleRentalRestarts();
@@ -96,10 +97,14 @@ function onServerChange() {
     '<tr><td colspan="7" class="text-center py-4 text-gray-400">Select a server to view orders.</td></tr>';
   document.getElementById('rentals-tbody').innerHTML =
     '<tr><td colspan="9" class="text-center py-4 text-gray-400">Select a server to view active rentals.</td></tr>';
+  document.getElementById('restarts-tbody').innerHTML =
+    '<tr><td colspan="5" class="text-center py-4 text-gray-400">Select a server to view restart history.</td></tr>';
+  document.getElementById('restart-status').textContent = '';
   if (currentServerId) {
     loadItems();
     loadOrders();
     loadRentals();
+    loadRestarts();
     loadRadarAudit();
     loadAnalytics();
   }
@@ -107,7 +112,7 @@ function onServerChange() {
 
 // ── Tab switching ──────────────────────────────────────────────────────────
 
-const ALL_TABS = ['items', 'presets', 'orders', 'rentals', 'radar', 'analytics'];
+const ALL_TABS = ['items', 'presets', 'orders', 'rentals', 'restarts', 'radar', 'analytics'];
 
 function setupTabListeners() {
   ALL_TABS.forEach(t => {
@@ -1219,6 +1224,110 @@ async function loadRentals() {
         serverId !== currentServerId) return;
     console.error('loadRentals:', err);
     tbody.innerHTML = '<tr><td colspan="9" class="text-center py-4 text-red-400">Failed to load rentals.</td></tr>';
+  }
+}
+
+// ── Restarts (owner-triggered recording + history) ─────────────────────────
+
+/** Badge styles/labels for the three restart types recorded by the shop. */
+function restartTypeBadge(type) {
+  const map = {
+    scheduled:       { classes: 'bg-green-800 text-green-200', label: 'Scheduled' },
+    owner_triggered: { classes: 'bg-blue-800 text-blue-200', label: 'Owner-triggered' },
+    crash:           { classes: 'bg-red-800 text-red-200', label: 'Crash' },
+  };
+  const entry = map[type] || { classes: 'bg-gray-700 text-gray-300', label: type || 'Unknown' };
+  return '<span class="' + entry.classes + ' px-2 py-0.5 rounded text-xs">' + escapeHtml(entry.label) + '</span>';
+}
+
+/** Load this server's recorded restarts (newest first) with rental consumption. */
+async function loadRestarts() {
+  const requestId = nextAdminRequestId('restarts');
+  const tbody = document.getElementById('restarts-tbody');
+  const generation = adminContextGeneration;
+  const serverId = currentServerId;
+  if (!serverId) return;
+  tbody.innerHTML = '<tr><td colspan="5" class="text-center py-4 text-gray-400">Loading\u2026</td></tr>';
+
+  try {
+    const res = await fetch('/api/shop/admin/restarts/' + serverId);
+    if (!res.ok) throw new Error('Failed to load restarts');
+    const json = await res.json();
+    if (requestId !== adminRequestSequence.restarts || generation !== adminContextGeneration ||
+        serverId !== currentServerId) return;
+    const restarts = json.data || [];
+
+    if (!restarts.length) {
+      tbody.innerHTML = '<tr><td colspan="5" class="text-center py-4 text-gray-400">No recorded restarts yet.</td></tr>';
+      return;
+    }
+
+    tbody.innerHTML = '';
+    restarts.forEach(restart => tbody.appendChild(buildRestartRow(restart)));
+  } catch (err) {
+    if (requestId !== adminRequestSequence.restarts || generation !== adminContextGeneration ||
+        serverId !== currentServerId) return;
+    console.error('loadRestarts:', err);
+    tbody.innerHTML = '<tr><td colspan="5" class="text-center py-4 text-red-400">Failed to load restarts.</td></tr>';
+  }
+}
+
+/** One history row: detected time, type badge, provider start, evidence, consumption. */
+function buildRestartRow(restart) {
+  const tr = document.createElement('tr');
+  tr.className = 'border-b border-gray-700 align-top';
+  const detected = restart.detected_at ? new Date(restart.detected_at).toLocaleString() : 'Unknown';
+  const providerStarted = restart.provider_started_at
+    ? new Date(restart.provider_started_at).toLocaleString()
+    : '\u2014';
+  const evidence = restart.evidence_source_file
+    ? '<code class="text-xs text-gray-400">' + escapeHtml(restart.evidence_source_file) + '</code>'
+    : '<span class="text-gray-500">\u2014</span>';
+  const consumption = (restart.consumption || []).map(row =>
+    '<div class="text-xs text-gray-300">' +
+      escapeHtml(row.player_name || 'Player') +
+      ' \u2014 ' + escapeHtml(row.item_name || 'Rental') +
+      ': ' + Number(row.previous_restarts_remaining) + ' \u2192 ' +
+      Number(row.resulting_restarts_remaining) + ' remaining</div>'
+  ).join('');
+  const consumptionCell = consumption
+    || '<span class="text-xs text-gray-500">None (no rental restarts consumed)</span>';
+  tr.innerHTML =
+    '<td class="py-2 px-3 text-gray-300">' + detected + '</td>' +
+    '<td class="py-2 px-3">' + restartTypeBadge(restart.restart_type) + '</td>' +
+    '<td class="py-2 px-3 text-gray-400">' + providerStarted + '</td>' +
+    '<td class="py-2 px-3">' + evidence + '</td>' +
+    '<td class="py-2 px-3">' + consumptionCell + '</td>';
+  return tr;
+}
+
+/**
+ * Record an owner-triggered restart. The next detected restart within 10
+ * minutes is classified as owner_triggered and does not consume rental counts.
+ */
+async function recordOwnerRestart() {
+  const serverId = currentServerId;
+  if (!serverId) { alert('Select a server first.'); return; }
+  if (!confirm('Record an owner-triggered restart for this server?\n\nThe next detected restart within 10 minutes will be marked owner-triggered and will not consume players\u2019 rental restarts.')) return;
+
+  const mutationGeneration = adminContextGeneration;
+  const mutationServerId = serverId;
+  const statusEl = document.getElementById('restart-status');
+  statusEl.textContent = 'Recording\u2026';
+  try {
+    const res = await fetchWithCsrf('/api/shop/admin/server/' + serverId + '/restart', { method: 'POST' });
+    if (mutationGeneration !== adminContextGeneration || mutationServerId !== currentServerId) return;
+    if (!res.ok) {
+      const payload = await res.json().catch(() => ({}));
+      throw new Error(payload.error || 'Failed to record owner restart');
+    }
+    statusEl.textContent = 'Owner restart recorded. The next detected restart within 10 minutes is excluded from rental counts.';
+    loadRestarts();
+  } catch (err) {
+    if (mutationGeneration !== adminContextGeneration || mutationServerId !== currentServerId) return;
+    console.error('recordOwnerRestart:', err);
+    statusEl.textContent = '';
+    alert('Failed to record owner restart: ' + err.message);
   }
 }
 

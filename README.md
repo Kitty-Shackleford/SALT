@@ -25,6 +25,7 @@ S.A.L.T. is a self-hosted web dashboard and Discord bot for administering Nitrad
 - Build and activate scheduled configuration-rotation presets
 - Review spawn exclusions and event-health information
 - Find loot and visualize loot-despawn activity on operator-supplied maps
+- DayZ Toolkit — client-side tools that run fully in the browser: XML/JSON/mission validators, duplicate classname checker, event conflict check, and a PAA ↔ PNG map-tile converter (files never leave the browser)
 - Queue audited player teleports and enforce position-restriction rules
 
 ### Discord and player features

@@ -407,7 +407,9 @@ function populateMapTiles(mapName) {
   mapTileLayerGroup.clearLayers();
 
   const cfg = MAP_CONFIGS[mapName] || MAP_CONFIGS.chernarusplus;
-  const { gridSize, tileSize: advancement, physicalSize } = cfg;
+  const gridSize = cfg.gridSize;
+  const advancement = cfg.tileSize;
+  const physicalSize = cfg.physicalSize || 512;
 
   for (let row = 0; row < gridSize; row++) {
     for (let col = 0; col < gridSize; col++) {
@@ -1031,6 +1033,7 @@ async function handleServerSelectorChange() {
     chernarusplus: 'Chernarus+',
     enoch:         'Livonia',
     sakhal:        'Sakhal',
+    nasdara:       'Nasdara',
     namalsk:       'Namalsk',
     takistanplus:  'Takistan+',
   };

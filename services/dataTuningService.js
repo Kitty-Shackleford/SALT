@@ -47,6 +47,7 @@ const MAP_FOLDER_SUFFIX = {
   chernarusplus: 'dayzOffline.chernarusplus',
   enoch:         'dayzOffline.enoch',
   sakhal:        'dayzOffline.sakhal',
+  nasdara:       'dayzOffline.nasdara',
 };
 const RE_MAP_STORAGE = /mpmissions\\dayzOffline\.(\w+)\\/;
 

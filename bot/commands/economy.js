@@ -15,7 +15,7 @@
  *
  * The <map> option defaults to auto-detection (first map folder found in
  * the guild's downloads directory).  Explicit choices: chernarusplus,
- * enoch (Livonia), sakhal.
+ * enoch (Livonia), sakhal, nasdara.
  */
 
 const { SlashCommandBuilder, EmbedBuilder, MessageFlags } = require('discord.js');
@@ -27,6 +27,7 @@ const MAP_LABELS = {
   chernarusplus: 'Chernarus',
   enoch:         'Livonia',
   sakhal:        'Sakhal',
+  nasdara:       'Nasdara',
 };
 
 /** Format seconds as a human-readable duration string. */
@@ -61,6 +62,7 @@ module.exports = {
               { name: 'Chernarus',  value: 'chernarusplus' },
               { name: 'Livonia',    value: 'enoch' },
               { name: 'Sakhal',     value: 'sakhal' },
+              { name: 'Nasdara',    value: 'nasdara' },
             )
         )
         .addStringOption(opt => opt
@@ -85,6 +87,7 @@ module.exports = {
               { name: 'Chernarus',  value: 'chernarusplus' },
               { name: 'Livonia',    value: 'enoch' },
               { name: 'Sakhal',     value: 'sakhal' },
+              { name: 'Nasdara',    value: 'nasdara' },
             )
         )
         .addStringOption(opt => opt

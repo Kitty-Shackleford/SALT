@@ -54,6 +54,23 @@
     enoch: definition('enoch', 12800, { name: 'Livonia' }),
     sakhal: definition('sakhal', 15360, { name: 'Sakhal' }),
 
+    // Nasdara (DayZ 1.30 / Badlands, 2026-10-15). World extent is authoritative
+    // from the navmesh header (worlds_nasdara_nav.pbo: 327 x 327 cells at 50.0
+    // units = 16350). The game's 43x43 terrain tiles (worlds_nasdara_data.pbo
+    // layers\S_*_lco.paa) are non-overlapping 512px cells (22016x22016 canvas);
+    // the shipped dashboard tiles are re-sliced from that canvas WITH a 32px
+    // bleed — 46x46 tiles at 480px advancement (image 22112, the final row/col
+    // edge-clamped past the canvas) — so nasdara uses the same overlap-band
+    // geometry as sakhal/enoch/chernarus and the hard-edge seam lattice is
+    // gone. Flagged unverified until a coordinate-calibration pass confirms
+    // the scale.
+    nasdara: definition('nasdara', 16350, {
+      name: 'Nasdara',
+      gridSize: 46,
+      tileAdvancement: 480,
+      verifiedGeometry: false,
+    }),
+
     // These definitions preserve existing behavior until matching raster assets
     // and authoritative terrain bounds are available for calibration.
     namalsk: definition('namalsk', 12800, {

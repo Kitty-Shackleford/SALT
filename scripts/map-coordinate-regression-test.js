@@ -39,6 +39,28 @@ function testMeasuredVanillaMapDefinitions() {
     'unverified maps must preserve their existing renderer extent');
   assert.strictEqual(coordinates.getMapDefinition('takistanplus').size, 12800,
     'unverified maps must preserve their existing renderer extent');
+
+  // Nasdara (DayZ 1.30): world extent from the navmesh (327 x 327 cells @ 50.0
+  // = 16350); 43x43 NON-overlapping terrain tiles placed edge-to-edge (512).
+  const nasdara = coordinates.getMapDefinition('nasdara');
+  assert.strictEqual(nasdara.id, 'nasdara');
+  assert.strictEqual(nasdara.name, 'Nasdara');
+  assert.strictEqual(nasdara.gridSize, 46);
+  assert.strictEqual(nasdara.physicalTileSize, 512);
+  assert.strictEqual(nasdara.tileAdvancement, 480,
+    'nasdara tiles carry the standard 32px bleed (re-sliced from the 22016 game canvas)');
+  assert.strictEqual(nasdara.tileOverlap, 32);
+  assert.strictEqual(nasdara.worldWidth, 16350, 'nasdara world extent = 327 navmesh cells * 50.0');
+  assert.strictEqual(nasdara.worldHeight, 16350);
+  assert.strictEqual(nasdara.imageWidth, 22112, 'nasdara image = 45 * 480 + 512 (46-tile bleed grid)');
+  assert.strictEqual(nasdara.imageHeight, 22112);
+  assert.strictEqual(nasdara.verifiedGeometry, false,
+    'nasdara geometry must stay flagged unverified until a calibration pass lands');
+  assert.deepStrictEqual(coordinates.tileFileCoordinates(0, 0, 'nasdara'), { x: 0, y: 45 },
+    'nasdara tile file-y must flip on the 46-grid');
+  assert.deepStrictEqual(coordinates.tileFileCoordinates(45, 45, 'nasdara'), { x: 45, y: 0 });
+  assert.strictEqual(coordinates.tileFileCoordinates(46, 0, 'nasdara'), null,
+    'tile indices outside the 46-grid must be rejected');
 }
 
 function testWorldLeafletTransformAndInverse() {

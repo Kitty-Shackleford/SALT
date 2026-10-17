@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://raw.githubusercontent.com/Kitty-Shackleford/SALT/main/templates/dayz-server-automation/dayz/schemas/server-status.schema.json",
+  "$id": "https://saltskrew.xyz/schemas/dayz-server-status-v1.json",
   "title": "DayZ Server Status",
   "type": "object",
   "additionalProperties": false,

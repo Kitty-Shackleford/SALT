@@ -4,6 +4,22 @@ All notable public changes to S.A.L.T. will be documented here.
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project intends to use semantic versioning once stable releases are tagged.
 
+## [2026-10-17] — Nasadara + Toolkit Update
+
+### Added
+
+- DayZ 1.30 Nasadara map support — map registry, coordinates, and tile grid (tiles remain operator-supplied, see the Map tiles section)
+- DayZ Toolkit — client-side tools that run fully in the browser: XML/JSON/mission validators, duplicate classname checker, event conflict check
+- PAA ↔ PNG map-tile converter in the toolkit (client-side WASM; files never leave the browser)
+- Landing page fleet statistics and GitHub repository metrics
+- Shop admin Restarts tab — owner-restart recording and restart history
+
+### Fixed
+
+- Guild removal — hiding a guild and having the bot leave it now completes and is visible in the admin UI
+- Nasadara map tile seams — the tile grid was re-sliced with bleed so tile boundaries no longer show as a visible lattice
+- Map destination preview and physical tile-size fallback now resolve through the canonical map registry
+
 ## [2026-10-13] — October Update
 
 ### Added

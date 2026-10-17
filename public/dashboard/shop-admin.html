@@ -51,6 +51,7 @@
       <button id="tab-btn-presets"   class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">&#x1F4CD; Preset Locations</button>
       <button id="tab-btn-orders"    class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">&#x1F4DC; Orders</button>
       <button id="tab-btn-rentals"   class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">&#x1F3E0; Active Rentals</button>
+      <button id="tab-btn-restarts"  class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">&#x1F504; Restarts</button>
       <button id="tab-btn-radar"      class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">📡 Radar Audit</button>
       <button id="tab-btn-analytics" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">&#x1F4CA; Analytics</button>
     </div>
@@ -437,6 +438,13 @@
 
     <!-- Orders tab -->
     <div id="tab-orders" style="display:none;">
+      <div class="bg-gray-800 rounded-lg p-3 mb-3 border border-gray-700 text-xs text-gray-300">
+        <strong>Fulfillment:</strong> purchases are provisioned at checkout and confirmed from server logs.
+        <span class="text-yellow-200">Awaiting spawn confirmation</span> becomes
+        <span class="text-green-300">Spawn confirmed</span> or
+        <span class="text-red-300">Spawn failed / Spawn refused</span> — expand an order for per-line evidence and
+        refund any failed fulfillment with the row's <em>Refund</em> action.
+      </div>
       <div class="flex gap-3 mb-3 items-end flex-wrap">
         <div>
           <label class="form-label">Filter by status</label>
@@ -474,6 +482,12 @@
 
     <!-- Active Rentals tab -->
     <div id="tab-rentals" style="display:none;">
+      <div class="bg-gray-800 rounded-lg p-3 mb-3 border border-gray-700 text-xs text-gray-300">
+        <strong>How rental restarts are counted:</strong> each <span class="text-green-300">scheduled</span> restart
+        (a shutdown with a save countdown confirmed in the server logs) consumes one remaining restart for every active
+        rental on this server. <span class="text-blue-300">Owner-triggered</span> restarts and
+        <span class="text-red-300">crashes</span> do not count. Normal refunds are prorated from unused scheduled restarts.
+      </div>
       <div class="bg-gray-800 rounded-lg border border-gray-700 overflow-x-auto">
         <table class="w-full text-sm">
           <thead class="bg-gray-700">
@@ -491,6 +505,43 @@
           </thead>
           <tbody id="rentals-tbody">
             <tr><td colspan="9" class="text-center py-6 text-gray-400">Select a server to view active rentals.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Restarts tab -->
+    <div id="tab-restarts" style="display:none;">
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+        <div class="bg-gray-800 rounded-lg p-4 border border-gray-700 text-xs text-gray-300">
+          <p class="text-sm font-semibold text-gray-200 mb-2">&#x1F504; How rental restarts are counted</p>
+          <p>Each <strong class="text-green-300">scheduled</strong> restart (a shutdown with a save countdown
+            confirmed in the server logs) consumes one remaining restart for every active rental on this server.
+            <strong class="text-blue-300">Owner-triggered</strong> restarts and <strong class="text-red-300">crashes</strong>
+            do not count. Each row below lists the rental line items that restart consumed.</p>
+        </div>
+        <div class="bg-gray-800 rounded-lg p-4 border border-gray-700">
+          <p class="text-sm font-semibold text-gray-200 mb-2">&#x1F3AF; Record an owner restart</p>
+          <p class="text-xs text-gray-300 mb-3">Use this after you restart the server manually (for example from the
+            Nitrado panel). The next detected restart within 10 minutes is marked <strong>owner-triggered</strong> and
+            does not consume players' rental restarts.</p>
+          <button id="record-owner-restart-btn" class="bg-indigo-600 hover:bg-indigo-500 px-4 py-2 rounded font-semibold text-sm">Record owner restart</button>
+          <p id="restart-status" class="text-xs mt-2"></p>
+        </div>
+      </div>
+      <div class="bg-gray-800 rounded-lg border border-gray-700 overflow-x-auto">
+        <table class="w-full text-sm">
+          <thead class="bg-gray-700">
+            <tr>
+              <th class="text-left py-2 px-3">Detected</th>
+              <th class="text-left py-2 px-3">Type</th>
+              <th class="text-left py-2 px-3">Provider Started</th>
+              <th class="text-left py-2 px-3">Evidence</th>
+              <th class="text-left py-2 px-3">Rentals consumed</th>
+            </tr>
+          </thead>
+          <tbody id="restarts-tbody">
+            <tr><td colspan="5" class="text-center py-6 text-gray-400">Select a server to view restart history.</td></tr>
           </tbody>
         </table>
       </div>

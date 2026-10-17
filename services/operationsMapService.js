@@ -10,7 +10,7 @@ const PRESENCE_MAX_AGE_MS = 120 * 60 * 1000;
 const PRESENCE_FUTURE_SKEW_MS = 5 * 60 * 1000;
 const POSITION_MAX_AGE_MS = 15 * 60 * 1000;
 const STREAM_LIMIT = 250;
-const SUPPORTED_MAPS = new Set(['chernarusplus', 'enoch', 'sakhal']);
+const SUPPORTED_MAPS = new Set(['chernarusplus', 'enoch', 'sakhal', 'nasdara']);
 
 function parseWindowMinutes(value) {
   const parsed = Number.parseInt(value, 10);

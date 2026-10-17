@@ -581,6 +581,7 @@ class MissionFileService {
       else if (mission.includes('sakhal')) mapName = 'sakhal';
       else if (mission.includes('namalsk')) mapName = 'namalsk';
       else if (mission.includes('takistanplus')) mapName = 'takistanplus';
+      else if (mission.includes('nasdara')) mapName = 'nasdara';
 
       console.log('   ✓ Mission:', mission);
       console.log('   ✓ Map:', mapName);

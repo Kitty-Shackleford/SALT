@@ -18,7 +18,7 @@ const { lockUserRoleMutations } = require('../utils/roleMutationLocks');
 
 const router = express.Router();
 router.param('serverId', requireServerCapability(CAPABILITIES.SERVER_MODERATE));
-const SUPPORTED_MAP_PATTERN = /(?:^|\.)(chernarusplus|enoch|sakhal|namalsk|takistanplus)(?:$|\.)/i;
+const SUPPORTED_MAP_PATTERN = /(?:^|\.)(chernarusplus|enoch|sakhal|namalsk|takistanplus|nasdara)(?:$|\.)/i;
 
 function activeSessionContext(gameserver) {
   if (gameserver?.status !== 'started') return null;

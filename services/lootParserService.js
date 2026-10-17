@@ -29,6 +29,7 @@ const MAP_FOLDER_SUFFIX = {
   chernarusplus: 'dayzOffline.chernarusplus',
   enoch:         'dayzOffline.enoch',
   sakhal:        'dayzOffline.sakhal',
+  nasdara:       'dayzOffline.nasdara',
 };
 
 const DOWNLOADS_DIR = path.join(__dirname, '..', 'downloads');

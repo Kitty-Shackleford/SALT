@@ -1004,6 +1004,66 @@ router.post('/admin/server/:serverId/restart', async (req, res) => {
 });
 
 /**
+ * GET /admin/restarts/:serverId
+ * List this server's recorded restarts (newest first, capped at 100) with the
+ * rental line items each scheduled restart consumed. Requires owner/admin.
+ */
+router.get('/admin/restarts/:serverId', async (req, res) => {
+  const db = req.app.locals.db;
+  const { serverId } = req.params;
+
+  try {
+    const isOwner = await verifyServerOwner(db, req.user.id, serverId);
+    if (!isOwner) return res.status(403).json({ error: 'Forbidden' });
+
+    const restarts = await db.query(
+      `SELECT srl.id, srl.restart_type, srl.bios_session_id, srl.detected_at,
+              srl.provider_started_at, srl.evidence_source_file
+       FROM server_restart_log srl
+       WHERE srl.server_id = ?
+       ORDER BY srl.detected_at DESC NULLS LAST, srl.id DESC
+       LIMIT 100`,
+      [serverId]
+    );
+    if (!restarts.length) return res.json({ success: true, data: [] });
+
+    const restartIds = restarts.map(row => row.id);
+    const placeholders = restartIds.map(() => '?').join(', ');
+    const consumptions = await db.query(
+      `SELECT srce.restart_log_id,
+              CASE WHEN soi.snapshot_schema_version = 1 THEN soi.item_name_snapshot ELSE si.name END AS item_name,
+              pi.platform_username AS player_name,
+              srce.previous_restarts_remaining,
+              srce.resulting_restarts_remaining,
+              srce.consumed_at
+       FROM shop_rental_consumption_events srce
+       JOIN shop_order_items soi ON soi.id = srce.order_item_id
+       JOIN shop_items si ON si.id = soi.shop_item_id
+       JOIN shop_orders so ON so.id = srce.order_id
+       JOIN player_identities pi ON pi.id = so.identity_id
+       WHERE srce.restart_log_id IN (${placeholders})
+       ORDER BY srce.consumed_at, srce.id`,
+      restartIds
+    );
+    const consumptionByRestart = new Map();
+    for (const row of consumptions) {
+      if (!consumptionByRestart.has(row.restart_log_id)) {
+        consumptionByRestart.set(row.restart_log_id, []);
+      }
+      consumptionByRestart.get(row.restart_log_id).push(row);
+    }
+    const data = restarts.map(row => ({
+      ...row,
+      consumption: consumptionByRestart.get(row.id) || [],
+    }));
+    return res.json({ success: true, data });
+  } catch (err) {
+    console.error('GET /admin/restarts/:serverId', err);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+/**
  * GET /admin/rentals/:serverId
  * List active event_rental order items with restarts remaining. Requires owner/admin.
  */
@@ -1281,7 +1341,7 @@ router.get('/maps/:serverId', async (req, res) => {
     if (!server) return res.status(404).json({ error: 'Server not found' });
 
     const { listAvailableLogs } = require('../services/lootLiveService');
-    const supportedMaps = new Set(['chernarusplus', 'enoch', 'sakhal', 'namalsk', 'takistanplus']);
+    const supportedMaps = new Set(['chernarusplus', 'enoch', 'sakhal', 'namalsk', 'takistanplus', 'nasdara']);
     const maps = [...new Set(
       listAvailableLogs(server.discord_guild_id, server.platform_server_id)
         .map(entry => String(entry.map || '').toLowerCase())

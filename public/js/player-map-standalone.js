@@ -95,7 +95,7 @@ function loadTiles(mapName) {
   const cfg = mapConfigs[mapName] || mapConfigs.chernarusplus;
   const gridSize = cfg.gridSize;
   const advancement = cfg.advancement || cfg.tileSize;
-  const physicalSize = cfg.physicalSize || advancement;
+  const physicalSize = cfg.physicalSize || 512;
 
   for (let y = 0; y < gridSize; y++) {
     for (let x = 0; x < gridSize; x++) {

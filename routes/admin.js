@@ -156,10 +156,18 @@ async function getIdentityReferenceColumns(db) {
 
 /**
  * GET /api/admin/guilds
- * List all approved Discord guilds
+ * List approved Discord guilds by default.
+ * Removed (disabled) guilds no longer appear in the default list; the
+ * guild-management approval page retrieves them with ?status=disabled.
  */
 router.get('/guilds', ensureAdmin, async (req, res) => {
   const db = req.app.locals.db;
+
+  const requestedStatus = req.query.status;
+  const status = requestedStatus === undefined ? 'approved' : requestedStatus;
+  if (status !== 'approved' && status !== 'disabled') {
+    return res.status(400).json({ error: "status must be 'approved' or 'disabled'" });
+  }
 
   const query = `
     SELECT 
@@ -175,12 +183,13 @@ router.get('/guilds', ensureAdmin, async (req, res) => {
     LEFT JOIN guild_roles gr ON g.id = gr.guild_id AND gr.role = 'owner'
     LEFT JOIN users u ON gr.user_id = u.id
     LEFT JOIN servers s ON g.id = s.guild_id
+    WHERE g.status = ?
     GROUP BY g.id, g.discord_guild_id, g.name, u.username, gt.token_hash
     ORDER BY g.created_at DESC
   `;
 
   try {
-    const rows = await db.query(query, []);
+    const rows = await db.query(query, [status]);
     res.json({ success: true, guilds: rows });
   } catch (err) {
     console.error('❌ Error fetching guilds:', err);
@@ -230,6 +239,18 @@ router.delete('/guilds/:guildId', validateGuildIdParam, ensureAdmin, async (req,
       await transactionDb.run(
         "UPDATE servers SET status = 'inactive' WHERE guild_id = ? AND status = 'active'",
         [guild.id]
+      );
+      // Enqueue the bot-leave job in the same transaction so the outbox row
+      // and the guild deactivation are atomic. Re-deleting an already removed
+      // guild re-queues any existing job instead of failing.
+      await transactionDb.run(
+        `INSERT INTO discord_guild_leave_jobs
+           (discord_guild_id, status, attempts, next_attempt_at, updated_at)
+         VALUES (?, 'pending', 0, NOW(), NOW())
+         ON CONFLICT (discord_guild_id) DO UPDATE SET
+           status = 'pending', attempts = 0, next_attempt_at = NOW(),
+           last_error = NULL, completed_at = NULL, locked_at = NULL, updated_at = NOW()`,
+        [guildId]
       );
       await logAction(transactionDb, req.user.id, 'REMOVE_GUILD', 'guild', guild.id, {
         guildName: guild.name,

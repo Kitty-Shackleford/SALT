@@ -68,7 +68,9 @@ function switchTab(tab) {
 async function loadGuilds() {
   const tab = currentTab;
   const generation = ++guildLoadGeneration;
-  const endpoint = tab === 'pending' ? '/api/admin/guilds/pending' : '/api/admin/guilds';
+  const endpoint = tab === 'pending' ? '/api/admin/guilds/pending'
+    : tab === 'disabled' ? '/api/admin/guilds?status=disabled'
+    : '/api/admin/guilds';
 
   try {
     const response = await fetch(endpoint);
@@ -134,12 +136,20 @@ function renderGuildCard(guild) {
               class="bg-red-600 hover:bg-red-700 px-4 py-2 rounded">
         🚫 Disable
       </button>
+      <button data-action="remove" data-guild-id="${guildId}"
+              class="bg-gray-900 hover:bg-black border border-red-500 px-4 py-2 rounded">
+        🗑️ Remove
+      </button>
     `;
   } else if (guild.status === 'disabled') {
     actions = `
       <button data-action="enable" data-guild-id="${guildId}"
               class="bg-green-600 hover:bg-green-700 px-4 py-2 rounded">
         ✅ Re-enable
+      </button>
+      <button data-action="remove" data-guild-id="${guildId}"
+              class="bg-gray-900 hover:bg-black border border-red-500 px-4 py-2 rounded">
+        🗑️ Remove
       </button>
     `;
   }
@@ -216,6 +226,13 @@ function showConfirmModal(action, guild) {
       showReason: false,
       btnClass: 'bg-green-600 hover:bg-green-700',
       btnText: '✅ Re-enable'
+    },
+    remove: {
+      title: 'Remove Guild',
+      message: `Remove <strong>${guildName}</strong> permanently? The guild will be hidden from the dashboard, its linked servers deactivated, and the bot will leave the Discord server.`,
+      showReason: false,
+      btnClass: 'bg-gray-900 hover:bg-black border border-red-500',
+      btnText: '🗑️ Remove'
     }
   };
   
@@ -243,12 +260,17 @@ async function executeAction() {
   const { action, guildId } = pendingAction;
   const reason = document.getElementById('actionReason').value;
   
-  const endpoint = `/api/admin/guilds/${guildId}/${action}`;
+  // `remove` is the dedicated DELETE route (soft-disable + bot-leave outbox
+  // job); the other actions use the POST /guilds/:id/:action handler.
+  const endpoint = action === 'remove'
+    ? `/api/admin/guilds/${guildId}`
+    : `/api/admin/guilds/${guildId}/${action}`;
+  const method = action === 'remove' ? 'DELETE' : 'POST';
   
   try {
     const response = await fetchWithCsrf(endpoint, {
-      method: 'POST',
-      body: JSON.stringify({ reason })
+      method,
+      body: action === 'remove' ? undefined : JSON.stringify({ reason })
     });
     
     const data = await response.json();

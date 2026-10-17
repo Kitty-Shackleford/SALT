@@ -10,14 +10,14 @@ function harness(file, overrides = {}) {
   const element = id => {
     if (!elements.has(id)) elements.set(id, {
       innerHTML: '', textContent: '', value: '', style: {}, className: '',
-      classList: { remove() {}, toggle() {} },
+      classList: { _classes: new Set(), add(c) { this._classes.add(c); }, remove(c) { this._classes.delete(c); }, toggle() {}, contains(c) { return this._classes.has(c); } },
       addEventListener() {}, querySelectorAll: () => [],
     });
     return elements.get(id);
   };
   const context = vm.createContext({
     api: { get: () => new Promise(() => {}) },
-    document: { getElementById: element, addEventListener() {}, querySelectorAll: () => [] },
+    document: { body: { appendChild() {} }, getElementById: element, addEventListener() {}, querySelectorAll: () => [], createElement: () => ({ className: '', textContent: '', remove() {} }) },
     window: {}, console, alert() {}, confirm: () => false,
     fetch: () => new Promise(() => {}),
     fetchWithCsrf: () => new Promise(() => {}),
@@ -54,6 +54,35 @@ async function main() {
   assert.ok(!named.includes('<script>owner</script>'));
   const identified = approval.context.renderGuildCard({ ...shell, ownerDiscordId: '123456789012345678' });
   assert.ok(identified.includes('123456789012345678'), 'known owner ID survives a missing username');
+
+  // Visible "remove guild" affordance: the management page must offer
+  // removal for BOTH live states — disabled guilds were previously
+  // unreachable (only Re-enable), and approved guilds only had Disable.
+  const approvedCard = approval.context.renderGuildCard({ ...shell, status: 'approved' });
+  assert.ok(approvedCard.includes('data-action="disable"'), 'approved guild still offers Disable');
+  assert.ok(approvedCard.includes('data-action="remove"'), 'approved guild must offer Remove');
+  const disabledCard = approval.context.renderGuildCard({ ...shell, status: 'disabled' });
+  assert.ok(disabledCard.includes('data-action="enable"'), 'disabled guild still offers Re-enable');
+  assert.ok(disabledCard.includes('data-action="remove"'), 'disabled guild must offer Remove (previously unreachable)');
+  assert.ok(!html.includes('data-action="remove"'), 'pending guilds must not offer Remove');
+
+  // Full remove flow: confirm modal → DELETE /api/admin/guilds/:id
+  const removeRequests = [];
+  approval.context.document.createElement = () => ({ className: '', textContent: '', remove() {} });
+  approval.context.fetchWithCsrf = (url, options) => {
+    removeRequests.push({ url, options });
+    return Promise.resolve({ ok: true, json: () => Promise.resolve({ success: true }) });
+  };
+  approval.context.showConfirmModal('remove', { guild_id: 'rm-1', guildName: 'Doomed', status: 'disabled' });
+  assert.equal(approval.element('modalTitle').textContent, 'Remove Guild');
+  assert.match(approval.element('modalMessage').innerHTML, /leave the Discord server/);
+  await approval.context.executeAction();
+  assert.equal(removeRequests.length, 1);
+  assert.equal(removeRequests[0].url, '/api/admin/guilds/rm-1');
+  assert.equal(removeRequests[0].options.method, 'DELETE');
+  assert.equal(removeRequests[0].options.body, undefined, 'the DELETE route takes no body');
+  assert.ok(approval.element('confirmModal').classList.contains('hidden'),
+    'modal closes after a successful remove');
 
   const listing = harness('admin-guilds.js');
   listing.context.api.get = async () => ({ json: async () => ({ success: true, guilds: [shell] }) });

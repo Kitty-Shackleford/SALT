@@ -123,7 +123,7 @@ async function request(app, method, path, body) {
 
 function assertSoftDisable(calls) {
   const writes = calls.filter(call => call.sql?.startsWith('UPDATE') || call.sql?.startsWith('INSERT'));
-  assert.equal(writes.length, 3, 'only guild/server deactivation and audit writes');
+  assert.equal(writes.length, 4, 'guild/server deactivation, leave job, and audit writes');
   assert.match(writes[0].sql, /UPDATE guilds\s+SET status = 'disabled'/);
   assert.match(writes[0].sql, /WHERE discord_guild_id = \?/);
   assert.deepEqual(writes[0].params, [ADMIN.id, GUILD_ID]);
@@ -131,9 +131,14 @@ function assertSoftDisable(calls) {
   assert.equal(writes[1].sql, "UPDATE servers SET status = 'inactive' WHERE guild_id = ? AND status = 'active'");
   assert.deepEqual(writes[1].params, [42]);
   assert.equal(writes[1].inTransaction, true);
-  assert.deepEqual(writes[2].params, [ADMIN.id, 'REMOVE_GUILD', 'guild', 42,
-    JSON.stringify({ guildName: 'Test guild', discordGuildId: GUILD_ID, serversAffected: 2 })]);
+  assert.match(writes[2].sql, /INSERT INTO discord_guild_leave_jobs/);
+  assert.match(writes[2].sql, /ON CONFLICT \(discord_guild_id\) DO UPDATE SET/);
+  assert.match(writes[2].sql, /status = 'pending', attempts = 0, next_attempt_at = NOW\(\)/);
+  assert.deepEqual(writes[2].params, [GUILD_ID]);
   assert.equal(writes[2].inTransaction, true);
+  assert.deepEqual(writes[3].params, [ADMIN.id, 'REMOVE_GUILD', 'guild', 42,
+    JSON.stringify({ guildName: 'Test guild', discordGuildId: GUILD_ID, serversAffected: 2 })]);
+  assert.equal(writes[3].inTransaction, true);
   assert.equal(calls.filter(call => call.transaction).length, 1);
   assert.equal(calls.some(call => /^DELETE\b/.test(call.sql || '')), false);
 }

@@ -1,0 +1,204 @@
+/* =====================================================================
+ * DayZ Toolkit — client-side tools.
+ * Colors are --dzc-* theme tokens so pages track the active theme;
+ * the toolkit ships its own fallbacks so it renders before any theme.
+ * ===================================================================== */
+
+:root {
+  --dzc-bg: #0c120d;
+  --dzc-bg-tint: #101711;
+  --dzc-surface: #121a13;
+  --dzc-surface-2: #172019;
+  --dzc-border: #24331f;
+  --dzc-border-strong: #37492f;
+  --dzc-text: #eaf2e9;
+  --dzc-text-muted: #a7b8a4;
+  --dzc-text-faint: #6d7f6a;
+  --dzc-accent: #6f9a3d;
+  --dzc-stat: #34e07a;
+  --dzc-warning: #e6b23a;
+  --dzc-danger: #e05252;
+  --dzc-info: #5cc8a0;
+  --dzc-radius-md: 8px;
+  --dzc-radius-lg: 12px;
+  --dzc-font-body: Inter, system-ui, 'Segoe UI', Arial, sans-serif;
+  --dzc-font-mono: 'JetBrains Mono', ui-monospace, 'Courier New', monospace;
+}
+
+body.tk-page {
+  margin: 0;
+  background: var(--dzc-bg);
+  color: var(--dzc-text);
+  font-family: var(--dzc-font-body);
+  line-height: 1.5;
+}
+
+.tk-wrap {
+  max-width: 980px;
+  margin: 0 auto;
+  padding: 24px 20px 64px;
+}
+
+.tk-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 0 16px;
+  border-bottom: 1px solid var(--dzc-border);
+  margin-bottom: 24px;
+}
+
+.tk-brand {
+  font-weight: 700;
+  font-size: 18px;
+  letter-spacing: 0.04em;
+  color: var(--dzc-text);
+  text-decoration: none;
+}
+
+.tk-local-badge {
+  margin-left: auto;
+  font-size: 12px;
+  color: var(--dzc-stat);
+  border: 1px solid color-mix(in srgb, var(--dzc-stat) 40%, transparent);
+  border-radius: 999px;
+  padding: 2px 10px;
+  white-space: nowrap;
+}
+
+.tk-title { font-size: 26px; margin: 0 0 8px; }
+.tk-blurb { color: var(--dzc-text-muted); max-width: 70ch; margin: 0 0 24px; }
+
+.tk-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
+
+.tk-btn {
+  background: var(--dzc-surface-2);
+  color: var(--dzc-text);
+  border: 1px solid var(--dzc-border-strong);
+  border-radius: var(--dzc-radius-md);
+  padding: 8px 14px;
+  font-size: 14px;
+  cursor: pointer;
+}
+.tk-btn:hover { border-color: var(--dzc-accent); }
+.tk-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.tk-btn-small { padding: 4px 10px; font-size: 12px; }
+
+.tk-dropzone {
+  border: 2px dashed var(--dzc-border-strong);
+  border-radius: var(--dzc-radius-lg);
+  padding: 28px 16px;
+  text-align: center;
+  color: var(--dzc-text-muted);
+  background: var(--dzc-bg-tint);
+  margin-bottom: 12px;
+}
+.tk-dropzone.tk-dragging { border-color: var(--dzc-accent); background: var(--dzc-surface); }
+.tk-drophint { font-size: 12px; color: var(--dzc-text-faint); margin: 4px 0 0; }
+
+.tk-paste-row { display: flex; gap: 8px; margin-top: 12px; }
+.tk-paste {
+  flex: 1;
+  min-height: 140px;
+  background: var(--dzc-bg-tint);
+  color: var(--dzc-text);
+  border: 1px solid var(--dzc-border);
+  border-radius: var(--dzc-radius-md);
+  padding: 10px;
+  font-family: var(--dzc-font-mono);
+  font-size: 13px;
+  resize: vertical;
+}
+.tk-pending { font-size: 12px; color: var(--dzc-text-faint); }
+.tk-err { color: var(--dzc-danger); font-size: 13px; }
+
+.tk-results { margin-top: 24px; }
+.tk-results-title { font-size: 16px; margin: 0 0 12px; color: var(--dzc-text-muted); }
+
+.tk-card {
+  background: var(--dzc-surface);
+  border: 1px solid var(--dzc-border);
+  border-radius: var(--dzc-radius-lg);
+  margin-bottom: 12px;
+  overflow: hidden;
+}
+.tk-card.tk-invalid { border-color: color-mix(in srgb, var(--dzc-danger) 55%, var(--dzc-border)); }
+.tk-card.tk-good { border-color: color-mix(in srgb, var(--dzc-warning) 45%, var(--dzc-border)); }
+.tk-card.tk-excellent { border-color: color-mix(in srgb, var(--dzc-stat) 45%, var(--dzc-border)); }
+
+.tk-card-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  background: var(--dzc-surface-2);
+  border-bottom: 1px solid var(--dzc-border);
+}
+.tk-card-title { margin: 0; font-size: 14px; font-family: var(--dzc-font-mono); flex: 1; word-break: break-all; }
+.tk-size { font-size: 12px; color: var(--dzc-text-faint); }
+
+.tk-status {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  padding: 2px 8px;
+  border-radius: 999px;
+}
+.tk-status-invalid { color: #fff; background: var(--dzc-danger); }
+.tk-status-good { color: #111; background: var(--dzc-warning); }
+.tk-status-excellent { color: #111; background: var(--dzc-stat); }
+
+.tk-findings { list-style: none; margin: 0; padding: 8px 14px 12px; }
+.tk-finding { font-size: 13px; padding: 4px 0; border-bottom: 1px solid color-mix(in srgb, var(--dzc-border) 50%, transparent); }
+.tk-finding:last-child { border-bottom: none; }
+.tk-sev { font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; margin-right: 4px; }
+.tk-finding-error .tk-sev { color: var(--dzc-danger); }
+.tk-finding-warning .tk-sev { color: var(--dzc-warning); }
+.tk-finding-info .tk-sev { color: var(--dzc-info); }
+.tk-finding-error { color: color-mix(in srgb, var(--dzc-text) 90%, var(--dzc-danger) 10%); }
+.tk-msg { color: var(--dzc-text-muted); }
+
+.tk-summary-line { color: var(--dzc-text-muted); font-size: 14px; }
+
+/* Index page */
+.tk-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 12px; }
+.tk-tool-card {
+  display: block;
+  background: var(--dzc-surface);
+  border: 1px solid var(--dzc-border);
+  border-radius: var(--dzc-radius-lg);
+  padding: 16px;
+  color: var(--dzc-text);
+  text-decoration: none;
+}
+.tk-tool-card:hover { border-color: var(--dzc-accent); }
+.tk-tool-card h3 { margin: 0 0 6px; font-size: 15px; }
+.tk-tool-card p { margin: 0; font-size: 13px; color: var(--dzc-text-muted); }
+.tk-tool-tag {
+  display: inline-block;
+  font-size: 11px;
+  color: var(--dzc-info);
+  border: 1px solid color-mix(in srgb, var(--dzc-info) 40%, transparent);
+  border-radius: 999px;
+  padding: 1px 8px;
+  margin-bottom: 8px;
+}
+
+/* Duplicate table */
+.tk-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.tk-table th, .tk-table td { text-align: left; padding: 6px 10px; border-bottom: 1px solid var(--dzc-border); }
+.tk-table th { color: var(--dzc-text-muted); font-weight: 600; font-size: 12px; }
+.tk-table td.tk-mono { font-family: var(--dzc-font-mono); }
+
+/* Splitter controls */
+.tk-split-row { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin: 10px 0; }
+.tk-split-row label { font-size: 13px; color: var(--dzc-text-muted); }
+.tk-select, .tk-number {
+  background: var(--dzc-bg-tint);
+  color: var(--dzc-text);
+  border: 1px solid var(--dzc-border);
+  border-radius: var(--dzc-radius-md);
+  padding: 6px 10px;
+  font-size: 13px;
+}
+.tk-number { width: 110px; }

@@ -35,6 +35,15 @@
     .btn:focus-visible,.tile:focus-visible{outline:2px solid var(--dzc-info);outline-offset:2px}
     .tiles{display:grid;grid-template-columns:repeat(2, minmax(0, 1fr));gap:var(--dzc-space-4);width:100%;max-width:44rem;margin:0 auto}
     @media (max-width: 560px){ .tiles{grid-template-columns:1fr} }
+    .fleet{width:100%;max-width:44rem;margin:0 auto;padding:var(--dzc-space-5);background:var(--dzc-surface);border:1px solid var(--dzc-border);border-radius:var(--dzc-radius-lg);box-shadow:var(--dzc-shadow-md)}
+    .fleet-title{font-family:var(--dzc-font-display);letter-spacing:var(--dzc-letter-spacing-display);text-transform:uppercase;font-size:1rem;font-weight:400;margin:0 0 var(--dzc-space-3)}
+    .fleet-grid{display:grid;grid-template-columns:repeat(2, minmax(0, 1fr));gap:var(--dzc-space-3)}
+    @media (min-width: 560px){ .fleet-grid{grid-template-columns:repeat(4, minmax(0, 1fr))} }
+    .metric{display:flex;flex-direction:column;gap:2px;min-width:0}
+    .metric-label{font-size:.75rem;text-transform:uppercase;letter-spacing:.08em;color:var(--dzc-text-faint)}
+    .metric-value{font-family:var(--dzc-font-display);font-size:1.5rem;line-height:1.25;color:var(--dzc-text)}
+    .metric-sub{font-size:.78rem;color:var(--dzc-text-muted)}
+    .fleet-note{margin:var(--dzc-space-3) 0 0;font-size:.8rem;color:var(--dzc-text-faint);min-height:1em}
     .tile{display:flex;align-items:center;gap:var(--dzc-space-4);padding:var(--dzc-space-4) var(--dzc-space-5);background:var(--dzc-surface);border:1px solid var(--dzc-border);border-radius:var(--dzc-radius-lg);color:var(--dzc-text);text-decoration:none;box-shadow:var(--dzc-shadow-md);transition:transform .15s ease,border-color .15s ease,background .15s ease}
     .tile:hover{transform:translateY(-2px);border-color:var(--dzc-border-strong);background:var(--dzc-surface-raised)}
     .tile .icon{width:2.1rem;height:2.1rem;color:var(--dzc-accent-khaki);flex:none}
@@ -77,6 +86,33 @@
       </div>
     </main>
 
+    <section class="fleet" id="fleetStats" aria-label="Fleet status" aria-live="polite">
+      <h2 class="fleet-title">Fleet status</h2>
+      <div class="fleet-grid">
+        <div class="metric">
+          <span class="metric-label">Players</span>
+          <span class="metric-value" id="fleetPlayers">—</span>
+          <span class="metric-sub" id="fleetPlayersSub">registered &amp; unregistered</span>
+        </div>
+        <div class="metric">
+          <span class="metric-label">Servers</span>
+          <span class="metric-value" id="fleetServers">—</span>
+          <span class="metric-sub" id="fleetServersSub">managed</span>
+        </div>
+        <div class="metric">
+          <span class="metric-label">Discord guilds</span>
+          <span class="metric-value" id="fleetGuilds">—</span>
+          <span class="metric-sub" id="fleetGuildsSub">active</span>
+        </div>
+        <div class="metric">
+          <span class="metric-label">GitHub · SALT</span>
+          <span class="metric-value" id="fleetGithub">—</span>
+          <span class="metric-sub" id="fleetGithubSub">public release</span>
+        </div>
+      </div>
+      <p class="fleet-note" id="fleetStatsNote"></p>
+    </section>
+
     <nav class="tiles" aria-label="Primary links">
       <a class="tile" href="https://discord.gg/Tuv9MrVbfy" target="_blank" rel="noopener noreferrer">
         <svg class="icon" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M20.317 4.37a19.79 19.79 0 0 0-4.885-1.515.074.074 0 0 0-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.037A19.736 19.736 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.057a.082.082 0 0 0 .031.057 19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028c.462-.63.874-1.295 1.226-1.994a.076.076 0 0 0-.041-.106 13.107 13.107 0 0 1-1.872-.892.077.077 0 0 1-.008-.128c.126-.094.252-.192.372-.291a.074.074 0 0 1 .077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127 12.299 12.299 0 0 1-1.873.891.077.077 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.839 19.839 0 0 0 6.002-3.03.077.077 0 0 0 .032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.03zM8.02 15.33c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.956-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.956 2.418-2.157 2.418zm7.975 0c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.955-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.946 2.418-2.157 2.418z"/></svg>
@@ -108,6 +144,7 @@
     <footer class="foot">Guild ownership is verified on the server — this page never asks for guild or server identifiers.</footer>
   </div>
   <script src="/js/instance-config.js" defer></script>
+  <script src="/js/splash-fleet-stats.js" defer></script>
   <script src="/js/onboarding.js" integrity="sha384-iGbFBTDYNUD4m++6sH3RYWHWW6SQBNmkleVhBSisrtd1kJOotn35QkTZwNtOEWJW" crossorigin="anonymous"></script>
 </body>
 </html>

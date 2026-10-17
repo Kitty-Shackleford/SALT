@@ -173,6 +173,7 @@ function displayMap(value) {
   if (/livonia|enoch/i.test(map)) return 'Livonia';
   if (/namalsk/i.test(map)) return 'Namalsk';
   if (/sakhal/i.test(map)) return 'Sakhal';
+  if (/nasdara|badlands/i.test(map)) return 'Nasdara';
   return map.replace(/^dayzOffline\./i, '') || 'Unknown';
 }
 

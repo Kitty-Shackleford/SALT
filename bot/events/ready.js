@@ -8,6 +8,7 @@ const { startDigestLoop } = require('../services/digestService');
 const { startOpsAlertLoop } = require('../services/opsAlertService');
 const { startEventExpiryMonitor } = require('../utils/eventExpiry');
 const { startGuildOwnershipReconciliation } = require('../services/guildOwnershipReconciliationService');
+const { startGuildLeaveLoop } = require('../services/guildLeaveService');
 const { bootstrapConfiguredDashboardOwner } = require('../services/dashboardOwnerBootstrapService');
 
 module.exports = {
@@ -37,6 +38,9 @@ module.exports = {
     // queues their joined sign-ups). Started here, next to the health monitor.
     startEventExpiryMonitor();
     startGuildOwnershipReconciliation(client);
+    // Admin guild removals: leave the Discord guild for removed guilds
+    // (outbox table discord_guild_leave_jobs, enqueued by the backend).
+    startGuildLeaveLoop(client);
 
     // Start the server status update loop (polls Nitrado, updates Discord channels)
     startLoop(client);

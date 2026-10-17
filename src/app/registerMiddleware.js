@@ -147,7 +147,12 @@ function registerMiddleware(app, db, csrfProtection) {
       directives: {
         defaultSrc: ["'self'"],
         styleSrc: ["'self'", "'unsafe-inline'"],
-        scriptSrc: ["'self'", "https://cdn.jsdelivr.net"],
+        // 'wasm-unsafe-eval' (not 'unsafe-eval'): the DayZ Toolkit's PAA
+        // converter compiles a same-origin WebAssembly module in the browser
+        // (public/js/tools/paa-wasm-asset.js). This directive permits WASM
+        // compilation only — no JS eval/new Function — and connect-src stays
+        // 'self', so no new network exfil path is opened.
+        scriptSrc: ["'self'", "'wasm-unsafe-eval'", "https://cdn.jsdelivr.net"],
         scriptSrcAttr: ["'none'"],
         imgSrc: ["'self'", "data:", "https://cdn.discordapp.com", "https://avatars.githubusercontent.com"],
         connectSrc: ["'self'"],

@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>DayZ Toolkit — client-side tools</title>
+  <link rel="stylesheet" href="/css/theme.css">
+  <link rel="stylesheet" href="/css/tools.css">
+</head>
+<body class="tk-page">
+  <div class="tk-wrap" id="app">
+    <header class="tk-header">
+      <a class="tk-brand" href="/tools">DayZ Toolkit</a>
+      <span class="tk-local-badge">100% in your browser — no uploads, no network</span>
+    </header>
+    <h1 class="tk-title">DayZ Toolkit</h1>
+    <p class="tk-blurb">
+      Mission and config validators that run entirely on your computer. Files never leave your
+      machine — every check below happens in your browser tab, with hard size limits and
+      DayZ-specific structure rules (class names, roots, coordinates, map bounds).
+    </p>
+    <div class="tk-grid">
+      <a class="tk-tool-card" href="/tools/xml-validator">
+        <span class="tk-tool-tag">Validate</span>
+        <h3>XML Validator</h3>
+        <p>Well-formedness plus DayZ structure rules for types.xml, events, globals, spawnables, presets and more. Safe cleanup download.</p>
+      </a>
+      <a class="tk-tool-card" href="/tools/json-validator">
+        <span class="tk-tool-tag">Validate + Split</span>
+        <h3>JSON Validator &amp; Splitter</h3>
+        <p>Strict JSON parsing with error location, formatting report, pretty-print download — and split any top-level array by count or size.</p>
+      </a>
+      <a class="tk-tool-card" href="/tools/mission-validator">
+        <span class="tk-tool-tag">Validate</span>
+        <h3>Mission Validator (ZIP)</h3>
+        <p>Drop a mission .zip (or a folder of loose files): every XML/JSON/init.c is checked, the mission structure is verified, and coordinates are tested against map bounds.</p>
+      </a>
+      <a class="tk-tool-card" href="/tools/duplicate-checker">
+        <span class="tk-tool-tag">Audit</span>
+        <h3>Duplicate Classname Checker</h3>
+        <p>Find duplicated type/group/event names across your types.xml, cfgspawnabletypes.xml, mapgroupproto.xml and friends — the #1 mission merge breaker.</p>
+      </a>
+      <a class="tk-tool-card" href="/tools/event-conflicts">
+        <span class="tk-tool-tag">Audit</span>
+        <h3>Event Conflict Check</h3>
+        <p>Cross-checks cfgeventspawns.xml and cfgeventgroups.xml: shadowed names, invalid or out-of-bounds positions, and lootmin/lootmax inversions.</p>
+      </a>
+      <a class="tk-tool-card" href="/tools/paa-converter">
+        <span class="tk-tool-tag">Convert</span>
+        <h3>PAA ↔ PNG Map-Tile Converter</h3>
+        <p>Drop .paa tiles, a map .pbo (DayZ 1.30 uncompressed), or .png images — lint + preview per tile, convert to PNG and back (DXT1/DXT5 auto), zip download.</p>
+      </a>
+    </div>
+    <p class="tk-blurb" style="margin-top:28px">
+      Hosted-server operators: the authenticated Mission Doctor inside the dashboard validates
+      your live Nitrado mission files the same way. These public tools are for local work —
+      merging mods, authoring events, preparing a mission before you upload it.
+    </p>
+  </div>
+  <script src="/js/tools/toolkit-core.js"></script>
+  <script src="/js/tools/toolkit-dom.js"></script>
+</body>
+</html>

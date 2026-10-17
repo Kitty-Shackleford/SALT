@@ -52,6 +52,8 @@ const {
 } = require('../../utils/publicConfig');
 
 // Route modules
+const { getFleetStats } = require('../../services/fleetStatsService');
+const { getRepoMetrics } = require('../../services/githubRepoMetricsService');
 const missionFilesRoutes = require('../../routes/missionFiles');
 const missionInitRoutes = require('../../routes/missionInit');
 const validationRoutes = require('../../routes/validation');
@@ -314,6 +316,27 @@ function registerRoutes(app, csrfProtection) {
     res.json({ discordClientId: process.env.DISCORD_CLIENT_ID });
   });
 
+  // Public fleet metrics for the splash page. No auth: the landing page is
+  // anonymous, and the data is aggregate counts (no per-player detail).
+  // GitHub metrics are cached server-side >=1h; a GitHub failure returns the
+  // cached values (or an unavailable marker) — it never 500s the page.
+  app.get('/api/public/fleet-stats', onboardingLimiter, async (req, res) => {
+    try {
+      const db = req.app.locals.db;
+      const [fleet, github] = await Promise.all([
+        getFleetStats(db),
+        getRepoMetrics(db)
+      ]);
+      res.json({ success: true, fleet, github });
+    } catch (err) {
+      // DB failure → 503; the splash client degrades to dashes for whatever
+      // is missing. (GitHub failures never reach here — getRepoMetrics
+      // falls back to its cache internally.)
+      console.error('❌ Error fetching public fleet stats:', err);
+      res.status(503).json({ success: false, error: 'Fleet stats temporarily unavailable' });
+    }
+  });
+
   // User's approved guilds (filtered by role)
   app.get('/api/user/guilds', ensureAuthenticated, async (req, res) => {
     const db = req.app.locals.db;
@@ -458,7 +481,7 @@ function registerRoutes(app, csrfProtection) {
         return res.json({ success: false, error: 'No active mission found' });
       }
 
-      const mapMatch = mission.match(/\.(chernarusplus|enoch|sakhal|namalsk|takistanplus)/i);
+      const mapMatch = mission.match(/\.(chernarusplus|enoch|sakhal|namalsk|takistanplus|nasdara)/i);
       const mapName = mapMatch ? mapMatch[1].toLowerCase() : null;
 
       console.log(`✓ Active mission: ${mission}`);
@@ -496,7 +519,7 @@ function registerRoutes(app, csrfProtection) {
           for (const entry of fs.readdirSync(dir)) {
             const fullPath = path.join(dir, entry);
             if (fs.existsSync(fullPath) && fs.statSync(fullPath).isDirectory()) {
-              const mapMatch = entry.match(/\.(chernarusplus|enoch|sakhal|namalsk|takistanplus)/i);
+              const mapMatch = entry.match(/\.(chernarusplus|enoch|sakhal|namalsk|takistanplus|nasdara)/i);
               if (mapMatch) {
                 mapSet.add(mapMatch[1].toLowerCase());
                 console.log(`   ✓ Found map: ${mapMatch[1].toLowerCase()} (from ${entry})`);
@@ -1461,6 +1484,33 @@ function registerRoutes(app, csrfProtection) {
       crumbs: [{ label: 'Platform Admin', href: '/admin' }, { label: 'Economy Analytics', href: '/admin/economy-analytics' }],
       serverContext: { kind: 'guild', guildName },
     });
+  });
+
+  // -------------------------------------------------------------------------
+  // DayZ Toolkit — public, fully client-side tools.
+  // These pages run entirely in the user's browser: no auth, no server-side
+  // file processing, no upload endpoints. The render is a static pass-through.
+  // -------------------------------------------------------------------------
+  app.get('/tools', apiLimiter, (req, res) => {
+    renderWithCsrf(pub('tools', 'index.html'), req, res);
+  });
+  app.get('/tools/xml-validator', apiLimiter, (req, res) => {
+    renderWithCsrf(pub('tools', 'xml-validator.html'), req, res);
+  });
+  app.get('/tools/json-validator', apiLimiter, (req, res) => {
+    renderWithCsrf(pub('tools', 'json-validator.html'), req, res);
+  });
+  app.get('/tools/mission-validator', apiLimiter, (req, res) => {
+    renderWithCsrf(pub('tools', 'mission-validator.html'), req, res);
+  });
+  app.get('/tools/duplicate-checker', apiLimiter, (req, res) => {
+    renderWithCsrf(pub('tools', 'duplicate-checker.html'), req, res);
+  });
+  app.get('/tools/event-conflicts', apiLimiter, (req, res) => {
+    renderWithCsrf(pub('tools', 'event-conflicts.html'), req, res);
+  });
+  app.get('/tools/paa-converter', apiLimiter, (req, res) => {
+    renderWithCsrf(pub('tools', 'paa-converter.html'), req, res);
   });
 
   // Root

@@ -929,8 +929,24 @@ async function createSchemaV2(db) {
   await db.run('CREATE INDEX IF NOT EXISTS idx_player_server_activity_identity ON player_server_activity(identity_id)');
   await db.run('CREATE INDEX IF NOT EXISTS idx_player_server_activity_server ON player_server_activity(server_id)');
   
-  // Session indexes
-  await db.run('CREATE INDEX IF NOT EXISTS idx_sessions_expire ON sessions(expire)');
+  // Session indexes: the express-session store owns its `session` table
+  // (connect-pg-simple createTableIfMissing in registerMiddleware.js) — it is
+  // NOT part of the app schema, so on a bare database (db:smoke-test, CI test
+  // service) it does not exist yet. Guard instead of failing init. The old
+  // `sessions` (plural, expire BIGINT) table this used to index was dead
+  // weight (removed 2026-10-13, a81a3bf + 5d4b9754).
+  await db.run(`
+    DO $$
+    BEGIN
+      IF EXISTS (
+        SELECT 1 FROM pg_class c
+        JOIN pg_namespace n ON n.oid = c.relnamespace
+        WHERE n.nspname = 'public' AND c.relname = 'session'
+      ) THEN
+        CREATE INDEX IF NOT EXISTS idx_session_expire ON "session"(expire);
+      END IF;
+    END
+    $$`);
   await db.run('CREATE INDEX IF NOT EXISTS idx_player_sessions_identity ON player_sessions(identity_id)');
   await db.run('CREATE INDEX IF NOT EXISTS idx_player_sessions_server ON player_sessions(server_id)');
   await db.run('CREATE INDEX IF NOT EXISTS idx_player_sessions_login ON player_sessions(login_at DESC)');

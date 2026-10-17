@@ -50,7 +50,6 @@ const EXPECTED_TABLES = [
   'economy_transactions',
   'guild_economy_config',
   'linked_accounts',
-  'sessions',
   'automation_settings',
   'sync_jobs',
   'downloads',

@@ -88,6 +88,12 @@ async function main() {
   // Enoch center: image = 12800*(15392/12800)... worldSize 12800 -> image 15392; center -> 7696 -> tile 16.
   const tE = preview.tileForWorld('enoch', { east: 6400, north: 6400 });
   check('preview tile at enoch center -> tile 16/16', tE.tileX === 16 && tE.tileY === 16, JSON.stringify(tE));
+  // Nasdara: 46x46 bleed grid (480 advancement), worldSize 16350, image 22112.
+  // center east 8175 -> image px 8175*22112/16350 = 11056 -> tile 23 (file-y 45-23=22).
+  const tN = preview.tileForWorld('nasdara', { east: 8175, north: 8175 });
+  check('preview tile at nasdara center -> tile 23/23', tN.tileX === 23 && tN.tileY === 23, JSON.stringify(tN));
+  check('preview nasdara tile url uses flipped file-y (grid 46)', tN.tileUrl === '/maps/nasdara/tiles/23/22.png', tN.tileUrl);
+  check('preview nasdara in-tile offset is within the 512px tile', tN.px >= 0 && tN.px < 512 && tN.py >= 0 && tN.py < 512, JSON.stringify({ px: tN.px, py: tN.py }));
   check('preview rejects namalsk (no tiles)', preview.tileForWorld('namalsk', { east: 1, north: 1 }) === null);
   check('preview rejects bad coords', preview.tileForWorld('enoch', { east: 'x', north: 1 }) === null);
   const html = preview.previewHtml({ mapName: 'enoch', east: 6400, north: 6400, name: '<b>"spot"</b>' });

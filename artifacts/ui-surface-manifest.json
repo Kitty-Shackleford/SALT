@@ -786,6 +786,97 @@
         "ensureAuthenticated"
       ],
       "inheritedMiddleware": []
+    },
+    {
+      "method": "GET",
+      "path": "/tools",
+      "kind": "page",
+      "pageTargets": [
+        "public/tools/index.html"
+      ],
+      "redirectTargets": [],
+      "declaredMiddleware": [
+        "apiLimiter"
+      ],
+      "inheritedMiddleware": []
+    },
+    {
+      "method": "GET",
+      "path": "/tools/duplicate-checker",
+      "kind": "page",
+      "pageTargets": [
+        "public/tools/duplicate-checker.html"
+      ],
+      "redirectTargets": [],
+      "declaredMiddleware": [
+        "apiLimiter"
+      ],
+      "inheritedMiddleware": []
+    },
+    {
+      "method": "GET",
+      "path": "/tools/event-conflicts",
+      "kind": "page",
+      "pageTargets": [
+        "public/tools/event-conflicts.html"
+      ],
+      "redirectTargets": [],
+      "declaredMiddleware": [
+        "apiLimiter"
+      ],
+      "inheritedMiddleware": []
+    },
+    {
+      "method": "GET",
+      "path": "/tools/json-validator",
+      "kind": "page",
+      "pageTargets": [
+        "public/tools/json-validator.html"
+      ],
+      "redirectTargets": [],
+      "declaredMiddleware": [
+        "apiLimiter"
+      ],
+      "inheritedMiddleware": []
+    },
+    {
+      "method": "GET",
+      "path": "/tools/mission-validator",
+      "kind": "page",
+      "pageTargets": [
+        "public/tools/mission-validator.html"
+      ],
+      "redirectTargets": [],
+      "declaredMiddleware": [
+        "apiLimiter"
+      ],
+      "inheritedMiddleware": []
+    },
+    {
+      "method": "GET",
+      "path": "/tools/paa-converter",
+      "kind": "page",
+      "pageTargets": [
+        "public/tools/paa-converter.html"
+      ],
+      "redirectTargets": [],
+      "declaredMiddleware": [
+        "apiLimiter"
+      ],
+      "inheritedMiddleware": []
+    },
+    {
+      "method": "GET",
+      "path": "/tools/xml-validator",
+      "kind": "page",
+      "pageTargets": [
+        "public/tools/xml-validator.html"
+      ],
+      "redirectTargets": [],
+      "declaredMiddleware": [
+        "apiLimiter"
+      ],
+      "inheritedMiddleware": []
     }
   ],
   "pages": [
@@ -1306,7 +1397,88 @@
       ],
       "scripts": [
         "/js/instance-config.js",
+        "/js/splash-fleet-stats.js",
         "/js/onboarding.js"
+      ]
+    },
+    {
+      "file": "public/tools/duplicate-checker.html",
+      "routes": [
+        "/tools/duplicate-checker"
+      ],
+      "scripts": [
+        "/js/tools/toolkit-core.js",
+        "/js/tools/toolkit-dom.js",
+        "/js/tools/duplicate-checker.js"
+      ]
+    },
+    {
+      "file": "public/tools/event-conflicts.html",
+      "routes": [
+        "/tools/event-conflicts"
+      ],
+      "scripts": [
+        "/js/tools/toolkit-core.js",
+        "/js/tools/toolkit-dom.js",
+        "/js/tools/event-conflicts.js"
+      ]
+    },
+    {
+      "file": "public/tools/index.html",
+      "routes": [
+        "/tools"
+      ],
+      "scripts": [
+        "/js/tools/toolkit-core.js",
+        "/js/tools/toolkit-dom.js"
+      ]
+    },
+    {
+      "file": "public/tools/json-validator.html",
+      "routes": [
+        "/tools/json-validator"
+      ],
+      "scripts": [
+        "/js/tools/toolkit-core.js",
+        "/js/tools/toolkit-dom.js",
+        "/js/tools/json-validator.js"
+      ]
+    },
+    {
+      "file": "public/tools/mission-validator.html",
+      "routes": [
+        "/tools/mission-validator"
+      ],
+      "scripts": [
+        "/vendor/jszip/jszip.min.js",
+        "/js/tools/toolkit-core.js",
+        "/js/tools/toolkit-dom.js",
+        "/js/tools/mission-validator.js"
+      ]
+    },
+    {
+      "file": "public/tools/paa-converter.html",
+      "routes": [
+        "/tools/paa-converter"
+      ],
+      "scripts": [
+        "/vendor/jszip/jszip.min.js",
+        "/js/tools/toolkit-core.js",
+        "/js/tools/toolkit-dom.js",
+        "/js/tools/paa-format.js",
+        "/js/tools/paa-wasm-asset.js",
+        "/js/tools/paa-converter.js"
+      ]
+    },
+    {
+      "file": "public/tools/xml-validator.html",
+      "routes": [
+        "/tools/xml-validator"
+      ],
+      "scripts": [
+        "/js/tools/toolkit-core.js",
+        "/js/tools/toolkit-dom.js",
+        "/js/tools/xml-validator.js"
       ]
     }
   ],
@@ -2694,6 +2866,13 @@
       "script": "public/js/shop-admin.js",
       "transport": "fetch",
       "method": "GET",
+      "target": "/api/shop/admin/restarts/{dynamic}",
+      "targetKind": "template"
+    },
+    {
+      "script": "public/js/shop-admin.js",
+      "transport": "fetch",
+      "method": "GET",
       "target": "/api/shop/admin/stats/{dynamic}",
       "targetKind": "template"
     },
@@ -2787,6 +2966,13 @@
       "method": "POST",
       "target": "/api/spawn-exclusions/{dynamic}/refresh",
       "targetKind": "template"
+    },
+    {
+      "script": "public/js/splash-fleet-stats.js",
+      "transport": "fetch",
+      "method": "GET",
+      "target": "/api/public/fleet-stats",
+      "targetKind": "literal"
     },
     {
       "script": "public/js/supportHub.js",
