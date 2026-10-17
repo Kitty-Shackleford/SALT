@@ -159,7 +159,7 @@ jobs:
 
       - name: Setup SSH key
         if: steps.deploy-config.outputs.configured == 'true'
-        uses: webfactory/ssh-agent@v0.9.1
+        uses: webfactory/ssh-agent@v0.10.0
         with:
           ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
 
