@@ -27,7 +27,7 @@ jobs:
           node scripts/merry-changelog.js
 
       - name: Commit CHANGELOG.md if changed
-        uses: stefanzweifel/git-auto-commit-action@v4
+        uses: stefanzweifel/git-auto-commit-action@v7
         with:
           commit_message: "chore(merry): update CHANGELOG.md [skip ci]"
           file_pattern: CHANGELOG.md
