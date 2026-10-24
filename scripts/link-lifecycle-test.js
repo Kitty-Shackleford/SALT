@@ -117,6 +117,60 @@ async function main() {
   assert.ok(resilientJoinAdds.includes('resilient-join-role'),
     'assignOnJoin must still run when linked-role reconciliation remains retryable');
 
+  // A double-fired GuildMemberAdd (rejoin after a missed leave, or a
+  // duplicated event) must converge on the same role set and let only the
+  // newest job generation mark the durable job completed.
+  const doubleFireState = { id: 55, generation: 0, status: 'pending' };
+  let doubleFireCompletions = 0;
+  const doubleFireDb = {
+    async query(sql, params = []) {
+      if (/SELECT id FROM users/.test(sql)) return { rows: [{ id: 74 }] };
+      if (/INSERT INTO discord_role_reconciliation_jobs/.test(sql) && /RETURNING \*/.test(sql)) {
+        doubleFireState.generation += 1;
+        doubleFireState.status = 'pending';
+        return { rows: [{
+          id: doubleFireState.id,
+          discord_guild_id: 'guild-double',
+          discord_user_id: 'discord-double',
+          user_id: 74,
+          generation: doubleFireState.generation,
+        }] };
+      }
+      if (/SET status = 'completed'/.test(sql)) {
+        if (params[1] === doubleFireState.generation) {
+          doubleFireState.status = 'completed';
+          doubleFireCompletions += 1;
+        }
+        return { rows: [] };
+      }
+      if (/SELECT sf\.enabled/.test(sql)) return { rows: [] };
+      if (/SELECT sf\.config/.test(sql)) {
+        return { rows: [{ config: JSON.stringify({ roles: { assignOnJoin: ['double-join'] } }) }] };
+      }
+      return { rows: [] };
+    },
+  };
+  const doubleFireRoles = new Set();
+  const doubleFireMember = {
+    id: 'discord-double',
+    guild: { id: 'guild-double' },
+    roles: {
+      cache: new Map(),
+      async add(roleIds) { for (const roleId of roleIds) doubleFireRoles.add(roleId); },
+      async remove(roleIds) { for (const roleId of roleIds) doubleFireRoles.delete(roleId); },
+    },
+  };
+  await Promise.all([
+    guildMemberAddEvent.execute(doubleFireMember, doubleFireDb),
+    guildMemberAddEvent.execute(doubleFireMember, doubleFireDb),
+  ]);
+  assert.strictEqual(doubleFireCompletions, 1,
+    'a double-fired join must let exactly one (the newest) generation complete the durable role job');
+  assert.strictEqual(doubleFireState.status, 'completed',
+    'a double-fired join must not strand the durable role job as pending');
+  assert.deepStrictEqual([...doubleFireRoles].sort(), ['double-join'],
+    'repeated join events must converge on the role set instead of stacking roles');
+
   const disabledSettings = await getLinkSettings({
     async query() {
       return {
